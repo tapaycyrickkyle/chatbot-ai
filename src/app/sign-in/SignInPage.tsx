@@ -66,7 +66,7 @@ const SignInPage = () => {
       <section className="relative flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-[420px] animate-[contentRise_650ms_cubic-bezier(0.22,1,0.36,1)]">
           <div className="mb-6 text-center animate-[slideUpSoft_520ms_cubic-bezier(0.22,1,0.36,1)]">
-            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#3ECF8E] bg-[#1d1d1d] shadow-[0_0_0_1px_rgba(62,207,142,0.08),0_20px_48px_rgba(0,0,0,0.28)]">
+            <div className="mx-auto mb-3 flex h-11 w-11 animate-[floatSoft_6s_ease-in-out_infinite] items-center justify-center rounded-xl border border-[#3ECF8E] bg-[#1d1d1d] shadow-[0_0_0_1px_rgba(62,207,142,0.08),0_20px_48px_rgba(0,0,0,0.28)]">
               <svg
                 aria-hidden="true"
                 className="h-5 w-5 text-[#3ECF8E]"
@@ -239,4 +239,3 @@ const SignInPage = () => {
 };
 
 export default SignInPage;
-

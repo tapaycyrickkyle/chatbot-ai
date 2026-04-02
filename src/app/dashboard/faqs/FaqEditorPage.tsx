@@ -258,7 +258,7 @@ const FaqEditorPage = () => {
                 <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
                   {editingFaqId ? "Update FAQ" : "Create New FAQ"}
                 </p>
-                <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-bright)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-bright)] animate-pulse" />
               </div>
 
               <div className="mt-6 space-y-5">
@@ -342,7 +342,7 @@ const FaqEditorPage = () => {
                   Library Health
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-8 rounded-full bg-[var(--accent-bright)]" />
+                  <span className="h-1.5 w-8 rounded-full bg-[var(--accent-bright)] animate-pulse" />
                   <span className="h-1.5 w-6 rounded-full bg-[#35b777]" />
                   <span className="h-1.5 w-5 rounded-full bg-[var(--border-input)]" />
                 </div>
@@ -499,7 +499,7 @@ const FaqEditorPage = () => {
                       </div>
 
                       <div className="flex h-[92px] w-full shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.22),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] sm:w-[112px]">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)] animate-[floatSoft_5.4s_ease-in-out_infinite]">
                           {isRemoving ? "Deleting" : "FAQ"}
                         </span>
                       </div>
@@ -516,4 +516,3 @@ const FaqEditorPage = () => {
 };
 
 export default FaqEditorPage;
-

@@ -184,7 +184,7 @@ const DashboardPage = () => {
       {successMessage ? (
         <div className="fixed right-5 top-5 z-[60] animate-[fadeIn_180ms_ease-out]">
           <div className="interactive-pop flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)] animate-[floatSoft_4.5s_ease-in-out_infinite]">
               <svg
                 aria-hidden="true"
                 className="h-4 w-4"
@@ -258,7 +258,7 @@ const DashboardPage = () => {
                       <h3 className="text-[1.15rem] font-bold tracking-[-0.03em]">
                         {client.client_name}
                       </h3>
-                      <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
+                      <span className="h-2 w-2 rounded-full bg-[#4ce2a2] animate-pulse" />
                     </div>
                     <p className="mt-1.5 text-[13px] text-[var(--text-subtle)]">
                       Page ID: {client.page_id}
@@ -332,7 +332,7 @@ const DashboardPage = () => {
                     }}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] text-[15px] font-bold text-[var(--accent-bright)]">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] text-[15px] font-bold text-[var(--accent-bright)] animate-[floatSoft_5.5s_ease-in-out_infinite]">
                         {page.name
                           .split(" ")
                           .map((part) => part[0])
@@ -370,4 +370,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-
