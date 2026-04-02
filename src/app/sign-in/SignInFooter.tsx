@@ -22,7 +22,7 @@ const SignInFooter = () => {
         </a>
       </div>
       <div className="text-[13px] text-[#a1a1aa]">
-        © 2026 Chatbot AI. All rights reserved.
+        (c) 2026 Chatbot AI. All rights reserved.
       </div>
     </footer>
   );

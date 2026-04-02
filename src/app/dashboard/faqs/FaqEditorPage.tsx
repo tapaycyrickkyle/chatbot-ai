@@ -48,6 +48,18 @@ const FaqEditorPage = () => {
   const [removingFaqId, setRemovingFaqId] = useState<string | null>(null);
   const [animatedFaqId, setAnimatedFaqId] = useState<string | null>(null);
   const [animatedFaqTone, setAnimatedFaqTone] = useState<"created" | "updated" | null>(null);
+  const faqQuery = (searchParams?.get("q") ?? "").trim().toLowerCase();
+  const filteredFaqEntries = faqEntries.filter((entry) => {
+    if (!faqQuery) {
+      return true;
+    }
+
+    return (
+      entry.answer.toLowerCase().includes(faqQuery) ||
+      (entry.image_attachment_id ?? "").toLowerCase().includes(faqQuery) ||
+      entry.keywords.some((keyword) => keyword.toLowerCase().includes(faqQuery))
+    );
+  });
 
   useEffect(() => {
     const loadFaqs = async () => {
@@ -358,7 +370,7 @@ const FaqEditorPage = () => {
                 </p>
                 <p className="mt-1 text-[13px] text-[var(--text-muted)]">
                   {clientId
-                    ? `${faqEntries.length} entries ready for automation.`
+                    ? `${filteredFaqEntries.length} ${filteredFaqEntries.length === 1 ? "entry" : "entries"} ready for automation.`
                     : "Select a client from the dashboard to manage FAQs."}
                 </p>
               </div>
@@ -403,7 +415,15 @@ const FaqEditorPage = () => {
                 </article>
               ) : null}
 
-              {faqEntries.map((entry, index) => {
+              {!isLoadingFaqs && clientId && faqEntries.length > 0 && filteredFaqEntries.length === 0 ? (
+                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+                  <p className="text-[14px] text-[var(--text-muted)]">
+                    No FAQ entries match your current search.
+                  </p>
+                </article>
+              ) : null}
+
+              {filteredFaqEntries.map((entry, index) => {
                 const isRemoving = removingFaqId === entry.id;
                 const isAnimated = animatedFaqId === entry.id;
                 const animationClass = isRemoving
@@ -423,85 +443,77 @@ const FaqEditorPage = () => {
                         : ""
                     } ${index > 0 ? "[animation-delay:40ms]" : ""}`}
                   >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {entry.keywords.map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-label)]"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-
-                        <h3 className="mt-4 text-[1.25rem] font-bold tracking-[-0.03em]">
-                          {entry.keywords[0] || "FAQ Entry"}
-                        </h3>
-                        <p className="mt-3 max-w-[740px] text-[14px] leading-6 text-[var(--text-label)]">
-                          {entry.answer}
-                        </p>
-
-                        <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
-                          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                            {entry.image_attachment_id
-                              ? `Image ID: ${entry.image_attachment_id}`
-                              : "Text only response"}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entry.keywords.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-label)]"
+                          >
+                            {tag}
                           </span>
-                          <div className="flex items-center gap-3 text-[var(--text-muted)]">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(entry)}
-                              disabled={isRemoving}
-                              className="rounded-lg border-none p-0 transition-colors hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label="Edit FAQ entry"
-                            >
-                              <svg
-                                aria-hidden="true"
-                                className="h-4.5 w-4.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M16.86 3.49a2.12 2.12 0 1 1 3 3L8.44 17.9 4 19l1.1-4.44L16.86 3.5Z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(entry.id)}
-                              disabled={!!removingFaqId}
-                              className="rounded-lg border-none p-0 transition-colors hover:text-[#f7abab] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label="Delete FAQ entry"
-                            >
-                              <svg
-                                aria-hidden="true"
-                                className="h-4.5 w-4.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M4 7h16m-10 4v6m4-6v6M6 7l1 12a1 1 0 0 0 1 .92h8a1 1 0 0 0 1-.92L18 7M9 7V4.75A.75.75 0 0 1 9.75 4h4.5a.75.75 0 0 1 .75.75V7"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
+                        ))}
                       </div>
 
-                      <div className="flex h-[92px] w-full shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.22),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] sm:w-[112px]">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
-                          {isRemoving ? "Deleting" : "FAQ"}
+                      <h3 className="mt-4 text-[1.25rem] font-bold tracking-[-0.03em]">
+                        {entry.keywords[0] || "FAQ Entry"}
+                      </h3>
+                      <p className="mt-3 max-w-[740px] text-[14px] leading-6 text-[var(--text-label)]">
+                        {entry.answer}
+                      </p>
+
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          {entry.image_attachment_id
+                            ? `Image ID: ${entry.image_attachment_id}`
+                            : "Text only response"}
                         </span>
+                        <div className="flex items-center gap-3 text-[var(--text-muted)]">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(entry)}
+                            disabled={isRemoving}
+                            className="rounded-lg border-none p-0 transition-colors hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Edit FAQ entry"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              className="h-4.5 w-4.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M16.86 3.49a2.12 2.12 0 1 1 3 3L8.44 17.9 4 19l1.1-4.44L16.86 3.5Z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(entry.id)}
+                            disabled={!!removingFaqId}
+                            className="rounded-lg border-none p-0 transition-colors hover:text-[#f7abab] disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label="Delete FAQ entry"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              className="h-4.5 w-4.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4 7h16m-10 4v6m4-6v6M6 7l1 12a1 1 0 0 0 1 .92h8a1 1 0 0 0 1-.92L18 7M9 7V4.75A.75.75 0 0 1 9.75 4h4.5a.75.75 0 0 1 .75.75V7"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -516,3 +528,6 @@ const FaqEditorPage = () => {
 };
 
 export default FaqEditorPage;
+
+
+

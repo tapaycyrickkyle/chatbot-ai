@@ -161,6 +161,17 @@ const DashboardPage = () => {
     }
   };
 
+  const clientQuery = (searchParams?.get("q") ?? "").trim().toLowerCase();
+  const filteredClients = clients.filter((client) => {
+    if (!clientQuery) {
+      return true;
+    }
+
+    return [client.client_name, client.page_id].some((value) =>
+      value.toLowerCase().includes(clientQuery)
+    );
+  });
+
   const formatClientTime = (createdAt: string) => {
     if (!createdAt) {
       return "Recently added";
@@ -221,7 +232,7 @@ const DashboardPage = () => {
 
             <Link
               href="/api/auth/facebook/login"
-              className="self-start rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+              className="self-start rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] shadow-[0_8px_22px_rgba(0,0,0,0.16)]"
             >
               + Connect New Page
             </Link>
@@ -229,7 +240,7 @@ const DashboardPage = () => {
 
           <div className="space-y-3.5">
             {isLoadingClients ? (
-              <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
                   Loading connected clients...
                 </p>
@@ -237,17 +248,25 @@ const DashboardPage = () => {
             ) : null}
 
             {!isLoadingClients && clients.length === 0 ? (
-              <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
                   No clients found yet. Connect a new page to get started.
                 </p>
               </article>
             ) : null}
 
-            {clients.map((client) => (
+            {!isLoadingClients && clients.length > 0 && filteredClients.length === 0 ? (
+              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+                <p className="text-[14px] text-[var(--text-muted)]">
+                  No clients match your current search.
+                </p>
+              </article>
+            ) : null}
+
+            {filteredClients.map((client) => (
               <article
                 key={client.id}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
+                className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1">
@@ -289,7 +308,7 @@ const DashboardPage = () => {
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-7 py-6">
-              <h3 className="text-[1.75rem] font-extrabold tracking-[-0.04em]">
+              <h3 className="text-[1.35rem] font-extrabold tracking-[-0.03em] sm:text-[1.5rem]">
                 Connect a New Facebook Page
               </h3>
               <button
@@ -366,3 +385,6 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
+
+
+
