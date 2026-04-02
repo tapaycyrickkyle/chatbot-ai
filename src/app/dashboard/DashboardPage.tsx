@@ -249,8 +249,8 @@ const DashboardPage = () => {
                 key={client.id}
                 className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
               >
-                <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_150px_140px] lg:items-center">
-                  <div>
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5">
                       <h3 className="text-[1.15rem] font-bold tracking-[-0.03em]">
                         {client.client_name}
@@ -262,21 +262,23 @@ const DashboardPage = () => {
                     </p>
                   </div>
 
-                  <div>
-                    <p className="text-[11px] font-bold tracking-[0.18em] text-[var(--text-muted)] uppercase">
-                      Added
-                    </p>
-                    <p className="mt-1.5 text-[14px] text-[var(--text-primary)]">
-                      {formatClientTime(client.created_at)}
-                    </p>
-                  </div>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
+                    <div className="min-w-[120px]">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                        Added
+                      </p>
+                      <p className="mt-1.5 text-[14px] text-[var(--text-primary)]">
+                        {formatClientTime(client.created_at)}
+                      </p>
+                    </div>
 
-                  <Link
-                    href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
-                    className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-                  >
-                    Edit FAQs
-                  </Link>
+                    <Link
+                      href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
+                      className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                    >
+                      Edit FAQs
+                    </Link>
+                  </div>
                 </div>
               </article>
             ))}
