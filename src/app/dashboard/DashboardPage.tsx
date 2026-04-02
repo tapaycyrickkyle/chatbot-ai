@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import DashboardShell from "./_components/DashboardShell";
 
@@ -18,7 +18,6 @@ type FacebookPage = {
 };
 
 const DashboardPage = () => {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
@@ -64,7 +63,7 @@ const DashboardPage = () => {
       .find((row) => row.startsWith("fb_pages="));
 
     if (!cookieValue) {
-      router.replace("/dashboard");
+      window.history.replaceState({}, "", "/dashboard");
       return;
     }
 
@@ -73,14 +72,16 @@ const DashboardPage = () => {
         decodeURIComponent(cookieValue.split("=")[1])
       ) as FacebookPage[];
 
-      setPages(Array.isArray(parsedPages) ? parsedPages : []);
-      setShowModal(true);
+      if (Array.isArray(parsedPages) && parsedPages.length > 0) {
+        setPages(parsedPages);
+        setShowModal(true);
+      }
     } catch (error) {
       console.error(error);
     } finally {
-      router.replace("/dashboard");
+      window.history.replaceState({}, "", "/dashboard");
     }
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   const clearFacebookPagesCookie = () => {
     document.cookie = "fb_pages=; Max-Age=0; path=/; SameSite=Lax";
