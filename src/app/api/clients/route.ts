@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
 
     const body = await req.json();
+    const existingClients = await getClients();
 
     if (
       typeof body?.facebook_page_id === "string" &&
@@ -73,11 +74,41 @@ export async function POST(req: NextRequest) {
         page_access_token: matchedPage.access_token,
       });
 
+      if (existingClients.some((client) => client.page_id === validatedPayload.page_id)) {
+        return NextResponse.json({ error: "Client already connected" }, { status: 409 });
+      }
+
       await addClient(validatedPayload);
+
+      const subscribeResponse = await fetch(
+        `https://graph.facebook.com/v20.0/${validatedPayload.page_id}/subscribed_apps`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            access_token: matchedPage.access_token,
+            subscribed_fields: ["messages", "messaging_postbacks"],
+          }),
+        }
+      );
+
+      if (!subscribeResponse.ok) {
+        console.warn("Webhook subscription failed after saving client", {
+          pageId: validatedPayload.page_id,
+        });
+      }
+
       return NextResponse.json({ success: true });
     }
 
     const { client_name, page_id, page_access_token } = validateClientPayload(body);
+
+    if (existingClients.some((client) => client.page_id === page_id)) {
+      return NextResponse.json({ error: "Client already connected" }, { status: 409 });
+    }
+
     await addClient({ client_name, page_id, page_access_token });
     return NextResponse.json({ success: true });
   } catch (error) {

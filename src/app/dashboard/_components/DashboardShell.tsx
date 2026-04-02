@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import DashboardIcon from "./DashboardIcons";
+import SidebarLogoutButton from "./SidebarLogoutButton";
 
 const navigationItems = [
   { label: "Clients", href: "/dashboard", icon: "clients" as const },
@@ -54,7 +55,9 @@ const DashboardShell = ({
           </ul>
         </nav>
 
-        <div className="mt-auto px-4 py-6" />
+        <div className="mt-auto px-4 py-6">
+          <SidebarLogoutButton />
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

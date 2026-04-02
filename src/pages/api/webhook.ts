@@ -1,5 +1,23 @@
-﻿import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getSheet } from "@/lib/sheets";
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+type WebhookBody = {
+  object?: string;
+  entry?: Array<{
+    id: string;
+    messaging?: Array<{
+      sender: { id: string };
+      message?: { text?: string };
+    }>;
+  }>;
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,10 +36,17 @@ export default async function handler(
   }
 
   if (req.method === "POST") {
-    const body = req.body;
+    const rawBody = await readRawBody(req);
+    const signature = req.headers["x-hub-signature-256"];
+
+    if (!isValidWebhookSignature(rawBody, signature)) {
+      return res.status(403).json({ error: "Invalid signature" });
+    }
+
+    const body = JSON.parse(rawBody) as WebhookBody;
 
     if (body.object === "page") {
-      for (const entry of body.entry) {
+      for (const entry of body.entry ?? []) {
         const pageId = entry.id;
         const clientsSheet = await getSheet("clients");
         const rows = await clientsSheet.getRows();
@@ -47,7 +72,7 @@ export default async function handler(
             imageAttachmentId: row.get("image_attachment_id"),
           }));
 
-        for (const event of entry.messaging) {
+        for (const event of entry.messaging ?? []) {
           if (event.message?.text) {
             const userId = event.sender.id;
             const userMessage = event.message.text.toLowerCase();
@@ -128,4 +153,36 @@ async function sendImageMessage(
       },
     }),
   });
+}
+
+async function readRawBody(req: NextApiRequest) {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function isValidWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | string[] | undefined
+) {
+  const secret = process.env.FACEBOOK_APP_SECRET;
+
+  if (!secret || typeof signatureHeader !== "string") {
+    return false;
+  }
+
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const actual = signatureHeader.replace(/^sha256=/, "");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const actualBuffer = Buffer.from(actual, "hex");
+
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, actualBuffer);
 }

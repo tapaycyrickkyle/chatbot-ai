@@ -93,7 +93,7 @@ const DashboardPage = () => {
     clearFacebookPagesCookie();
   };
 
-  const handleConnectPage = async (page: FacebookPage) => {
+  const connectPage = async (page: FacebookPage) => {
     setIsConnectingPageId(page.id);
 
     try {
@@ -109,13 +109,32 @@ const DashboardPage = () => {
       });
 
       if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+
+        if (data?.error === "Missing Facebook session") {
+          window.alert("Session expired. Please reconnect your Facebook account.");
+          window.location.href = "/api/auth/facebook/login";
+          return;
+        }
+
+        if (data?.error === "Client already connected") {
+          window.alert("This page is already connected.");
+          await loadClients();
+          closeModal();
+          return;
+        }
+
         throw new Error("Failed to save connected page");
       }
 
       await loadClients();
       closeModal();
+      window.alert("Page connected and webhook subscribed!");
     } catch (error) {
       console.error(error);
+      window.alert("Failed to connect page. See console.");
       setIsConnectingPageId(null);
     }
   };
@@ -280,7 +299,7 @@ const DashboardPage = () => {
 
                     <button
                       type="button"
-                      onClick={() => void handleConnectPage(page)}
+                      onClick={() => void connectPage(page)}
                       disabled={isConnectingPageId === page.id}
                       className="rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                     >
