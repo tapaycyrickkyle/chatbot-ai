@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addClient, getClients } from "@/lib/sheets";
+import { addClient, deleteClientByPageId, getClients } from "@/lib/sheets";
 import { assertSameOrigin, validateClientPayload } from "@/lib/api-security";
 import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
 
@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
       const pagesData = await pagesResponse.json();
       const matchedPage = Array.isArray(pagesData.data)
         ? pagesData.data.find(
-            (page: { id?: string; access_token?: string }) => page.id === body.facebook_page_id
+            (page: { id?: string; access_token?: string }) =>
+              page.id === body.facebook_page_id
           )
         : null;
 
@@ -95,9 +96,20 @@ export async function POST(req: NextRequest) {
       );
 
       if (!subscribeResponse.ok) {
-        console.warn("Webhook subscription failed after saving client", {
-          pageId: validatedPayload.page_id,
-        });
+        const subscribeData = (await subscribeResponse.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+
+        await deleteClientByPageId(validatedPayload.page_id);
+
+        return NextResponse.json(
+          {
+            error:
+              subscribeData?.error?.message ??
+              "Webhook subscription failed for this page",
+          },
+          { status: 400 }
+        );
       }
 
       return NextResponse.json({ success: true });

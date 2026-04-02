@@ -2,7 +2,6 @@ import "server-only";
 import { JWT } from "google-auth-library";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 
-// --- Helper to get the spreadsheet document ---
 async function getDoc() {
   const auth = new JWT({
     email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL!,
@@ -15,13 +14,11 @@ async function getDoc() {
   return doc;
 }
 
-// --- Get a specific sheet by title ---
 export async function getSheet(sheetTitle: string) {
   const doc = await getDoc();
   return doc.sheetsByTitle[sheetTitle];
 }
 
-// --- Client operations ---
 export async function getClients() {
   const sheet = await getSheet("clients");
   const rows = await sheet.getRows();
@@ -55,7 +52,16 @@ export async function addClient(clientData: {
   return newId;
 }
 
-// --- FAQ operations ---
+export async function deleteClientByPageId(pageId: string) {
+  const sheet = await getSheet("clients");
+  const rows = await sheet.getRows();
+  const row = rows.find((currentRow) => currentRow.get("page_id") === pageId);
+
+  if (row) {
+    await row.delete();
+  }
+}
+
 export async function getFaqsForClient(clientId: string) {
   const sheet = await getSheet("faqs");
   const rows = await sheet.getRows();

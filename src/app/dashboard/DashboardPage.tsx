@@ -24,6 +24,7 @@ const DashboardPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [isConnectingPageId, setIsConnectingPageId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadClients = async () => {
     try {
@@ -46,6 +47,20 @@ const DashboardPage = () => {
   useEffect(() => {
     void loadClients();
   }, []);
+
+  useEffect(() => {
+    if (!successMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSuccessMessage(null);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [successMessage]);
 
   useEffect(() => {
     const fbConnectedFromQuery = searchParams?.get("fb_connected") === "true";
@@ -129,15 +144,19 @@ const DashboardPage = () => {
           return;
         }
 
-        throw new Error("Failed to save connected page");
+        throw new Error(data?.error ?? "Failed to connect page");
       }
 
       await loadClients();
       closeModal();
-      window.alert("Page connected and webhook subscribed!");
+      setSuccessMessage("Page connected successfully.");
     } catch (error) {
       console.error(error);
-      window.alert("Failed to connect page. See console.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to connect page. See console.";
+      window.alert(message);
       setIsConnectingPageId(null);
     }
   };
@@ -162,6 +181,31 @@ const DashboardPage = () => {
 
   return (
     <>
+      {successMessage ? (
+        <div className="fixed right-5 top-5 z-[60] animate-[fadeIn_180ms_ease-out]">
+          <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m5 13 4 4L19 7"
+                />
+              </svg>
+            </span>
+            <p className="text-[13px] font-medium text-[var(--text-primary)]">
+              {successMessage}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <DashboardShell activeNav="Clients" searchPlaceholder="Search clients...">
         <div className="flex flex-col gap-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
