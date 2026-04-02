@@ -17,12 +17,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const pagesUrl = new URL("https://graph.facebook.com/v20.0/me/accounts");
-    pagesUrl.search = new URLSearchParams({
-      access_token: userToken,
-    }).toString();
-
-    const pagesResponse = await fetch(pagesUrl.toString());
+    const pagesResponse = await fetch("https://graph.facebook.com/v20.0/me/accounts", {
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
     const pagesData = (await pagesResponse.json()) as {
       data?: Array<{ id?: string; name?: string }>;
       error?: unknown;

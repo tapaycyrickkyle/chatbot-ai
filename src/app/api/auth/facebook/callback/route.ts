@@ -1,21 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  ADMIN_ACCESS_TOKEN_COOKIE,
   FACEBOOK_OAUTH_STATE_COOKIE,
   isValidFacebookOAuthState,
+  verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 
-export async function GET(req: NextRequest) {
-  const clearStateCookie = (response: NextResponse) => {
-    response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 0,
-      path: "/",
-    });
+function clearTransientCookies(response: NextResponse) {
+  response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
+}
+
+async function exchangeFacebookToken(
+  params: Record<string, string>
+) {
+  const response = await fetch("https://graph.facebook.com/v20.0/oauth/access_token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(params).toString(),
+  });
+
+  const data = (await response.json()) as {
+    access_token?: string;
+    error?: unknown;
   };
 
+  return { response, data };
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const session = await verifyAdminAccessToken(
+      req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
+    );
+
+    if (!session) {
+      const response = NextResponse.redirect(new URL("/sign-in", req.url));
+      clearTransientCookies(response);
+      return response;
+    }
+
     const { searchParams } = new URL(req.url);
     const code = searchParams.get("code");
     const state = searchParams.get("state");
@@ -25,7 +56,7 @@ export async function GET(req: NextRequest) {
       const response = NextResponse.redirect(
         new URL("/dashboard?error=no_code", req.url)
       );
-      clearStateCookie(response);
+      clearTransientCookies(response);
       return response;
     }
 
@@ -33,7 +64,7 @@ export async function GET(req: NextRequest) {
       const response = NextResponse.redirect(
         new URL("/dashboard?error=invalid_state", req.url)
       );
-      clearStateCookie(response);
+      clearTransientCookies(response);
       return response;
     }
 
@@ -45,62 +76,43 @@ export async function GET(req: NextRequest) {
       throw new Error("Missing Facebook environment variables");
     }
 
-    const shortLivedTokenUrl = new URL(
-      "https://graph.facebook.com/v20.0/oauth/access_token"
-    );
-    shortLivedTokenUrl.search = new URLSearchParams({
+    const shortLived = await exchangeFacebookToken({
       client_id: appId,
       client_secret: appSecret,
       redirect_uri: redirectUri,
       code,
-    }).toString();
+    });
 
-    const tokenResponse = await fetch(shortLivedTokenUrl.toString());
-    const tokenData = (await tokenResponse.json()) as {
-      access_token?: string;
-      error?: unknown;
-    };
-
-    if (!tokenResponse.ok || !tokenData.access_token) {
-      console.error("Facebook short-lived token exchange failed", tokenData);
+    if (!shortLived.response.ok || !shortLived.data.access_token) {
+      console.error("Facebook short-lived token exchange failed", shortLived.data);
       const response = NextResponse.redirect(
         new URL("/dashboard?error=token_failed", req.url)
       );
-      clearStateCookie(response);
+      clearTransientCookies(response);
       return response;
     }
 
-    const longLivedTokenUrl = new URL(
-      "https://graph.facebook.com/v20.0/oauth/access_token"
-    );
-    longLivedTokenUrl.search = new URLSearchParams({
+    const longLived = await exchangeFacebookToken({
       grant_type: "fb_exchange_token",
       client_id: appId,
       client_secret: appSecret,
-      fb_exchange_token: tokenData.access_token,
-    }).toString();
+      fb_exchange_token: shortLived.data.access_token,
+    });
 
-    const longLivedTokenResponse = await fetch(longLivedTokenUrl.toString());
-    const longLivedData = (await longLivedTokenResponse.json()) as {
-      access_token?: string;
-      error?: unknown;
-    };
-
-    if (!longLivedTokenResponse.ok || !longLivedData.access_token) {
-      console.error("Facebook long-lived token exchange failed", longLivedData);
+    if (!longLived.response.ok || !longLived.data.access_token) {
+      console.error("Facebook long-lived token exchange failed", longLived.data);
       const response = NextResponse.redirect(
         new URL("/dashboard?error=long_lived_token_failed", req.url)
       );
-      clearStateCookie(response);
+      clearTransientCookies(response);
       return response;
     }
 
-    const pagesUrl = new URL("https://graph.facebook.com/v20.0/me/accounts");
-    pagesUrl.search = new URLSearchParams({
-      access_token: longLivedData.access_token,
-    }).toString();
-
-    const pagesResponse = await fetch(pagesUrl.toString());
+    const pagesResponse = await fetch("https://graph.facebook.com/v20.0/me/accounts", {
+      headers: {
+        Authorization: `Bearer ${longLived.data.access_token}`,
+      },
+    });
     const pagesData = (await pagesResponse.json()) as {
       data?: Array<{ id?: string; name?: string }>;
       error?: unknown;
@@ -111,7 +123,7 @@ export async function GET(req: NextRequest) {
       const response = NextResponse.redirect(
         new URL("/dashboard?error=pages_failed", req.url)
       );
-      clearStateCookie(response);
+      clearTransientCookies(response);
       return response;
     }
 
@@ -126,7 +138,7 @@ export async function GET(req: NextRequest) {
       new URL("/dashboard?fb_connected=true", req.url)
     );
 
-    response.cookies.set("fb_user_token", longLivedData.access_token, {
+    response.cookies.set("fb_user_token", longLived.data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 60,
@@ -151,7 +163,7 @@ export async function GET(req: NextRequest) {
       path: "/",
       sameSite: "lax",
     });
-    clearStateCookie(response);
+    clearTransientCookies(response);
 
     return response;
   } catch (error) {
@@ -159,7 +171,7 @@ export async function GET(req: NextRequest) {
     const response = NextResponse.redirect(
       new URL("/dashboard?error=callback_failed", req.url)
     );
-    clearStateCookie(response);
+    clearTransientCookies(response);
     return response;
   }
 }

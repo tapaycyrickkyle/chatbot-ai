@@ -11,12 +11,6 @@ const KEYWORD_MAX_LENGTH = 80;
 const MAX_KEYWORDS = 20;
 
 export function assertSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-
-  if (!origin) {
-    return;
-  }
-
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   const protocol = request.headers.get("x-forwarded-proto") ?? "http";
 
@@ -25,8 +19,27 @@ export function assertSameOrigin(request: NextRequest) {
   }
 
   const expectedOrigin = `${protocol}://${host}`;
+  const origin = request.headers.get("origin");
 
-  if (origin !== expectedOrigin) {
+  if (origin) {
+    if (origin !== expectedOrigin) {
+      throw new Error("Cross-origin request blocked");
+    }
+
+    return;
+  }
+
+  const referer = request.headers.get("referer");
+
+  if (!referer) {
+    throw new Error("Cross-origin request blocked");
+  }
+
+  try {
+    if (new URL(referer).origin !== expectedOrigin) {
+      throw new Error("Cross-origin request blocked");
+    }
+  } catch {
     throw new Error("Cross-origin request blocked");
   }
 }
@@ -169,4 +182,3 @@ export function sanitizeIdentifier(value: string, fieldName: string) {
 
   return sanitized;
 }
-

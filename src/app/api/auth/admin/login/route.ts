@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_ACCESS_TOKEN_COOKIE,
+  hasConfiguredAdminEmails,
   verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
@@ -8,6 +9,13 @@ import { assertSameOrigin } from "@/lib/api-security";
 export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
+
+    if (!hasConfiguredAdminEmails()) {
+      return NextResponse.json(
+        { error: "Missing admin allowlist configuration" },
+        { status: 500 }
+      );
+    }
 
     const body = await req.json();
     const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";

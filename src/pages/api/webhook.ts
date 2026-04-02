@@ -8,6 +8,8 @@ export const config = {
   },
 };
 
+const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
+
 type WebhookBody = {
   object?: string;
   entry?: Array<{
@@ -36,14 +38,33 @@ export default async function handler(
   }
 
   if (req.method === "POST") {
-    const rawBody = await readRawBody(req);
+    let rawBody = "";
+
+    try {
+      rawBody = await readRawBody(req);
+    } catch (error) {
+      if (error instanceof Error && error.message === "Webhook body too large") {
+        return res.status(413).json({ error: "Payload too large" });
+      }
+
+      console.error("Failed to read webhook body", error);
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+
     const signature = req.headers["x-hub-signature-256"];
 
     if (!isValidWebhookSignature(rawBody, signature)) {
       return res.status(403).json({ error: "Invalid signature" });
     }
 
-    const body = JSON.parse(rawBody) as WebhookBody;
+    let body: WebhookBody;
+
+    try {
+      body = JSON.parse(rawBody) as WebhookBody;
+    } catch (error) {
+      console.error("Invalid webhook JSON payload", error);
+      return res.status(400).json({ error: "Invalid JSON payload" });
+    }
 
     if (body.object === "page") {
       const clients = await getClients();
@@ -109,11 +130,12 @@ async function sendTextMessage(
   text: string,
   pageToken: string
 ) {
-  const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken}`;
-
-  await fetch(url, {
+  await fetch("https://graph.facebook.com/v20.0/me/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${pageToken}`,
+    },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: { text },
@@ -126,11 +148,12 @@ async function sendImageMessage(
   attachmentId: string,
   pageToken: string
 ) {
-  const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken}`;
-
-  await fetch(url, {
+  await fetch("https://graph.facebook.com/v20.0/me/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${pageToken}`,
+    },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: {
@@ -147,10 +170,28 @@ async function sendImageMessage(
 }
 
 async function readRawBody(req: NextApiRequest) {
+  const contentLengthHeader = req.headers["content-length"];
+  const contentLength =
+    typeof contentLengthHeader === "string"
+      ? Number.parseInt(contentLengthHeader, 10)
+      : Number.NaN;
+
+  if (Number.isFinite(contentLength) && contentLength > MAX_WEBHOOK_BODY_BYTES) {
+    throw new Error("Webhook body too large");
+  }
+
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
 
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const normalizedChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += normalizedChunk.length;
+
+    if (totalBytes > MAX_WEBHOOK_BODY_BYTES) {
+      throw new Error("Webhook body too large");
+    }
+
+    chunks.push(normalizedChunk);
   }
 
   return Buffer.concat(chunks).toString("utf8");

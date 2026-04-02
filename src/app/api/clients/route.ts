@@ -54,9 +54,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing Facebook session" }, { status: 400 });
       }
 
-      const pagesResponse = await fetch(
-        `https://graph.facebook.com/v20.0/me/accounts?access_token=${userToken}`
-      );
+      const pagesResponse = await fetch("https://graph.facebook.com/v20.0/me/accounts", {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
       const pagesData = await pagesResponse.json();
       const matchedPage = Array.isArray(pagesData.data)
         ? pagesData.data.find(
