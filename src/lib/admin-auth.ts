@@ -47,18 +47,15 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(left, right);
 }
 
-export async function validateAdminCredentials(email: string, password: string) {
-  const normalizedEmail = email.trim().toLowerCase();
+export async function verifyAdminAccessToken(accessToken: string) {
+  const token = accessToken.trim();
 
-  if (!normalizedEmail || !password) {
+  if (!token) {
     return null;
   }
 
   const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: normalizedEmail,
-    password,
-  });
+  const { data, error } = await supabase.auth.getUser(token);
 
   if (error) {
     if (error.message === "fetch failed" || error.name === "AuthRetryableFetchError") {

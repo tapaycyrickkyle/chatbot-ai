@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import SignInFooter from "./SignInFooter";
 
 const SignInPage = () => {
@@ -19,25 +20,41 @@ const SignInPage = () => {
     setIsSubmitting(true);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError || !data.session?.access_token) {
+        setError(signInError?.message || "Unable to sign in");
+        return;
+      }
+
       const response = await fetch("/api/auth/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ accessToken: data.session.access_token }),
       });
 
-      const data = (await response.json()) as { error?: string };
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
 
       if (!response.ok) {
-        setError(data.error || "Unable to sign in");
+        await supabase.auth.signOut();
+        setError(payload?.error || "Unable to sign in");
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
-    } catch {
-      setError("Unable to sign in");
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Unable to sign in"
+      );
     } finally {
       setIsSubmitting(false);
     }

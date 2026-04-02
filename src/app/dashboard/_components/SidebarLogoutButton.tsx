@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const SidebarLogoutButton = () => {
   const router = useRouter();
@@ -11,6 +12,9 @@ const SidebarLogoutButton = () => {
     setIsLoggingOut(true);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
+
       const response = await fetch("/api/auth/admin/logout", {
         method: "POST",
       });

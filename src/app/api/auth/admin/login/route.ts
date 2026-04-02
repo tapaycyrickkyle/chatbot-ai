@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  validateAdminCredentials,
+  verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
 
@@ -11,17 +11,16 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
 
     const body = await req.json();
-    const email = typeof body?.email === "string" ? body.email : "";
-    const password = typeof body?.password === "string" ? body.password : "";
+    const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
 
-    if (!email.trim() || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    if (!accessToken.trim()) {
+      return NextResponse.json({ error: "Missing access token" }, { status: 400 });
     }
 
-    const adminUser = await validateAdminCredentials(email, password);
+    const adminUser = await verifyAdminAccessToken(accessToken);
 
     if (!adminUser) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
     const response = NextResponse.json({ success: true });
@@ -40,14 +39,10 @@ export async function POST(req: NextRequest) {
     const status =
       message === "Cross-origin request blocked" || message === "Missing host header"
         ? 403
-        : message === "Missing admin session environment variables" ||
-            message === "Missing Supabase environment variables" ||
-            message === "Unable to reach Supabase Auth"
-          ? 500
-          : 500;
+        : 500;
 
     return NextResponse.json(
-      { error: message || (status === 500 ? "Internal server error" : message) },
+      { error: status === 500 ? "Internal server error" : message },
       { status }
     );
   }
