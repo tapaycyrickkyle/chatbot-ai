@@ -233,7 +233,7 @@ const FaqEditorPage = () => {
   return (
     <DashboardShell activeNav="Clients" searchPlaceholder="Search FAQs...">
       <div className="flex flex-col gap-7">
-        <div className="max-w-[760px]">
+        <div className="max-w-[760px] animate-[slideUpSoft_520ms_cubic-bezier(0.22,1,0.36,1)]">
           <div className="inline-flex items-center gap-3 border-l-2 border-[var(--accent-bright)] pl-4">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
@@ -252,13 +252,13 @@ const FaqEditorPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="space-y-4">
-            <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+          <aside className="space-y-4 animate-[slideUpSoft_600ms_cubic-bezier(0.22,1,0.36,1)]">
+            <section className="panel-float rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 shadow-[0_18px_38px_rgba(0,0,0,0.18)]">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
                   {editingFaqId ? "Update FAQ" : "Create New FAQ"}
                 </p>
-                <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-bright)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-bright)] animate-pulse" />
               </div>
 
               <div className="mt-6 space-y-5">
@@ -271,7 +271,7 @@ const FaqEditorPage = () => {
                     placeholder="e.g. billing, account, setup"
                     value={keywordsInput}
                     onChange={(event) => setKeywordsInput(event.target.value)}
-                    className="mt-2 w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    className="interactive-field mt-2 w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   />
                   <p className="mt-1.5 text-[11px] text-[var(--text-subtle)]">
                     Separate tags with commas
@@ -287,7 +287,7 @@ const FaqEditorPage = () => {
                     rows={6}
                     value={answerInput}
                     onChange={(event) => setAnswerInput(event.target.value)}
-                    className="mt-2 w-full resize-none rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    className="interactive-field mt-2 w-full resize-none rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   />
                 </div>
 
@@ -295,7 +295,7 @@ const FaqEditorPage = () => {
                   <label className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                     Image ID (Optional)
                   </label>
-                  <div className="mt-2 flex rounded-xl border border-[var(--border-input)] bg-background">
+                  <div className="mt-2 flex rounded-xl border border-[var(--border-input)] bg-background transition-colors duration-200 hover:border-[var(--accent-bright)]/30">
                     <span className="border-r border-[var(--border-input)] px-4 py-3 text-[13px] font-semibold text-[var(--text-muted)]">
                       IMG
                     </span>
@@ -304,7 +304,7 @@ const FaqEditorPage = () => {
                       placeholder="004291"
                       value={imageIdInput}
                       onChange={(event) => setImageIdInput(event.target.value)}
-                      className="w-full px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
+                      className="interactive-field w-full px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -313,7 +313,7 @@ const FaqEditorPage = () => {
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="interactive-pop w-full rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-white shadow-[0_18px_36px_rgba(5,39,22,0.26)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isSubmitting
                     ? editingFaqId
@@ -328,7 +328,7 @@ const FaqEditorPage = () => {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="w-full rounded-xl border border-[var(--border)] bg-background px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                    className="interactive-pop w-full rounded-xl border border-[var(--border)] bg-background px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
                   >
                     Cancel Editing
                   </button>
@@ -336,13 +336,13 @@ const FaqEditorPage = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+            <section className="panel-float rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-[0_18px_38px_rgba(0,0,0,0.16)]">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Library Health
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-8 rounded-full bg-[var(--accent-bright)]" />
+                  <span className="h-1.5 w-8 rounded-full bg-[var(--accent-bright)] animate-pulse" />
                   <span className="h-1.5 w-6 rounded-full bg-[#35b777]" />
                   <span className="h-1.5 w-5 rounded-full bg-[var(--border-input)]" />
                 </div>
@@ -350,7 +350,7 @@ const FaqEditorPage = () => {
             </section>
           </aside>
 
-          <section>
+          <section className="animate-[slideUpSoft_660ms_cubic-bezier(0.22,1,0.36,1)]">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--text-label)]">
@@ -378,7 +378,7 @@ const FaqEditorPage = () => {
 
             <div className="space-y-4">
               {isLoadingFaqs ? (
-                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
                   <p className="text-[14px] text-[var(--text-muted)]">
                     Loading FAQ entries...
                   </p>
@@ -386,7 +386,7 @@ const FaqEditorPage = () => {
               ) : null}
 
               {!isLoadingFaqs && !clientId ? (
-                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
                   <p className="text-[14px] text-[var(--text-muted)]">
                     Open this page from a client card to load that client&apos;s
                     FAQ library.
@@ -395,7 +395,7 @@ const FaqEditorPage = () => {
               ) : null}
 
               {!isLoadingFaqs && clientId && faqEntries.length === 0 ? (
-                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+                <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
                   <p className="text-[14px] text-[var(--text-muted)]">
                     No FAQ entries yet. Create the first one from the form on
                     the left.
@@ -417,10 +417,10 @@ const FaqEditorPage = () => {
                 return (
                   <article
                     key={entry.id}
-                    className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-[border-color,box-shadow,opacity,transform] duration-300 ${animationClass} ${
+                    className={`interactive-pop rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-[border-color,box-shadow,opacity,transform] duration-300 ${animationClass} ${
                       isAnimated
                         ? "border-[var(--accent-bright)]/50 shadow-[0_0_0_1px_rgba(62,207,142,0.08),0_18px_45px_rgba(5,39,22,0.26)]"
-                        : ""
+                        : "shadow-[0_16px_34px_rgba(0,0,0,0.18)] hover:border-[var(--accent-bright)]/35 hover:shadow-[0_26px_54px_rgba(5,39,22,0.22)]"
                     } ${index > 0 ? "[animation-delay:40ms]" : ""}`}
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -429,7 +429,7 @@ const FaqEditorPage = () => {
                           {entry.keywords.map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-label)]"
+                              className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-label)] transition-transform duration-200 hover:-translate-y-[1px]"
                             >
                               {tag}
                             </span>
@@ -454,7 +454,7 @@ const FaqEditorPage = () => {
                               type="button"
                               onClick={() => handleEdit(entry)}
                               disabled={isRemoving}
-                              className="rounded-lg border-none p-0 transition-colors hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40"
+                              className="interactive-pop rounded-lg border-none p-0 transition-colors hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label="Edit FAQ entry"
                             >
                               <svg
@@ -476,7 +476,7 @@ const FaqEditorPage = () => {
                               type="button"
                               onClick={() => void handleDelete(entry.id)}
                               disabled={!!removingFaqId}
-                              className="rounded-lg border-none p-0 transition-colors hover:text-[#f7abab] disabled:cursor-not-allowed disabled:opacity-40"
+                              className="interactive-pop rounded-lg border-none p-0 transition-colors hover:text-[#f7abab] disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label="Delete FAQ entry"
                             >
                               <svg
@@ -499,7 +499,7 @@ const FaqEditorPage = () => {
                       </div>
 
                       <div className="flex h-[92px] w-full shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.22),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] sm:w-[112px]">
-                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)] animate-[floatSoft_5.4s_ease-in-out_infinite]">
                           {isRemoving ? "Deleting" : "FAQ"}
                         </span>
                       </div>
