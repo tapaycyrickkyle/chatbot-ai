@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  ADMIN_SESSION_COOKIE,
-  createAdminSessionToken,
+  ADMIN_ACCESS_TOKEN_COOKIE,
   verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
@@ -24,11 +23,11 @@ export async function POST(req: NextRequest) {
     }
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(adminUser.email), {
+    response.cookies.set(ADMIN_ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 8,
+      maxAge: 60 * 60,
       path: "/",
     });
 

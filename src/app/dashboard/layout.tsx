@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
+import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
 export default async function DashboardLayout({
   children,
@@ -8,8 +8,8 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const session = verifyAdminSessionToken(
-    cookieStore.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    cookieStore.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {

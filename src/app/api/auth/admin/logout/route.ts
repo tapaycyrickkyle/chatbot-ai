@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  ADMIN_SESSION_COOKIE,
+  ADMIN_ACCESS_TOKEN_COOKIE,
   FACEBOOK_OAUTH_STATE_COOKIE,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set(ADMIN_SESSION_COOKIE, "", {
+    response.cookies.set(ADMIN_ACCESS_TOKEN_COOKIE, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

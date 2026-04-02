@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import SignInPage from "./SignInPage";
-import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
+import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
 export const metadata: Metadata = {
   title: "Sign In | Chatbot AI",
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 const Page = async () => {
   const cookieStore = await cookies();
-  const session = verifyAdminSessionToken(
-    cookieStore.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    cookieStore.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (session) {

@@ -6,7 +6,7 @@ import {
   validateFaqPayload,
   validateFaqUpdatePayload,
 } from "@/lib/api-security";
-import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
+import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,8 +16,8 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {
@@ -45,8 +45,8 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {
@@ -86,8 +86,8 @@ export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {
@@ -133,8 +133,8 @@ export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {

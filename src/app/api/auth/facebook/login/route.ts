@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  ADMIN_SESSION_COOKIE,
+  ADMIN_ACCESS_TOKEN_COOKIE,
   FACEBOOK_OAUTH_STATE_COOKIE,
   generateFacebookOAuthState,
-  verifyAdminSessionToken,
+  verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClients } from "@/lib/database";
-import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
+import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV !== "development") {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
-  const session = verifyAdminSessionToken(
-    req.cookies.get(ADMIN_SESSION_COOKIE)?.value
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
   );
 
   if (!session) {
