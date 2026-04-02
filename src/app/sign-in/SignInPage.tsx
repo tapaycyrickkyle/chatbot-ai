@@ -87,11 +87,6 @@ const SignInPage = () => {
           </div>
 
           <div className="rounded-2xl border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
-            <div className="mb-5 text-center">
-              <h2 className="text-[1.35rem] font-extrabold leading-tight tracking-[-0.03em] text-[#f7f7f7] sm:text-[1.5rem]">
-                Sign In
-              </h2>
-            </div>
             <form className="space-y-4.5" onSubmit={handleSubmit}>
               <div className="space-y-1.5">
                 <label

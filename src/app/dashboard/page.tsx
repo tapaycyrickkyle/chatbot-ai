@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import DashboardPage from "./DashboardPage";
 
 export const metadata: Metadata = {
-  title: "Secretary Dashboard | Chatbot AI",
+  title: "Secretary Dashboard | Business Chatbot",
   description: "Secretary dashboard aligned with the project login page design system.",
 };
 

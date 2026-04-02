@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import FaqEditorPage from "./FaqEditorPage";
 
 export const metadata: Metadata = {
-  title: "FAQ Editor | Chatbot AI",
+  title: "FAQ Editor | Business Chatbot",
   description: "Manage and organize FAQ responses for connected clients.",
 };
 

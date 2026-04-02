@@ -13,8 +13,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Chatbot AI",
-  description: "Project GUI based on the sign-in page design system.",
+  title: "Business Chatbot",
+  description: "Business Chatbot admin dashboard for Facebook Page automation.",
 };
 
 export default function RootLayout({

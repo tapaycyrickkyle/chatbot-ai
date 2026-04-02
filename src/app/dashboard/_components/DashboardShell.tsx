@@ -28,6 +28,7 @@ const DashboardShell = ({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -43,7 +44,7 @@ const DashboardShell = ({
     const nextQuery = nextSearchParams.toString();
 
     startTransition(() => {
-      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+      router.replace(nextQuery ? `${currentPathname}?${nextQuery}` : currentPathname);
     });
   };
 

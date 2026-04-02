@@ -5,8 +5,8 @@ import SignInPage from "./SignInPage";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
 export const metadata: Metadata = {
-  title: "Sign In | Chatbot AI",
-  description: "Sign in to access the Chatbot AI dashboard.",
+  title: "Sign In | Business Chatbot",
+  description: "Sign in to access the Business Chatbot dashboard.",
 };
 
 const Page = async () => {
