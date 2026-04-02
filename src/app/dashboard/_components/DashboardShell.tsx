@@ -22,7 +22,7 @@ const DashboardShell = ({
     <main className="dashboard-stage flex min-h-screen bg-background text-foreground">
       <aside className="panel-float hidden w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)]/92 backdrop-blur-xl xl:flex">
         <div className="px-6 py-8">
-          <div className="animate-[floatSoft_7s_ease-in-out_infinite]">
+          <div className="">
             <h2 className="text-[1.7rem] font-extrabold leading-tight tracking-[-0.03em]">
               Admin Panel
             </h2>
@@ -113,3 +113,6 @@ const DashboardShell = ({
 };
 
 export default DashboardShell;
+
+
+
