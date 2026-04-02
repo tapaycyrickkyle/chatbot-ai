@@ -141,12 +141,17 @@ export function validateFaqUpdatePayload(payload: unknown) {
 
   const { faqId, ...rest } = payload as Record<string, unknown>;
 
-  if (typeof faqId !== "string" || !faqId.trim()) {
+  const normalizedFaqId =
+    typeof faqId === "string" || typeof faqId === "number"
+      ? String(faqId).trim()
+      : "";
+
+  if (!normalizedFaqId) {
     throw new Error("Invalid FAQ ID");
   }
 
   return {
-    faqId: faqId.trim(),
+    faqId: sanitizeIdentifier(normalizedFaqId, "FAQ ID"),
     ...validateFaqPayload(rest),
   };
 }
@@ -164,3 +169,4 @@ export function sanitizeIdentifier(value: string, fieldName: string) {
 
   return sanitized;
 }
+

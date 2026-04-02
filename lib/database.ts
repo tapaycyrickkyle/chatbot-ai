@@ -20,7 +20,7 @@ type FaqRow = {
 
 function normalizeClient(row: ClientRow) {
   return {
-    id: row.id,
+    id: String(row.id),
     client_name: row.client_name,
     page_id: row.page_id,
     page_access_token: row.page_access_token,
@@ -30,8 +30,8 @@ function normalizeClient(row: ClientRow) {
 
 function normalizeFaq(row: FaqRow) {
   return {
-    id: row.id,
-    client_id: row.client_id,
+    id: String(row.id),
+    client_id: String(row.client_id),
     keywords: Array.isArray(row.keywords) ? row.keywords : [],
     answer: row.answer,
     image_attachment_id: row.image_attachment_id ?? "",
@@ -194,3 +194,4 @@ export async function deleteFaq(faqId: string) {
     throw new Error(error.message || "Failed to delete FAQ");
   }
 }
+
