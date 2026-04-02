@@ -134,16 +134,22 @@ export async function addFaq(
   image_attachment_id?: string
 ) {
   const supabase = getDb();
-  const { error } = await supabase.from("faqs").insert({
-    client_id: clientId,
-    keywords,
-    answer,
-    image_attachment_id: image_attachment_id || null,
-  });
+  const { data, error } = await supabase
+    .from("faqs")
+    .insert({
+      client_id: clientId,
+      keywords,
+      answer,
+      image_attachment_id: image_attachment_id || null,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message || "Failed to add FAQ");
   }
+
+  return data.id;
 }
 
 export async function updateFaq(

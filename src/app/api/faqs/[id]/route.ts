@@ -62,8 +62,8 @@ export async function POST(
       await req.json()
     );
 
-    await addFaq(clientId, keywords, answer, image_attachment_id);
-    return NextResponse.json({ success: true });
+    const faqId = await addFaq(clientId, keywords, answer, image_attachment_id);
+    return NextResponse.json({ success: true, faqId });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Internal server error";
@@ -110,7 +110,7 @@ export async function PUT(
     }
 
     await updateFaq(faqId, { keywords, answer, image_attachment_id });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, faqId });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Internal server error";
@@ -161,7 +161,7 @@ export async function DELETE(
     }
 
     await deleteFaq(faqId);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, faqId });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Internal server error";
