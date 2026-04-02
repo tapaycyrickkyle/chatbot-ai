@@ -48,39 +48,41 @@ const DashboardPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!searchParams) {
-      return;
-    }
-
-    const fbConnected = searchParams.get("fb_connected");
-
-    if (fbConnected !== "true") {
-      return;
-    }
-
-    const cookieValue = document.cookie
+    const fbConnectedFromQuery = searchParams?.get("fb_connected") === "true";
+    const fbConnectedFromCookie = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("fb_pages="));
+      .some((row) => row === "fb_connected=true");
 
-    if (!cookieValue) {
-      window.history.replaceState({}, "", "/dashboard");
+    if (!fbConnectedFromQuery && !fbConnectedFromCookie) {
       return;
     }
 
-    try {
-      const parsedPages = JSON.parse(
-        decodeURIComponent(cookieValue.split("=")[1])
-      ) as FacebookPage[];
+    const openFacebookPagesModal = async () => {
+      try {
+        const response = await fetch("/api/auth/facebook/pages", {
+          cache: "no-store",
+        });
 
-      if (Array.isArray(parsedPages) && parsedPages.length > 0) {
-        setPages(parsedPages);
-        setShowModal(true);
+        if (!response.ok) {
+          throw new Error("Failed to load Facebook pages");
+        }
+
+        const data = (await response.json()) as { pages?: FacebookPage[] };
+        const nextPages = Array.isArray(data.pages) ? data.pages : [];
+
+        if (nextPages.length > 0) {
+          setPages(nextPages);
+          setShowModal(true);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        document.cookie = "fb_connected=; Max-Age=0; path=/; SameSite=Lax";
+        window.history.replaceState({}, "", "/dashboard");
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      window.history.replaceState({}, "", "/dashboard");
-    }
+    };
+
+    void openFacebookPagesModal();
   }, [searchParams]);
 
   const clearFacebookPagesCookie = () => {

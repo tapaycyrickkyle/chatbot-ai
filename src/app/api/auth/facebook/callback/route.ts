@@ -144,6 +144,13 @@ export async function GET(req: NextRequest) {
         sameSite: "lax",
       }
     );
+    response.cookies.set("fb_connected", "true", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 5,
+      path: "/",
+      sameSite: "lax",
+    });
     clearStateCookie(response);
 
     return response;
