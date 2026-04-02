@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addClient, deleteClientByPageId, getClients } from "@/lib/sheets";
+import { addClient, deleteClientByPageId, getClients } from "@/lib/database";
 import { assertSameOrigin, validateClientPayload } from "@/lib/api-security";
 import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
 

@@ -18,12 +18,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    if (!validateAdminCredentials(email, password)) {
+    const adminUser = await validateAdminCredentials(email, password);
+
+    if (!adminUser) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(email), {
+    response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(adminUser.email), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -38,10 +40,14 @@ export async function POST(req: NextRequest) {
     const status =
       message === "Cross-origin request blocked" || message === "Missing host header"
         ? 403
-        : 500;
+        : message === "Missing admin session environment variables" ||
+            message === "Missing Supabase environment variables" ||
+            message === "Unable to reach Supabase Auth"
+          ? 500
+          : 500;
 
     return NextResponse.json(
-      { error: status === 500 ? "Internal server error" : message },
+      { error: message || (status === 500 ? "Internal server error" : message) },
       { status }
     );
   }

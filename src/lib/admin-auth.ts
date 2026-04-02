@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { getSupabaseServerClient } from "../../lib/supabase";
 
 export const ADMIN_SESSION_COOKIE = "admin_session";
 export const FACEBOOK_OAUTH_STATE_COOKIE = "fb_oauth_state";
@@ -13,16 +14,14 @@ type SessionPayload = {
   iat: number;
 };
 
-function getAdminConfig() {
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
+function getAdminSessionConfig() {
   const sessionSecret = process.env.ADMIN_SESSION_SECRET;
 
-  if (!email || !password || !sessionSecret) {
-    throw new Error("Missing admin authentication environment variables");
+  if (!sessionSecret) {
+    throw new Error("Missing admin session environment variables");
   }
 
-  return { email, password, sessionSecret };
+  return { sessionSecret };
 }
 
 function base64UrlEncode(input: string) {
@@ -48,17 +47,39 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(left, right);
 }
 
-export function validateAdminCredentials(email: string, password: string) {
-  const config = getAdminConfig();
+export async function validateAdminCredentials(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
 
-  return (
-    safeEqual(email.trim().toLowerCase(), config.email.trim().toLowerCase()) &&
-    safeEqual(password, config.password)
-  );
+  if (!normalizedEmail || !password) {
+    return null;
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  });
+
+  if (error) {
+    if (error.message === "fetch failed" || error.name === "AuthRetryableFetchError") {
+      throw new Error("Unable to reach Supabase Auth");
+    }
+
+    return null;
+  }
+
+  if (!data.user?.email) {
+    return null;
+  }
+
+  return {
+    email: data.user.email.trim().toLowerCase(),
+    userId: data.user.id,
+  };
 }
 
 export function createAdminSessionToken(email: string) {
-  const { sessionSecret } = getAdminConfig();
+  const { sessionSecret } = getAdminSessionConfig();
   const payload: SessionPayload = {
     email: email.trim().toLowerCase(),
     iat: Math.floor(Date.now() / 1000),
@@ -75,7 +96,7 @@ export function verifyAdminSessionToken(token: string | undefined | null) {
     return null;
   }
 
-  const { sessionSecret } = getAdminConfig();
+  const { sessionSecret } = getAdminSessionConfig();
   const [encodedPayload, signature] = token.split(".");
 
   if (!encodedPayload || !signature) {

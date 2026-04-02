@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getSheet } from "@/lib/sheets";
+import { getClients, getFaqsForClient } from "@/lib/database";
 
 export const config = {
   api: {
@@ -46,31 +46,22 @@ export default async function handler(
     const body = JSON.parse(rawBody) as WebhookBody;
 
     if (body.object === "page") {
+      const clients = await getClients();
+
       for (const entry of body.entry ?? []) {
         const pageId = entry.id;
-        const clientsSheet = await getSheet("clients");
-        const rows = await clientsSheet.getRows();
-        const clientRow = rows.find((row) => row.get("page_id") === pageId);
+        const client = clients.find((row) => row.page_id === pageId);
 
-        if (!clientRow) {
+        if (!client) {
           continue;
         }
 
-        const pageAccessToken = clientRow.get("page_access_token");
-        const clientId = clientRow.get("id");
-
-        const faqsSheet = await getSheet("faqs");
-        const faqRows = await faqsSheet.getRows();
-        const clientFaqs = faqRows
-          .filter((row) => row.get("client_id") === clientId)
-          .map((row) => ({
-            keywords: row
-              .get("keywords")
-              .split(",")
-              .map((keyword: string) => keyword.trim().toLowerCase()),
-            answer: row.get("answer"),
-            imageAttachmentId: row.get("image_attachment_id"),
-          }));
+        const pageAccessToken = client.page_access_token;
+        const clientFaqs = (await getFaqsForClient(client.id)).map((faq) => ({
+          keywords: faq.keywords.map((keyword) => keyword.trim().toLowerCase()),
+          answer: faq.answer,
+          imageAttachmentId: faq.image_attachment_id,
+        }));
 
         for (const event of entry.messaging ?? []) {
           if (event.message?.text) {

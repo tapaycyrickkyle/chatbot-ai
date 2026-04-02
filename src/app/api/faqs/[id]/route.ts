@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addFaq, deleteFaq, getFaqById, getFaqsForClient, updateFaq } from "@/lib/sheets";
+import { addFaq, deleteFaq, getFaqById, getFaqsForClient, updateFaq } from "@/lib/database";
 import {
   assertSameOrigin,
   sanitizeIdentifier,
