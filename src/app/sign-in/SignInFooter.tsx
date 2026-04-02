@@ -1,6 +1,6 @@
 const SignInFooter = () => {
   return (
-    <footer className="relative mt-auto hidden w-full animate-[slideUpSoft_700ms_cubic-bezier(0.22,1,0.36,1)] flex-col items-center justify-between gap-4 border-t border-[#2a2a2a] bg-[#171717]/92 px-6 py-5 text-center backdrop-blur-xl md:flex md:flex-row md:px-10">
+    <footer className="mt-auto hidden w-full flex-col items-center justify-between gap-4 border-t border-[#2a2a2a] bg-[#171717] px-6 py-5 text-center md:flex md:flex-row md:px-10">
       <div className="flex flex-wrap items-center justify-center gap-6">
         <a
           className="text-[13px] text-[#a1a1aa] transition-colors hover:text-[#3aa06f]"
@@ -22,7 +22,7 @@ const SignInFooter = () => {
         </a>
       </div>
       <div className="text-[13px] text-[#a1a1aa]">
-        (c) 2026 Chatbot AI. All rights reserved.
+        © 2026 Chatbot AI. All rights reserved.
       </div>
     </footer>
   );
