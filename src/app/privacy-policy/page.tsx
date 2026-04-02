@@ -34,7 +34,7 @@ const sections = [
     title: "User Rights and Data Deletion",
     content: [
       "If you want your data deleted, you can request deletion by contacting the service operator associated with this chatbot and providing enough information to identify the relevant Facebook Page or conversation.",
-      "Upon receiving a verified deletion request, we will remove the relevant stored data within a reasonable timeframe, subject to any legal or security obligations.",
+      "Upon receiving and verifying a deletion request, we will remove the connected Facebook Page data and related chatbot records stored in our system within a reasonable timeframe, subject to any legal or security obligations.",
       "Detailed deletion instructions are available on our Data Deletion Instructions page.",
     ],
   },

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 
+function buildPagePictureUrl(pageId: string) {
+  return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
+}
+
 export async function GET(req: NextRequest) {
   const session = await verifyAdminAccessToken(
     req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
       ? pagesData.data.map((page) => ({
           id: page.id ?? "",
           name: page.name ?? "",
+          picture_url: page.id ? buildPagePictureUrl(page.id) : "",
         }))
       : [];
 

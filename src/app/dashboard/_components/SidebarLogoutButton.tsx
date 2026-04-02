@@ -37,7 +37,7 @@ const SidebarLogoutButton = () => {
       type="button"
       onClick={() => void handleLogout()}
       disabled={isLoggingOut}
-      className="flex w-full items-center justify-start gap-2 rounded-xl border border-transparent bg-[var(--surface)] px-4 py-3 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent-bright)] hover:bg-[var(--surface)] hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-70"
+      className="flex w-full items-center justify-start gap-2 rounded-xl border border-transparent bg-[var(--surface)] px-4 py-3 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[#7a2222] hover:bg-[var(--surface)] hover:text-[#ff8f8f] disabled:cursor-not-allowed disabled:opacity-70"
     >
       <svg
         aria-hidden="true"

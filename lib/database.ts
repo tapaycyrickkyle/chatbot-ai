@@ -18,6 +18,10 @@ type FaqRow = {
   image_attachment_id: string | null;
 };
 
+function buildPagePictureUrl(pageId: string) {
+  return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -25,6 +29,7 @@ function normalizeClient(row: ClientRow) {
     page_id: row.page_id,
     page_access_token: row.page_access_token,
     created_at: row.created_at,
+    picture_url: buildPagePictureUrl(row.page_id),
   };
 }
 
@@ -81,6 +86,43 @@ export async function deleteClientByPageId(pageId: string) {
 
   if (error) {
     throw new Error(error.message || "Failed to delete client");
+  }
+}
+
+export async function deleteClientById(clientId: string) {
+  const supabase = getDb();
+  const { error } = await supabase.from("clients").delete().eq("id", clientId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to delete client");
+  }
+}
+
+export async function getClientById(clientId: string) {
+  const supabase = getDb();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, client_name, page_id, page_access_token, created_at")
+    .eq("id", clientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || "Failed to load client");
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return normalizeClient(data as ClientRow);
+}
+
+export async function deleteFaqsForClient(clientId: string) {
+  const supabase = getDb();
+  const { error } = await supabase.from("faqs").delete().eq("client_id", clientId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to delete FAQs");
   }
 }
 
@@ -194,4 +236,3 @@ export async function deleteFaq(faqId: string) {
     throw new Error(error.message || "Failed to delete FAQ");
   }
 }
-

@@ -10,11 +10,13 @@ type ClientRow = {
   client_name: string;
   page_id: string;
   created_at: string;
+  picture_url?: string;
 };
 
 type FacebookPage = {
   id: string;
   name: string;
+  picture_url?: string;
 };
 
 const DashboardPage = () => {
@@ -24,6 +26,9 @@ const DashboardPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [isConnectingPageId, setIsConnectingPageId] = useState<string | null>(null);
+  const [isDisconnectingClientId, setIsDisconnectingClientId] = useState<string | null>(null);
+  const [disconnectTarget, setDisconnectTarget] = useState<ClientRow | null>(null);
+  const [disconnectConfirmation, setDisconnectConfirmation] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadClients = async () => {
@@ -111,6 +116,20 @@ const DashboardPage = () => {
     clearFacebookPagesCookie();
   };
 
+  const openDisconnectModal = (client: ClientRow) => {
+    setDisconnectTarget(client);
+    setDisconnectConfirmation("");
+  };
+
+  const closeDisconnectModal = () => {
+    if (isDisconnectingClientId) {
+      return;
+    }
+
+    setDisconnectTarget(null);
+    setDisconnectConfirmation("");
+  };
+
   const connectPage = async (page: FacebookPage) => {
     setIsConnectingPageId(page.id);
 
@@ -161,6 +180,50 @@ const DashboardPage = () => {
     }
   };
 
+  const disconnectClient = async () => {
+    if (!disconnectTarget) {
+      return;
+    }
+
+    setIsDisconnectingClientId(disconnectTarget.id);
+
+    try {
+      const response = await fetch("/api/clients", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientId: disconnectTarget.id,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Failed to disconnect client");
+      }
+
+      setClients((currentClients) =>
+        currentClients.filter((currentClient) => currentClient.id !== disconnectTarget.id)
+      );
+      setSuccessMessage("Page disconnected successfully.");
+      setDisconnectTarget(null);
+      setDisconnectConfirmation("");
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to disconnect client. See console.";
+      window.alert(message);
+    } finally {
+      setIsDisconnectingClientId(null);
+    }
+  };
+
   const clientQuery = (searchParams?.get("q") ?? "").trim().toLowerCase();
   const filteredClients = clients.filter((client) => {
     if (!clientQuery) {
@@ -183,17 +246,22 @@ const DashboardPage = () => {
       return "Recently added";
     }
 
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+    const month = date.toLocaleString("en-US", {
+      month: "long",
+      timeZone: "UTC",
     });
+    const day = date.getUTCDate();
+    const year = date.getUTCFullYear();
+
+    return `${month} ${day}, ${year}`;
   };
+
+  const canConfirmDisconnect = disconnectConfirmation.trim().toLowerCase() === "disconnect";
 
   return (
     <>
       {successMessage ? (
-        <div className="fixed right-5 top-5 z-[60] animate-[fadeIn_180ms_ease-out]">
+        <div className="fixed right-5 bottom-5 z-[60] animate-[fadeIn_180ms_ease-out]">
           <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
               <svg
@@ -269,16 +337,36 @@ const DashboardPage = () => {
                 className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2.5">
-                      <h3 className="text-[1.15rem] font-bold tracking-[-0.03em]">
-                        {client.client_name}
-                      </h3>
-                      <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.2),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
+                      {client.picture_url ? (
+                        <img
+                          src={client.picture_url}
+                          alt={`${client.client_name} page profile picture`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[15px] font-bold text-[var(--accent-bright)]">
+                          {client.client_name
+                            .split(" ")
+                            .map((part) => part[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </span>
+                      )}
                     </div>
-                    <p className="mt-1.5 text-[13px] text-[var(--text-subtle)]">
-                      Page ID: {client.page_id}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-[1.15rem] font-bold tracking-[-0.03em]">
+                          {client.client_name}
+                        </h3>
+                        <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
+                      </div>
+                      <p className="mt-1.5 text-[13px] text-[var(--text-subtle)]">
+                        Page ID: {client.page_id}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
@@ -291,12 +379,22 @@ const DashboardPage = () => {
                       </p>
                     </div>
 
-                    <Link
-                      href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
-                      className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-                    >
-                      Edit FAQs
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
+                        className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                      >
+                        Edit FAQs
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => openDisconnectModal(client)}
+                        disabled={isDisconnectingClientId === client.id}
+                        className="inline-flex w-fit items-center justify-center rounded-xl border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -304,6 +402,73 @@ const DashboardPage = () => {
           </div>
         </div>
       </DashboardShell>
+      {disconnectTarget ? (
+        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#5a2626] px-7 py-6">
+              <h3 className="text-[1.25rem] font-extrabold tracking-[-0.03em] text-[#ffdfdf] sm:text-[1.4rem]">
+                Confirm Disconnect
+              </h3>
+              <button
+                type="button"
+                onClick={closeDisconnectModal}
+                disabled={Boolean(isDisconnectingClientId)}
+                className="rounded-full border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Close disconnect modal"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 6l12 12M18 6 6 18"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-5 px-7 py-6">
+              <p className="text-[15px] leading-7 text-[var(--text-label)]">
+                You are about to disconnect <span className="font-semibold text-[var(--text-primary)]">{disconnectTarget.client_name}</span> and remove its connected page data and saved FAQs.
+              </p>
+              <p className="text-[14px] leading-6 text-[var(--text-muted)]">
+                To continue, type <span className="font-semibold lowercase text-[#ffb4b4]">disconnect</span> below.
+              </p>
+              <input
+                type="text"
+                value={disconnectConfirmation}
+                onChange={(event) => setDisconnectConfirmation(event.target.value)}
+                placeholder="Type disconnect"
+                className="w-full rounded-xl border border-[#5a2626] bg-[#171717] px-4 py-2.5 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#8e3434] focus:outline-none focus:ring-2 focus:ring-[#8e3434]/25"
+              />
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeDisconnectModal}
+                  disabled={Boolean(isDisconnectingClientId)}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void disconnectClient()}
+                  disabled={!canConfirmDisconnect || Boolean(isDisconnectingClientId)}
+                  className="rounded-xl border border-[#5a2626] bg-[#7a2222] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#912929] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isDisconnectingClientId ? "Disconnecting..." : "Disconnect Page"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {showModal ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
@@ -341,40 +506,64 @@ const DashboardPage = () => {
               </p>
 
               <div className="mt-6 space-y-4">
-                {pages.map((page) => (
-                  <div
-                    key={page.id}
-                    className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] text-[15px] font-bold text-[var(--accent-bright)]">
-                        {page.name
-                          .split(" ")
-                          .map((part) => part[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-[1.1rem] font-bold tracking-[-0.03em]">
-                          {page.name}
-                        </p>
-                        <p className="mt-1 text-[14px] text-[var(--text-subtle)]">
-                          ID: {page.id}
-                        </p>
-                      </div>
-                    </div>
+                {pages.map((page) => {
+                  const isAlreadyConnected = clients.some(
+                    (client) => client.page_id === page.id
+                  );
 
-                    <button
-                      type="button"
-                      onClick={() => void connectPage(page)}
-                      disabled={isConnectingPageId === page.id}
-                      className="rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                  return (
+                    <div
+                      key={page.id}
+                      className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      {isConnectingPageId === page.id ? "Connecting..." : "Connect"}
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
+                          {page.picture_url ? (
+                            <img
+                              src={page.picture_url}
+                              alt={`${page.name} page profile picture`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-[15px] font-bold text-[var(--accent-bright)]">
+                              {page.name
+                                .split(" ")
+                                .map((part) => part[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[1.1rem] font-bold tracking-[-0.03em]">
+                            {page.name}
+                          </p>
+                          <p className="mt-1 text-[14px] text-[var(--text-subtle)]">
+                            ID: {page.id}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={isAlreadyConnected ? undefined : () => void connectPage(page)}
+                        disabled={isAlreadyConnected || isConnectingPageId === page.id}
+                        className={`rounded-xl px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed ${
+                          isAlreadyConnected
+                            ? "border border-[#2f5f49] bg-[#173126] text-[#9ce3c1] opacity-80"
+                            : "border border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-70"
+                        }`}
+                      >
+                        {isAlreadyConnected
+                          ? "Connected"
+                          : isConnectingPageId === page.id
+                            ? "Connecting..."
+                            : "Connect"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -385,6 +574,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-
-
-

@@ -13,7 +13,7 @@ const steps = [
   "Send an email to tapaycyrickkyle@gmail.com with the subject line \"Data Deletion Request\".",
   "Include the Facebook Page name or Page ID connected to the chatbot, plus any details that help identify the conversation or account you want removed.",
   "If needed, we may ask for additional information to verify the request before deleting data.",
-  "Once verified, we will delete the relevant stored data from the chatbot system within a reasonable timeframe, unless we must keep limited information for legal or security reasons.",
+  "Once verified, we will process the request by removing the connected Facebook Page data and related chatbot records from our system within a reasonable timeframe, unless we must keep limited information for legal or security reasons.",
 ];
 
 export default function DataDeletionPage() {

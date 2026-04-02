@@ -62,28 +62,19 @@ const SignInPage = () => {
 
   return (
     <main className="page-enter flex min-h-screen flex-col bg-[#171717] text-[#f3f4f6]">
-      <section className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+      <section className="flex flex-1 items-start justify-center px-4 pt-14 pb-10 sm:px-6 sm:pt-16">
         <div className="w-full max-w-[420px] panel-enter">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#3ECF8E] bg-[#1d1d1d] shadow-[0_0_0_1px_rgba(62,207,142,0.08)]">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 text-[#3ECF8E]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 10h8M8 14h5m-7 5h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3Z"
-                />
-              </svg>
-            </div>
-            <h1 className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em] text-[#f7f7f7] sm:text-[1.7rem]">
+          <div className="mb-8 text-center">
+            <h1
+              className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[1.7rem]"
+              style={{ color: "var(--accent-text)" }}
+            >
               Business Chatbot
             </h1>
+            <p className="mx-auto mt-3 max-w-[320px] text-[14px] leading-6 text-[#a1a1aa]">
+              Sign in to manage your Facebook Page chatbot and connected client
+              workflows.
+            </p>
           </div>
 
           <div className="rounded-2xl border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
