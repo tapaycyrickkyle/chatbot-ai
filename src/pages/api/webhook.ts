@@ -20,6 +20,7 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const BULK_MESSAGE_DELAY_MS = 350;
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_FORMATTED_TEXT_CHUNK_LENGTH = 280;
+const MAX_TEMPLATE_TEXT_LENGTH = 640;
 const RATE_LIMIT_LOG_RETENTION_DAYS = 30;
 const RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
@@ -249,6 +250,7 @@ async function sendFlowNodeMessage(
 ) {
   const config = parseBotFlowNodeConfig(node.answer, node.keywords[0] || "Flow Card");
   const formattedMessageParts = formatMessengerTextParts(config.message);
+  const combinedFormattedMessage = formattedMessageParts.join("\n\n").trim();
   const imageAttachmentIds = config.images.length ? config.images : node.imageAttachmentId ? [node.imageAttachmentId] : [];
   const validButtons = config.buttons.filter((button) =>
     clientFlowNodes.some((candidate) => candidate.id === button.targetNodeId)
@@ -1083,6 +1085,8 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
 
 
 
