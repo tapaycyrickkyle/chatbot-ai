@@ -74,36 +74,36 @@ export default function TermsOfServicePage() {
       <div className="mx-auto max-w-4xl">
         <section className="panel-enter overflow-hidden rounded-[28px] border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-sm">
           <div className="border-b border-white/10 px-6 py-8 sm:px-10">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-accent-bright">
+            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-accent-bright">
               Terms of Service
             </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="mt-3 text-[2rem] font-semibold tracking-tight sm:text-[2.35rem]">
               Terms for using Business Chatbot
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-text-muted sm:text-base">
+            <p className="mt-4 max-w-2xl text-[14px] leading-6 text-text-muted">
               These terms explain the rules, responsibilities, and limitations
               that apply when using Business Chatbot with a Facebook Page or
               related chatbot workflows.
             </p>
-            <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-text-subtle">
+            <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-text-subtle">
               Last updated: {lastUpdated}
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Link
                 href="/privacy-policy"
-                className="rounded-full border border-white/10 px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
+                className="rounded-full border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
               >
                 Privacy Policy
               </Link>
               <Link
                 href="/data-deletion"
-                className="rounded-full border border-white/10 px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
+                className="rounded-full border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
               >
                 Data Deletion
               </Link>
               <Link
                 href="/terms-of-service"
-                className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-accent-bright"
+                className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-accent-bright"
               >
                 Terms of Service
               </Link>
@@ -116,10 +116,10 @@ export default function TermsOfServicePage() {
                 key={section.title}
                 className="rounded-2xl border border-white/8 bg-black/15 p-5 sm:p-6"
               >
-                <h2 className="text-xl font-semibold text-text-heading">
+                <h2 className="text-[1.5rem] font-semibold text-text-heading">
                   {section.title}
                 </h2>
-                <div className="mt-3 space-y-3 text-sm leading-6 text-text-label sm:text-[15px]">
+                <div className="mt-3 space-y-3 text-[14px] leading-6 text-text-label">
                   {section.content.map((paragraph) => (
                     <p key={paragraph}>{paragraph}</p>
                   ))}
@@ -128,10 +128,10 @@ export default function TermsOfServicePage() {
             ))}
 
             <section className="rounded-2xl border border-white/8 bg-black/15 p-5 sm:p-6">
-              <h2 className="text-xl font-semibold text-text-heading">
+              <h2 className="text-[1.5rem] font-semibold text-text-heading">
                 Contact Us
               </h2>
-              <p className="mt-3 text-sm leading-6 text-text-label sm:text-[15px]">
+              <p className="mt-3 text-[14px] leading-6 text-text-label">
                 If you have questions about these terms, contact us at{" "}
                 <a
                   href="mailto:tapaycyrickkyle@gmail.com"
@@ -141,7 +141,7 @@ export default function TermsOfServicePage() {
                 </a>
                 .
               </p>
-              <p className="mt-3 text-sm leading-6 text-text-label sm:text-[15px]">
+              <p className="mt-3 text-[14px] leading-6 text-text-label">
                 You can also review our{" "}
                 <a
                   href="/privacy-policy"

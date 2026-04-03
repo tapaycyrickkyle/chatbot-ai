@@ -52,7 +52,7 @@ const DashboardShell = ({
     <main className="page-enter flex min-h-screen bg-background text-foreground">
       <aside className="hidden w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)] xl:flex panel-enter">
         <div className="px-6 py-8">
-          <h2 className="text-[1.7rem] font-extrabold leading-tight tracking-[-0.03em]">
+          <h2 className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em]">
             Admin Panel
           </h2>
           <p className="mt-1.5 text-[13px] text-[var(--text-muted)]">
@@ -95,7 +95,7 @@ const DashboardShell = ({
         <header className="border-b border-[var(--border)] bg-background px-6 py-3.5 sm:px-8 lg:px-10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center justify-between gap-4">
-              <h1 className="text-[1.2rem] font-black uppercase tracking-[0.14em]">
+              <h1 className="text-[1.125rem] font-black uppercase tracking-[0.14em]">
                 Business Chatbot
               </h1>
               <button

@@ -289,7 +289,7 @@ const DashboardPage = () => {
         <div className="flex flex-col gap-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-[760px]">
-              <h2 className="text-[2.1rem] font-extrabold tracking-[-0.05em] sm:text-[2.6rem]">
+              <h2 className="text-[2rem] font-extrabold tracking-[-0.05em] sm:text-[2.35rem]">
                 Connected Clients
               </h2>
               <p className="mt-2.5 max-w-[640px] text-[14px] leading-6 text-[var(--text-muted)]">
@@ -358,7 +358,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2.5">
-                        <h3 className="text-[1.15rem] font-bold tracking-[-0.03em]">
+                        <h3 className="text-[1.125rem] font-bold tracking-[-0.03em]">
                           {client.client_name}
                         </h3>
                         <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
@@ -406,7 +406,7 @@ const DashboardPage = () => {
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#5a2626] px-7 py-6">
-              <h3 className="text-[1.25rem] font-extrabold tracking-[-0.03em] text-[#ffdfdf] sm:text-[1.4rem]">
+              <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em] text-[#ffdfdf]">
                 Confirm Disconnect
               </h3>
               <button
@@ -473,7 +473,7 @@ const DashboardPage = () => {
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-7 py-6">
-              <h3 className="text-[1.35rem] font-extrabold tracking-[-0.03em] sm:text-[1.5rem]">
+              <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em]">
                 Connect a New Facebook Page
               </h3>
               <button
@@ -536,7 +536,7 @@ const DashboardPage = () => {
                           )}
                         </div>
                         <div>
-                          <p className="text-[1.1rem] font-bold tracking-[-0.03em]">
+                          <p className="text-[1.125rem] font-bold tracking-[-0.03em]">
                             {page.name}
                           </p>
                           <p className="mt-1 text-[14px] text-[var(--text-subtle)]">

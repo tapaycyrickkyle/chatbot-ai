@@ -267,7 +267,7 @@ const FaqEditorPage = () => {
           <aside className="space-y-4">
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
               <div className="flex items-center justify-between">
-                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
                   {editingFaqId ? "Update FAQ" : "Create New FAQ"}
                 </p>
                 <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-bright)]" />
@@ -365,7 +365,7 @@ const FaqEditorPage = () => {
           <section>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--text-label)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-label)]">
                   Active FAQ Library
                 </p>
                 <p className="mt-1 text-[13px] text-[var(--text-muted)]">
@@ -455,7 +455,7 @@ const FaqEditorPage = () => {
                         ))}
                       </div>
 
-                      <h3 className="mt-4 text-[1.25rem] font-bold tracking-[-0.03em]">
+                      <h3 className="mt-4 text-[1.125rem] font-bold tracking-[-0.03em]">
                         {entry.keywords[0] || "FAQ Entry"}
                       </h3>
                       <p className="mt-3 max-w-[740px] text-[14px] leading-6 text-[var(--text-label)]">

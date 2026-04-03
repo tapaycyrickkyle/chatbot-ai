@@ -66,7 +66,7 @@ const SignInPage = () => {
         <div className="w-full max-w-[420px] panel-enter">
           <div className="mb-8 text-center">
             <h1
-              className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[1.7rem]"
+              className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[1.6rem]"
               style={{ color: "var(--accent-text)" }}
             >
               Business Chatbot
@@ -80,7 +80,7 @@ const SignInPage = () => {
           <div className="rounded-2xl border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
             <form className="space-y-4.5" onSubmit={handleSubmit}>
               <div className="border-b border-[#2a2a2a] pb-4 text-center">
-                <h2 className="text-[1.45rem] font-extrabold tracking-[-0.04em] text-[#f3f4f6] sm:text-[1.6rem]">
+                <h2 className="text-[1.5rem] font-extrabold tracking-[-0.04em] text-[#f3f4f6]">
                   Sign In
                 </h2>
               </div>
