@@ -52,7 +52,7 @@ type ConnectionDragState = {
 const MIN_CANVAS_WIDTH = 1100;
 const MIN_CANVAS_HEIGHT = 860;
 const NODE_WIDTH = 350;
-const NODE_HEIGHT = 440;
+const BASE_NODE_HEIGHT = 440;
 const CARD_PADDING = 24;
 const QUICK_REPLY_ROW_START_Y = 404;
 const QUICK_REPLY_ROW_SPACING = 62;
@@ -115,6 +115,11 @@ function clampPosition(value: number, max: number) {
 function buildConnectionPath(startX: number, startY: number, endX: number, endY: number) {
   const controlOffset = Math.max(120, Math.abs(endX - startX) * 0.35);
   return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+}
+
+function getNodeHeight(node: FlowNodeRecord) {
+  const extraButtons = Math.max(0, node.config.buttons.length - 1);
+  return BASE_NODE_HEIGHT + extraButtons * QUICK_REPLY_ROW_SPACING;
 }
 
 function normalizeKeywordInput(value: string) {
@@ -196,7 +201,7 @@ const FaqEditorPage = () => {
 
   const canvasHeight = Math.max(
     MIN_CANVAS_HEIGHT,
-    ...filteredNodes.map((node) => node.config.position.y + NODE_HEIGHT + CARD_PADDING * 2)
+    ...filteredNodes.map((node) => node.config.position.y + getNodeHeight(node) + CARD_PADDING * 2)
   );
 
   useEffect(() => {
@@ -351,7 +356,7 @@ const FaqEditorPage = () => {
       title: `Card ${nodes.length + 1}`,
       position: {
         x: clampPosition(72 + offset, canvasWidth - NODE_WIDTH - CARD_PADDING),
-        y: clampPosition(72 + offset, MIN_CANVAS_HEIGHT - NODE_HEIGHT - CARD_PADDING),
+        y: clampPosition(72 + offset, MIN_CANVAS_HEIGHT - BASE_NODE_HEIGHT - CARD_PADDING),
       },
     });
 
@@ -435,13 +440,15 @@ const FaqEditorPage = () => {
               return node;
             }
 
+            const nodeHeight = getNodeHeight(node);
+
             return {
               ...node,
               config: {
                 ...node.config,
                 position: {
                   x: clampPosition(nodeDragState.originX + deltaX, canvasWidth - NODE_WIDTH - CARD_PADDING),
-                  y: clampPosition(nodeDragState.originY + deltaY, canvasHeight - NODE_HEIGHT - CARD_PADDING),
+                  y: clampPosition(nodeDragState.originY + deltaY, canvasHeight - nodeHeight - CARD_PADDING),
                 },
               },
             };
@@ -542,7 +549,7 @@ const FaqEditorPage = () => {
             ? getCanvasPointFromElement(targetNodeElement, canvasRef.current, "left", zoom)
             : {
                 x: targetNode.config.position.x,
-                y: targetNode.config.position.y + NODE_HEIGHT / 2,
+                y: targetNode.config.position.y + getNodeHeight(targetNode) / 2,
               };
 
         return {
