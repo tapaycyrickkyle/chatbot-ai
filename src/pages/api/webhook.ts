@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getClients, getFaqsForClient } from "@/lib/database";
 import { parseBotFlowNodeConfig } from "@/lib/bot-flow";
+import { getClients, getFaqsForClient } from "@/lib/database";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
   api: {
@@ -9,8 +10,15 @@ export const config = {
   },
 };
 
+const GRAPH_API_MESSAGES_URL = "https://graph.facebook.com/v20.0/me/messages";
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const MAX_QUICK_REPLIES = 13;
+const MAX_SEND_RETRIES = 5;
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000] as const;
+const HIGH_USAGE_THRESHOLD = 80;
+const HIGH_USAGE_DELAY_MS = 1500;
+const BULK_MESSAGE_DELAY_MS = 350;
+const REQUEST_TIMEOUT_MS = 15000;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const WELCOME_KEYWORDS = new Set(["get started", "get_started", "welcome", "start"]);
@@ -39,6 +47,44 @@ type WebhookBody = {
       };
     }>;
   }>;
+};
+
+type MessengerRequestBody = {
+  recipient: { id: string };
+  message: unknown;
+};
+
+type UsageMetrics = {
+  call_count?: number;
+  total_cputime?: number;
+  total_time?: number;
+};
+
+type UsageSummary = {
+  appUsage: UsageMetrics | null;
+  pageUsage: UsageMetrics | null;
+  appUsageRaw: string;
+  pageUsageRaw: string;
+  highestCallCount: number;
+};
+
+type MessengerApiError = {
+  message?: string;
+  type?: string;
+  code?: number;
+  error_subcode?: number;
+  fbtrace_id?: string;
+};
+
+type MessengerApiErrorPayload = {
+  error?: MessengerApiError;
+};
+
+type SafeSendContext = {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  messageType: "text" | "quick_replies" | "button_template" | "image";
 };
 
 export default async function handler(
@@ -114,7 +160,18 @@ export default async function handler(
               const welcomeNode = resolveWelcomeNode(clientFlowNodes);
 
               if (welcomeNode) {
-                await sendFlowNodeMessage(userId, welcomeNode, client.id, pageAccessToken, clientFlowNodes);
+                await safelyHandleFlowSend(
+                  () =>
+                    sendFlowNodeMessage(
+                      userId,
+                      welcomeNode,
+                      client.id,
+                      pageId,
+                      pageAccessToken,
+                      clientFlowNodes
+                    ),
+                  { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+                );
               }
 
               continue;
@@ -123,7 +180,18 @@ export default async function handler(
             const targetNode = resolveQuickReplyTarget(client.id, flowPayload, clientFlowNodes);
 
             if (targetNode) {
-              await sendFlowNodeMessage(userId, targetNode, client.id, pageAccessToken, clientFlowNodes);
+              await safelyHandleFlowSend(
+                () =>
+                  sendFlowNodeMessage(
+                    userId,
+                    targetNode,
+                    client.id,
+                    pageId,
+                    pageAccessToken,
+                    clientFlowNodes
+                  ),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
             }
 
             continue;
@@ -144,7 +212,18 @@ export default async function handler(
             continue;
           }
 
-          await sendFlowNodeMessage(userId, matchedNode, client.id, pageAccessToken, clientFlowNodes);
+          await safelyHandleFlowSend(
+            () =>
+              sendFlowNodeMessage(
+                userId,
+                matchedNode,
+                client.id,
+                pageId,
+                pageAccessToken,
+                clientFlowNodes
+              ),
+            { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+          );
         }
       }
     }
@@ -159,46 +238,483 @@ async function sendFlowNodeMessage(
   recipientId: string,
   node: ClientFlowNode,
   clientId: string,
+  pageId: string,
   pageToken: string,
   clientFlowNodes: ClientFlowNode[]
 ) {
   const config = parseBotFlowNodeConfig(node.answer, node.keywords[0] || "Flow Card");
+  const imageAttachmentIds = config.images.length ? config.images : node.imageAttachmentId ? [node.imageAttachmentId] : [];
   const validButtons = config.buttons.filter((button) =>
     clientFlowNodes.some((candidate) => candidate.id === button.targetNodeId)
   );
+  const messages: Array<{ body: MessengerRequestBody; type: SafeSendContext["messageType"] }> = [];
 
-  if (node.imageAttachmentId) {
-    await sendImageMessage(recipientId, node.imageAttachmentId, pageToken);
+  for (const imageAttachmentId of imageAttachmentIds) {
+    messages.push({
+      type: "image",
+      body: createImageMessageBody(recipientId, imageAttachmentId),
+    });
   }
 
   if (validButtons.length > 0) {
     if (validButtons.length <= 3) {
-      await sendButtonTemplateMessage(
-        recipientId,
-        config.message || "Choose an option below.",
-        validButtons.map((button) => ({
-          title: button.label,
-          payload: createFlowPayload(clientId, button.targetNodeId),
-        })),
-        pageToken
-      );
-      return;
+      messages.push({
+        type: "button_template",
+        body: createButtonTemplateMessageBody(
+          recipientId,
+          config.message || "Choose an option below.",
+          validButtons.map((button) => ({
+            title: button.label,
+            payload: createFlowPayload(clientId, button.targetNodeId),
+          }))
+        ),
+      });
+    } else {
+      messages.push({
+        type: "quick_replies",
+        body: createQuickRepliesMessageBody(
+          recipientId,
+          config.message || "Choose an option below.",
+          validButtons.map((button) => ({
+            title: button.label,
+            payload: createFlowPayload(clientId, button.targetNodeId),
+          }))
+        ),
+      });
     }
-
-    await sendQuickRepliesMessage(
-      recipientId,
-      config.message || "Choose an option below.",
-      validButtons.map((button) => ({
-        title: button.label,
-        payload: createFlowPayload(clientId, button.targetNodeId),
-      })),
-      pageToken
-    );
-    return;
   }
 
-  if (config.message) {
-    await sendTextMessage(recipientId, config.message, pageToken);
+  await sendMessageBatch(messages, pageToken, {
+    clientId,
+    pageId,
+    recipientId,
+  });
+
+  if (!validButtons.length && config.message) {
+    if (messages.length > 0) {
+      await sleep(BULK_MESSAGE_DELAY_MS);
+    }
+
+    await safeSendMessage(recipientId, config.message, pageToken, 0, pageId, clientId);
+  }
+}
+
+async function sendMessageBatch(
+  messages: Array<{ body: MessengerRequestBody; type: SafeSendContext["messageType"] }>,
+  pageToken: string,
+  baseContext: Omit<SafeSendContext, "messageType">
+) {
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+
+    if (!message) {
+      continue;
+    }
+
+    if (index > 0) {
+      await sleep(BULK_MESSAGE_DELAY_MS);
+    }
+
+    await safeSendApiRequest(message.body, pageToken, {
+      ...baseContext,
+      messageType: message.type,
+    });
+  }
+}
+
+async function safeSendMessage(
+  recipientId: string,
+  text: string,
+  pageToken: string,
+  retryCount = 0,
+  pageId = "unknown",
+  clientId = "unknown"
+): Promise<boolean> {
+  const url = `${GRAPH_API_MESSAGES_URL}?access_token=${pageToken}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: { text },
+      }),
+    });
+    clearTimeout(timeoutId);
+
+    const appUsageRaw = res.headers.get("X-App-Usage") ?? "";
+    const pageUsageRaw = res.headers.get("X-Page-Usage") ?? "";
+
+    if (appUsageRaw || pageUsageRaw) {
+      const usageSummary = getUsageSummary(res.headers);
+      await handleUsageSummary(
+        { clientId, pageId, recipientId, messageType: "text" },
+        usageSummary
+      );
+      await logUsageSnapshot({
+        clientId,
+        pageId,
+        recipientId,
+        messageType: "text",
+        appUsage: appUsageRaw,
+        pageUsage: pageUsageRaw,
+      });
+    }
+
+    const responseText = await res.text().catch(() => "");
+    const errorPayload = parseMessengerErrorPayload(responseText);
+    const errorCode = errorPayload?.error?.code;
+    const isRateLimited = res.status === 429 || errorCode === 4 || errorCode === 32;
+
+    if (isRateLimited) {
+      if (retryCount >= MAX_SEND_RETRIES) {
+        console.error(`Rate limit retry exhausted for user ${recipientId}`);
+        await logSendFailure({
+          clientId,
+          pageId,
+          recipientId,
+          messageType: "text",
+          statusCode: res.status,
+          errorCode,
+          errorSubcode: errorPayload?.error?.error_subcode,
+          errorMessage: "Rate limit retry exhausted",
+          payload: createTextMessageBody(recipientId, text),
+        });
+        return false;
+      }
+
+      const delay = withJitter(Math.pow(2, retryCount) * 1000);
+      console.warn(`Rate limited. Retry ${retryCount + 1} in ${delay}ms`);
+      await sleep(delay);
+      return safeSendMessage(recipientId, text, pageToken, retryCount + 1, pageId, clientId);
+    }
+
+    if (!res.ok) {
+      const errorData = errorPayload ?? responseText;
+      console.error("Send API error:", errorData);
+      await logSendFailure({
+        clientId,
+        pageId,
+        recipientId,
+        messageType: "text",
+        statusCode: res.status,
+        errorCode,
+        errorSubcode: errorPayload?.error?.error_subcode,
+        errorMessage: typeof errorData === "string" ? errorData : JSON.stringify(errorData),
+        payload: createTextMessageBody(recipientId, text),
+      });
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.error("Network error in safeSendMessage:", err);
+    await logSendFailure({
+      clientId,
+      pageId,
+      recipientId,
+      messageType: "text",
+      statusCode: 0,
+      errorMessage: err instanceof Error ? err.message : "Unknown network error",
+      payload: createTextMessageBody(recipientId, text),
+    });
+    return false;
+  }
+}
+
+async function safeSendApiRequest(
+  body: MessengerRequestBody,
+  pageToken: string,
+  context: SafeSendContext
+) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < MAX_SEND_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(GRAPH_API_MESSAGES_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pageToken}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text().catch(() => "");
+      const errorPayload = parseMessengerErrorPayload(responseText);
+      const usageSummary = getUsageSummary(response.headers);
+
+      if (response.ok) {
+        await handleUsageSummary(context, usageSummary);
+        return;
+      }
+
+      const errorCode = errorPayload?.error?.code;
+      const errorMessage = errorPayload?.error?.message || responseText || response.statusText;
+      const isRateLimited = response.status === 429 || errorCode === 4 || errorCode === 32;
+
+      if (isRateLimited) {
+        console.warn(
+          `[Messenger Rate Limit] ${context.messageType} send throttled for page ${context.pageId} and recipient ${context.recipientId}. Attempt ${attempt + 1}/${MAX_SEND_RETRIES}.`,
+          {
+            status: response.status,
+            errorCode,
+            errorMessage,
+            appUsage: usageSummary.appUsageRaw,
+            pageUsage: usageSummary.pageUsageRaw,
+          }
+        );
+
+        await logRateLimitEvent({
+          ...context,
+          attempt: attempt + 1,
+          statusCode: response.status,
+          errorCode,
+          errorSubcode: errorPayload?.error?.error_subcode,
+          errorMessage,
+          appUsage: usageSummary.appUsageRaw,
+          pageUsage: usageSummary.pageUsageRaw,
+          payload: body,
+        });
+
+        if (attempt < MAX_SEND_RETRIES - 1) {
+          await sleep(withJitter(RETRY_DELAYS_MS[attempt] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]));
+          continue;
+        }
+      }
+
+      lastError = new Error(`Messenger API request failed (${response.status}): ${errorMessage}`);
+      await logSendFailure({
+        clientId: context.clientId,
+        pageId: context.pageId,
+        recipientId: context.recipientId,
+        messageType: context.messageType,
+        statusCode: response.status,
+        errorCode,
+        errorSubcode: errorPayload?.error?.error_subcode,
+        errorMessage,
+        payload: body,
+      });
+      break;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error instanceof Error ? error : new Error("Unknown send error");
+
+      if (attempt < MAX_SEND_RETRIES - 1) {
+        console.warn(
+          `[Messenger Send] ${context.messageType} send failed for page ${context.pageId}. Retrying in ${withJitter(RETRY_DELAYS_MS[attempt] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1])}ms.`,
+          error
+        );
+        await sleep(withJitter(RETRY_DELAYS_MS[attempt] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]));
+        continue;
+      }
+
+      await logSendFailure({
+        clientId: context.clientId,
+        pageId: context.pageId,
+        recipientId: context.recipientId,
+        messageType: context.messageType,
+        statusCode: 0,
+        errorMessage: lastError.message,
+        payload: body,
+      });
+      break;
+    }
+  }
+
+  throw lastError ?? new Error("Messenger API request failed for an unknown reason.");
+}
+
+async function handleUsageSummary(context: SafeSendContext, usageSummary: UsageSummary) {
+  if (usageSummary.appUsageRaw) {
+    console.warn(`[Messenger Usage] X-App-Usage for page ${context.pageId}: ${usageSummary.appUsageRaw}`);
+  }
+
+  if (usageSummary.pageUsageRaw) {
+    console.warn(`[Messenger Usage] X-Page-Usage for page ${context.pageId}: ${usageSummary.pageUsageRaw}`);
+  }
+
+  if (usageSummary.highestCallCount > HIGH_USAGE_THRESHOLD) {
+    console.warn(
+      `[Messenger Rate Limit] High usage detected for page ${context.pageId}. Slowing down sends because call_count is at ${usageSummary.highestCallCount}%.`
+    );
+    await sleep(withJitter(HIGH_USAGE_DELAY_MS));
+  }
+}
+
+function getUsageSummary(headers: Headers): UsageSummary {
+  const appUsageRaw = headers.get("X-App-Usage") ?? "";
+  const pageUsageRaw = headers.get("X-Page-Usage") ?? "";
+  const appUsage = parseUsageHeader(appUsageRaw);
+  const pageUsage = parseUsageHeader(pageUsageRaw);
+  const highestCallCount = Math.max(appUsage?.call_count ?? 0, pageUsage?.call_count ?? 0);
+
+  return {
+    appUsage,
+    pageUsage,
+    appUsageRaw,
+    pageUsageRaw,
+    highestCallCount,
+  };
+}
+
+function parseUsageHeader(value: string): UsageMetrics | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as UsageMetrics;
+    return typeof parsed === "object" && parsed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseMessengerErrorPayload(responseText: string) {
+  if (!responseText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(responseText) as MessengerApiErrorPayload;
+  } catch {
+    return null;
+  }
+}
+
+async function logRateLimitEvent(details: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  messageType: SafeSendContext["messageType"];
+  attempt: number;
+  statusCode: number;
+  errorCode?: number;
+  errorSubcode?: number;
+  errorMessage: string;
+  appUsage: string;
+  pageUsage: string;
+  payload: MessengerRequestBody;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("rate_limit_logs").insert({
+      client_id: details.clientId,
+      page_id: details.pageId,
+      recipient_id: details.recipientId,
+      message_type: details.messageType,
+      attempt_number: details.attempt,
+      status_code: details.statusCode,
+      error_code: details.errorCode ?? null,
+      error_subcode: details.errorSubcode ?? null,
+      error_message: details.errorMessage,
+      x_app_usage: details.appUsage || null,
+      x_page_usage: details.pageUsage || null,
+      payload: details.payload,
+    });
+
+    if (error) {
+      console.warn("Failed to log rate limit event to Supabase", error);
+    }
+  } catch (error) {
+    console.warn("Failed to log rate limit event to Supabase", error);
+  }
+}
+
+async function logUsageSnapshot(details: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  messageType: SafeSendContext["messageType"];
+  appUsage: string;
+  pageUsage: string;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("rate_limit_logs").insert({
+      client_id: details.clientId,
+      page_id: details.pageId,
+      recipient_id: details.recipientId,
+      message_type: `${details.messageType}_usage`,
+      attempt_number: 0,
+      status_code: 200,
+      error_code: null,
+      error_subcode: null,
+      error_message: "Usage snapshot",
+      x_app_usage: details.appUsage || null,
+      x_page_usage: details.pageUsage || null,
+      payload: {},
+    });
+
+    if (error) {
+      console.warn("Failed to log usage snapshot to Supabase", error);
+    }
+  } catch (error) {
+    console.warn("Failed to log usage snapshot to Supabase", error);
+  }
+}
+
+async function logSendFailure(details: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  messageType: SafeSendContext["messageType"];
+  statusCode: number;
+  errorCode?: number;
+  errorSubcode?: number;
+  errorMessage: string;
+  payload: MessengerRequestBody;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("rate_limit_logs").insert({
+      client_id: details.clientId,
+      page_id: details.pageId,
+      recipient_id: details.recipientId,
+      message_type: `${details.messageType}_failed`,
+      attempt_number: 0,
+      status_code: details.statusCode,
+      error_code: details.errorCode ?? null,
+      error_subcode: details.errorSubcode ?? null,
+      error_message: details.errorMessage,
+      x_app_usage: null,
+      x_page_usage: null,
+      payload: details.payload,
+    });
+
+    if (error) {
+      console.warn("Failed to log send failure to Supabase", error);
+    }
+  } catch (error) {
+    console.warn("Failed to log send failure to Supabase", error);
+  }
+}
+
+async function safelyHandleFlowSend(
+  action: () => Promise<void>,
+  context: SafeSendContext
+) {
+  try {
+    await action();
+  } catch (error) {
+    console.error("Webhook send pipeline failed", error);
+    await logSendFailure({
+      clientId: context.clientId,
+      pageId: context.pageId,
+      recipientId: context.recipientId,
+      messageType: context.messageType,
+      statusCode: 0,
+      errorMessage: error instanceof Error ? error.message : "Unknown send failure",
+      payload: { recipient: { id: context.recipientId }, message: {} },
+    });
   }
 }
 
@@ -270,107 +786,82 @@ function parseFlowPayload(payload: string) {
   return { clientId, nodeId };
 }
 
-async function sendTextMessage(
-  recipientId: string,
-  text: string,
-  pageToken: string
-) {
-  await sendMessengerRequest(
-    {
-      recipient: { id: recipientId },
-      message: { text },
-    },
-    pageToken
-  );
+function createTextMessageBody(recipientId: string, text: string): MessengerRequestBody {
+  return {
+    recipient: { id: recipientId },
+    message: { text },
+  };
 }
 
-async function sendQuickRepliesMessage(
+function createQuickRepliesMessageBody(
   recipientId: string,
   text: string,
-  quickReplies: Array<{ title: string; payload: string }>,
-  pageToken: string
-) {
+  quickReplies: Array<{ title: string; payload: string }>
+): MessengerRequestBody {
   const limitedQuickReplies = quickReplies.slice(0, MAX_QUICK_REPLIES);
 
-  await sendMessengerRequest(
-    {
-      recipient: { id: recipientId },
-      message: {
-        text,
-        quick_replies: limitedQuickReplies.map((quickReply) => ({
-          content_type: "text",
-          title: quickReply.title,
-          payload: quickReply.payload,
-        })),
-      },
+  return {
+    recipient: { id: recipientId },
+    message: {
+      text,
+      quick_replies: limitedQuickReplies.map((quickReply) => ({
+        content_type: "text",
+        title: quickReply.title,
+        payload: quickReply.payload,
+      })),
     },
-    pageToken
-  );
+  };
 }
-async function sendButtonTemplateMessage(
+
+function createButtonTemplateMessageBody(
   recipientId: string,
   text: string,
-  buttons: Array<{ title: string; payload: string }>,
-  pageToken: string
-) {
-  await sendMessengerRequest(
-    {
-      recipient: { id: recipientId },
-      message: {
-        attachment: {
-          type: "template",
-          payload: {
-            template_type: "button",
-            text,
-            buttons: buttons.slice(0, 3).map((button) => ({
-              type: "postback",
-              title: button.title,
-              payload: button.payload,
-            })),
-          },
+  buttons: Array<{ title: string; payload: string }>
+): MessengerRequestBody {
+  return {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text,
+          buttons: buttons.slice(0, 3).map((button) => ({
+            type: "postback",
+            title: button.title,
+            payload: button.payload,
+          })),
         },
       },
     },
-    pageToken
-  );
+  };
 }
 
-
-async function sendImageMessage(
-  recipientId: string,
-  attachmentId: string,
-  pageToken: string
-) {
-  await sendMessengerRequest(
-    {
-      recipient: { id: recipientId },
-      message: {
-        attachment: {
-          type: "template",
-          payload: {
-            template_type: "media",
-            elements: [{ media_type: "image", attachment_id: attachmentId }],
-          },
+function createImageMessageBody(recipientId: string, attachmentId: string): MessengerRequestBody {
+  return {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "media",
+          elements: [{ media_type: "image", attachment_id: attachmentId }],
         },
       },
     },
-    pageToken
-  );
+  };
 }
 
-async function sendMessengerRequest(body: unknown, pageToken: string) {
-  const response = await fetch("https://graph.facebook.com/v20.0/me/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${pageToken}`,
-    },
-    body: JSON.stringify(body),
-  });
+async function sendBulkMessages(users: string[], text: string, pageToken: string, pageId = "unknown", clientId = "unknown") {
+  for (let index = 0; index < users.length; index += 1) {
+    const userId = users[index];
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "");
-    throw new Error(`Messenger API request failed (${response.status}): ${errorBody || response.statusText}`);
+    if (!userId) {
+      continue;
+    }
+
+    await safeSendMessage(userId, text, pageToken, 0, pageId, clientId);
+    await sleep(100);
   }
 }
 
@@ -440,9 +931,12 @@ function messageMatchesKeyword(message: string, keyword: string) {
   return message === keyword;
 }
 
+function sleep(durationMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, durationMs));
+}
 
-
-
-
-
+function withJitter(durationMs: number) {
+  const jitter = Math.round(durationMs * 0.25 * Math.random());
+  return durationMs + jitter;
+}
 

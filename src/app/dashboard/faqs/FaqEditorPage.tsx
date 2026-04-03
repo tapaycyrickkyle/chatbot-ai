@@ -23,7 +23,8 @@ type FlowNodeRecord = {
   keywords: string[];
   keywordInput: string;
   manualKeywordInput: string;
-  imageAttachmentId: string;
+  imageAttachmentIds: string[];
+  imagePreviewUrls: string[];
   config: BotFlowNodeConfig;
 };
 
@@ -92,24 +93,37 @@ async function fetchFlowNodes(clientId: string) {
 
 function toFlowNodeRecord(entry: FaqEntry): FlowNodeRecord {
   const initialKeywordInput = entry.keywords.join(", ");
+  const parsedConfig = createDefaultBotFlowNodeConfig(
+    parseBotFlowNodeConfig(entry.answer, entry.keywords[0] || "Flow Card")
+  );
+  const imageAttachmentIds = parsedConfig.images.length
+    ? parsedConfig.images
+    : entry.image_attachment_id
+      ? [entry.image_attachment_id]
+      : [];
 
   return {
     id: entry.id,
     keywords: entry.keywords,
     keywordInput: initialKeywordInput,
     manualKeywordInput: initialKeywordInput,
-    imageAttachmentId: entry.image_attachment_id ?? "",
-    config: createDefaultBotFlowNodeConfig(
-      parseBotFlowNodeConfig(entry.answer, entry.keywords[0] || "Flow Card")
-    ),
+    imageAttachmentIds,
+    imagePreviewUrls: [],
+    config: {
+      ...parsedConfig,
+      images: imageAttachmentIds,
+    },
   };
 }
 
 function toApiPayload(node: FlowNodeRecord) {
   return {
     keywords: node.keywords,
-    answer: serializeBotFlowNodeConfig(node.config),
-    image_attachment_id: node.imageAttachmentId,
+    answer: serializeBotFlowNodeConfig({
+      ...node.config,
+      images: node.imageAttachmentIds,
+    }),
+    image_attachment_id: node.imageAttachmentIds[0] ?? "",
   };
 }
 
@@ -238,6 +252,7 @@ function normalizeNodeForSave(node: FlowNodeRecord) {
       config: {
         ...node.config,
         message: trimmedMessage,
+        images: node.imageAttachmentIds,
         buttons: normalizedButtons,
       },
     },
@@ -259,6 +274,25 @@ function buildNewNodeConfig(nodeCount: number, canvasWidth: number) {
   });
 }
 
+function ensureNodeImages(node: FlowNodeRecord): FlowNodeRecord {
+  const safeImages = Array.isArray(node.imageAttachmentIds)
+    ? node.imageAttachmentIds.filter(Boolean)
+    : [];
+  const safePreviewUrls = Array.isArray(node.imagePreviewUrls)
+    ? node.imagePreviewUrls
+    : [];
+
+  return {
+    ...node,
+    imageAttachmentIds: safeImages,
+    imagePreviewUrls: safePreviewUrls,
+    config: {
+      ...node.config,
+      images: safeImages,
+    },
+  };
+}
+
 const FaqEditorPage = () => {
   const searchParams = useSearchParams();
   const clientId = searchParams?.get("clientId") ?? "";
@@ -266,6 +300,7 @@ const FaqEditorPage = () => {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLElement | null>>({});
   const quickReplyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [nodes, setNodes] = useState<FlowNodeRecord[]>([]);
   const [isLoadingNodes, setIsLoadingNodes] = useState(true);
@@ -273,6 +308,8 @@ const FaqEditorPage = () => {
   const [isCreatingNode, setIsCreatingNode] = useState(false);
   const [isSavingFlow, setIsSavingFlow] = useState(false);
   const [deletingNodeId, setDeletingNodeId] = useState<string | null>(null);
+  const [uploadingImageNodeId, setUploadingImageNodeId] = useState<string | null>(null);
+  const [imageCarouselIndexes, setImageCarouselIndexes] = useState<Record<string, number>>({});
   const [nodeDragState, setNodeDragState] = useState<NodeDragState | null>(null);
   const [connectionDragState, setConnectionDragState] = useState<ConnectionDragState | null>(null);
   const [hoveredConnectionTargetId, setHoveredConnectionTargetId] = useState("");
@@ -286,7 +323,7 @@ const FaqEditorPage = () => {
     const haystacks = [
       node.config.title,
       node.config.message,
-      node.imageAttachmentId,
+      ...node.imageAttachmentIds,
       ...node.keywords,
       ...node.config.buttons.map((button) => button.label),
     ];
@@ -321,7 +358,11 @@ const FaqEditorPage = () => {
   }, [connectionDragState, hoveredConnectionTargetId]);
 
   const updateNode = (nodeId: string, updater: (node: FlowNodeRecord) => FlowNodeRecord) => {
-    setNodes((currentNodes) => currentNodes.map((node) => (node.id === nodeId ? updater(node) : node)));
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === nodeId ? ensureNodeImages(updater(ensureNodeImages(node))) : ensureNodeImages(node)
+      )
+    );
   };
 
   const adjustZoom = (direction: "in" | "out") => {
@@ -456,7 +497,7 @@ const FaqEditorPage = () => {
       setNodes((currentNodes) =>
         syncKeywordsFromConnections([
           ...currentNodes,
-          { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentId: "", config },
+          { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentIds: [], imagePreviewUrls: [], config },
         ])
       );
       if (!options?.quiet) {
@@ -468,6 +509,59 @@ const FaqEditorPage = () => {
       setIsCreatingNode(false);
     }
   }, [canvasWidth, clientId, nodes.length]);
+
+  const uploadNodeImage = async (nodeId: string, file: File | null) => {
+    if (!clientId || !file) {
+      return;
+    }
+
+    setUploadingImageNodeId(nodeId);
+
+    try {
+      const formData = new FormData();
+      formData.append("clientId", clientId);
+      formData.append("file", file);
+
+      const response = await fetch("/api/facebook/attachments", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; attachmentId?: string }
+        | null;
+
+      if (!response.ok || !result?.attachmentId) {
+        throw new Error(result?.error || "Unable to upload image");
+      }
+
+      updateNode(nodeId, (current) => ({
+        ...current,
+        imageAttachmentIds: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
+        imagePreviewUrls: [...current.imagePreviewUrls, URL.createObjectURL(file)],
+        config: {
+          ...current.config,
+          images: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
+        },
+      }));
+      setImageCarouselIndexes((current) => ({
+        ...current,
+        [nodeId]: Math.max(0, (nodes.find((node) => node.id === nodeId)?.imageAttachmentIds.length ?? 0)),
+      }));
+      setNotice({ tone: "success", message: "Image uploaded and attached to the card." });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to upload image.",
+      });
+    } finally {
+      setUploadingImageNodeId(null);
+      const input = imageInputRefs.current[nodeId];
+      if (input) {
+        input.value = "";
+      }
+    }
+  };
 
   useEffect(() => {
     const loadNodes = async () => {
@@ -506,7 +600,7 @@ const FaqEditorPage = () => {
           startTransition(() => {
             setNodes(
               syncKeywordsFromConnections([
-                { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentId: "", config },
+                { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentIds: [], imagePreviewUrls: [], config },
               ])
             );
           });
@@ -900,17 +994,163 @@ const FaqEditorPage = () => {
                       />
 
                       <input
-                        type="text"
-                        value={node.imageAttachmentId}
-                        onChange={(event) => updateNode(node.id, (current) => ({ ...current, imageAttachmentId: event.target.value }))}
-                        placeholder="Image attachment ID (optional)"
-                        className="w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                        type="hidden"
+                        value={(node.imageAttachmentIds ?? []).join(", ")}
+                        readOnly
+                        aria-hidden="true"
                       />
+                      <div className="rounded-2xl border border-[var(--border)] bg-background/80 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                              {(node.imageAttachmentIds ?? []).length === 1 ? "Image" : "Images"}
+                            </p>
+                          </div>
+                          <input
+                            ref={(element) => {
+                              imageInputRefs.current[node.id] = element;
+                            }}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              void uploadNodeImage(node.id, file);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => imageInputRefs.current[node.id]?.click()}
+                            disabled={uploadingImageNodeId === node.id}
+                            className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {uploadingImageNodeId === node.id ? "Uploading..." : "Upload Image"}
+                          </button>
+                        </div>
+                        {(node.imageAttachmentIds ?? []).length > 0 ? (
+                          <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                            <div className="relative aspect-[16/10] w-full overflow-hidden">
+                              {node.imagePreviewUrls?.[imageCarouselIndexes[node.id] ?? 0] ? (
+                                <img
+                                  src={node.imagePreviewUrls[imageCarouselIndexes[node.id] ?? 0]}
+                                  alt={`Uploaded preview ${Math.min((imageCarouselIndexes[node.id] ?? 0) + 1, node.imageAttachmentIds.length)}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.16),_transparent_45%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] px-6 text-center">
+                                  <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                                      Image {Math.min((imageCarouselIndexes[node.id] ?? 0) + 1, node.imageAttachmentIds.length)}
+                                    </p>
+                                    <p className="mt-2 text-[13px] text-[var(--text-muted)]">
+                                      Uploaded to Messenger and ready to send.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {(node.imageAttachmentIds ?? []).length > 1 ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setImageCarouselIndexes((current) => ({
+                                        ...current,
+                                        [node.id]:
+                                          ((current[node.id] ?? 0) - 1 + node.imageAttachmentIds.length) %
+                                          node.imageAttachmentIds.length,
+                                      }))
+                                    }
+                                    className="absolute left-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-black/55 text-[var(--text-primary)]"
+                                    aria-label="Previous image"
+                                  >
+                                    {"<"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setImageCarouselIndexes((current) => ({
+                                        ...current,
+                                        [node.id]: ((current[node.id] ?? 0) + 1) % node.imageAttachmentIds.length,
+                                      }))
+                                    }
+                                    className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-black/55 text-[var(--text-primary)]"
+                                    aria-label="Next image"
+                                  >
+                                    {">"}
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-3 py-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                                {Math.min((imageCarouselIndexes[node.id] ?? 0) + 1, node.imageAttachmentIds.length)} / {node.imageAttachmentIds.length}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  {node.imageAttachmentIds.map((_, imageIndex) => (
+                                    <button
+                                      key={`${node.id}-dot-${imageIndex}`}
+                                      type="button"
+                                      onClick={() =>
+                                        setImageCarouselIndexes((current) => ({
+                                          ...current,
+                                          [node.id]: imageIndex,
+                                        }))
+                                      }
+                                      className={`h-2.5 w-2.5 rounded-full ${imageIndex === (imageCarouselIndexes[node.id] ?? 0) ? "bg-[var(--accent-bright)]" : "bg-[var(--border)]"}`}
+                                      aria-label={`Show image ${imageIndex + 1}`}
+                                    />
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateNode(node.id, (current) => {
+                                      const activeIndex = Math.min(
+                                        imageCarouselIndexes[node.id] ?? 0,
+                                        Math.max(current.imageAttachmentIds.length - 1, 0)
+                                      );
+                                      const nextImages = current.imageAttachmentIds.filter(
+                                        (_, currentIndex) => currentIndex !== activeIndex
+                                      );
+                                      const nextPreviewUrls = current.imagePreviewUrls.filter(
+                                        (_, currentIndex) => currentIndex !== activeIndex
+                                      );
+
+                                      setImageCarouselIndexes((indexes) => ({
+                                        ...indexes,
+                                        [node.id]: Math.max(0, Math.min(activeIndex, nextImages.length - 1)),
+                                      }));
+
+                                      return {
+                                        ...current,
+                                        imageAttachmentIds: nextImages,
+                                        imagePreviewUrls: nextPreviewUrls,
+                                        config: {
+                                          ...current.config,
+                                          images: nextImages,
+                                        },
+                                      };
+                                    })
+                                  }
+                                  className="rounded-full border border-[#5a2626] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#ffb4b4]"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-[13px] text-[var(--text-muted)]">No images yet.</p>
+                        )}
+                      </div>
 
                       <div className="rounded-2xl border border-[var(--border)] bg-background/80 p-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">Quick Replies</p>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                              {node.config.buttons.length === 1 ? "Button" : "Buttons"}
+                            </p>
                           </div>
                           <button
                             type="button"
@@ -939,7 +1179,7 @@ const FaqEditorPage = () => {
                         </div>
 
                         <div className="mt-3 space-y-2">
-                          {node.config.buttons.length === 0 ? <p className="text-[13px] text-[var(--text-muted)]">No quick replies yet.</p> : null}
+                          {node.config.buttons.length === 0 ? <p className="text-[13px] text-[var(--text-muted)]">No buttons yet.</p> : null}
                           {node.config.buttons.map((button, index) => (
                             <div
                               key={button.id}
@@ -1122,4 +1362,5 @@ const FaqEditorPage = () => {
 };
 
 export default FaqEditorPage;
+
 
