@@ -120,7 +120,7 @@ const SignInPage = () => {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="name@company.com"
+                    placeholder="emailhehe@gmail.com"
                     className="w-full rounded-xl border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                   />
                 </div>
