@@ -34,22 +34,19 @@ const DashboardShell = ({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    return window.localStorage.getItem("dashboard-sidebar-open") !== "false";
-  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
   const isDesktopSidebarExpanded = isSidebarOpen;
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    const storedSidebarPreference =
+      window.localStorage.getItem("dashboard-sidebar-open") !== "false";
 
+    setIsSidebarOpen(storedSidebarPreference);
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem("dashboard-sidebar-open", String(isSidebarOpen));
   }, [isSidebarOpen]);
 
