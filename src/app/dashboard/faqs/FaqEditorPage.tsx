@@ -1069,7 +1069,7 @@ const FaqEditorPage = () => {
                         value={node.config.message}
                         onChange={(event) => updateNode(node.id, (current) => ({ ...current, config: { ...current.config, message: event.target.value } }))}
                         placeholder="Reply message"
-                        className="w-full resize-none rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                        className="scrollbar-hidden w-full resize-none overflow-y-auto rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                       />
 
                       <input

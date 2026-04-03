@@ -247,6 +247,35 @@ input[type="search"]::-webkit-search-cancel-button {
   background: transparent;
 }
 
+.scrollbar-modern {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(62, 207, 142, 0.92) rgba(255, 255, 255, 0.08);
+}
+
+.scrollbar-modern::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.scrollbar-modern::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(23, 23, 23, 0.9);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #57e1a2, #0a7a4a);
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #74efb5, #12a260);
+}
+
+.scrollbar-modern::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

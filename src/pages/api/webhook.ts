@@ -19,6 +19,7 @@ const HIGH_USAGE_THRESHOLD = 80;
 const HIGH_USAGE_DELAY_MS = 1500;
 const BULK_MESSAGE_DELAY_MS = 350;
 const REQUEST_TIMEOUT_MS = 15000;
+const MAX_FORMATTED_TEXT_CHUNK_LENGTH = 280;
 const RATE_LIMIT_LOG_RETENTION_DAYS = 30;
 const RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
@@ -247,6 +248,7 @@ async function sendFlowNodeMessage(
   clientFlowNodes: ClientFlowNode[]
 ) {
   const config = parseBotFlowNodeConfig(node.answer, node.keywords[0] || "Flow Card");
+  const formattedMessageParts = formatMessengerTextParts(config.message);
   const imageAttachmentIds = config.images.length ? config.images : node.imageAttachmentId ? [node.imageAttachmentId] : [];
   const validButtons = config.buttons.filter((button) =>
     clientFlowNodes.some((candidate) => candidate.id === button.targetNodeId)
@@ -266,7 +268,7 @@ async function sendFlowNodeMessage(
         type: "button_template",
         body: createButtonTemplateMessageBody(
           recipientId,
-          config.message || "Choose an option below.",
+          formattedMessageParts[0] || "Choose an option below.",
           validButtons.map((button) => ({
             title: button.label,
             payload: createFlowPayload(clientId, button.targetNodeId),
@@ -278,7 +280,7 @@ async function sendFlowNodeMessage(
         type: "quick_replies",
         body: createQuickRepliesMessageBody(
           recipientId,
-          config.message || "Choose an option below.",
+          formattedMessageParts[0] || "Choose an option below.",
           validButtons.map((button) => ({
             title: button.label,
             payload: createFlowPayload(clientId, button.targetNodeId),
@@ -828,6 +830,106 @@ function parseFlowPayload(payload: string) {
   return { clientId, nodeId };
 }
 
+function formatMessengerTextParts(text: string) {
+  const normalizedText = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  if (!normalizedText) {
+    return [];
+  }
+
+  const paragraphs = normalizedText
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const parts: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.length <= MAX_FORMATTED_TEXT_CHUNK_LENGTH) {
+      parts.push(paragraph);
+      continue;
+    }
+
+    const sentences = paragraph
+      .split(/(?<=[.!?])\s+/)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 1) {
+      parts.push(...splitLongTextBlock(paragraph, MAX_FORMATTED_TEXT_CHUNK_LENGTH));
+      continue;
+    }
+
+    let currentPart = "";
+
+    for (const sentence of sentences) {
+      const candidate = currentPart ? `${currentPart} ${sentence}` : sentence;
+
+      if (candidate.length <= MAX_FORMATTED_TEXT_CHUNK_LENGTH) {
+        currentPart = candidate;
+        continue;
+      }
+
+      if (currentPart) {
+        parts.push(currentPart);
+      }
+
+      if (sentence.length <= MAX_FORMATTED_TEXT_CHUNK_LENGTH) {
+        currentPart = sentence;
+      } else {
+        parts.push(...splitLongTextBlock(sentence, MAX_FORMATTED_TEXT_CHUNK_LENGTH));
+        currentPart = "";
+      }
+    }
+
+    if (currentPart) {
+      parts.push(currentPart);
+    }
+  }
+
+  return parts;
+}
+
+function splitLongTextBlock(text: string, maxLength: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const parts: string[] = [];
+  let currentPart = "";
+
+  for (const word of words) {
+    const candidate = currentPart ? `${currentPart} ${word}` : word;
+
+    if (candidate.length <= maxLength) {
+      currentPart = candidate;
+      continue;
+    }
+
+    if (currentPart) {
+      parts.push(currentPart);
+    }
+
+    if (word.length <= maxLength) {
+      currentPart = word;
+      continue;
+    }
+
+    for (let index = 0; index < word.length; index += maxLength) {
+      parts.push(word.slice(index, index + maxLength));
+    }
+
+    currentPart = "";
+  }
+
+  if (currentPart) {
+    parts.push(currentPart);
+  }
+
+  return parts;
+}
 function createTextMessageBody(recipientId: string, text: string): MessengerRequestBody {
   return {
     recipient: { id: recipientId },
@@ -981,6 +1083,9 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
+
 
 
 
