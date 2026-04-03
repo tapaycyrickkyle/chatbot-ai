@@ -827,30 +827,28 @@ const FaqEditorPage = () => {
         );
 
         if (targetNodeId) {
-          let nextNodes: FlowNodeRecord[] = [];
-          setNodes((currentNodes) => {
-            nextNodes = syncKeywordsFromConnections(
-              currentNodes.map((node) => {
-                if (node.id !== connectionDragState.sourceNodeId) {
-                  return node;
-                }
+          const nextNodes = syncKeywordsFromConnections(
+            nodesRef.current.map((node) => {
+              if (node.id !== connectionDragState.sourceNodeId) {
+                return node;
+              }
 
-                return {
-                  ...node,
-                  config: {
-                    ...node.config,
-                    buttons: node.config.buttons.map((button) =>
-                      button.id === connectionDragState.buttonId
-                        ? { ...button, targetNodeId }
-                        : button
-                    ),
-                  },
-                };
-              })
-            );
+              return {
+                ...node,
+                config: {
+                  ...node.config,
+                  buttons: node.config.buttons.map((button) =>
+                    button.id === connectionDragState.buttonId
+                      ? { ...button, targetNodeId }
+                      : button
+                  ),
+                },
+              };
+            })
+          );
 
-            return nextNodes;
-          });
+          nodesRef.current = nextNodes;
+          setNodes(nextNodes);
           const updatedNode = nextNodes.find((node) => node.id === connectionDragState.sourceNodeId);
           if (updatedNode) {
             await persistNode(updatedNode, { quiet: true, skipContentValidation: true });
