@@ -161,6 +161,18 @@ function normalizeNodeForSave(node: FlowNodeRecord) {
   };
 }
 
+function buildNewNodeConfig(nodeCount: number, canvasWidth: number) {
+  const offset = nodeCount * 28;
+
+  return createDefaultBotFlowNodeConfig({
+    title: `Card ${nodeCount + 1}`,
+    position: {
+      x: clampPosition(72 + offset, canvasWidth - NODE_WIDTH - CARD_PADDING),
+      y: clampPosition(72 + offset, MIN_CANVAS_HEIGHT - BASE_NODE_HEIGHT - CARD_PADDING),
+    },
+  });
+}
+
 const FaqEditorPage = () => {
   const searchParams = useSearchParams();
   const clientId = searchParams?.get("clientId") ?? "";
@@ -204,36 +216,6 @@ const FaqEditorPage = () => {
     MIN_CANVAS_HEIGHT,
     ...filteredNodes.map((node) => node.config.position.y + getNodeHeight(node) + CARD_PADDING * 2)
   );
-
-  useEffect(() => {
-    const loadNodes = async () => {
-      if (!clientId) {
-        setNodes([]);
-        setIsLoadingNodes(false);
-        return;
-      }
-
-      setIsLoadingNodes(true);
-
-      try {
-        const data = await fetchFlowNodes(clientId);
-        startTransition(() => {
-          setNodes(data.map((entry) => toFlowNodeRecord(entry)));
-        });
-      } catch (error) {
-        console.error(error);
-        setNodes([]);
-        setNotice({
-          tone: "error",
-          message: error instanceof Error ? error.message : "Failed to load bot flow.",
-        });
-      } finally {
-        setIsLoadingNodes(false);
-      }
-    };
-
-    void loadNodes();
-  }, [clientId]);
 
   useEffect(() => {
     if (!notice) {
@@ -354,20 +336,14 @@ const FaqEditorPage = () => {
     }
   };
 
-  const createNode = async () => {
+  const createNode = useCallback(async (options?: { quiet?: boolean; seedNodesCount?: number }) => {
     if (!clientId) {
       return;
     }
 
     setIsCreatingNode(true);
-    const offset = nodes.length * 28;
-    const config = createDefaultBotFlowNodeConfig({
-      title: `Card ${nodes.length + 1}`,
-      position: {
-        x: clampPosition(72 + offset, canvasWidth - NODE_WIDTH - CARD_PADDING),
-        y: clampPosition(72 + offset, MIN_CANVAS_HEIGHT - BASE_NODE_HEIGHT - CARD_PADDING),
-      },
-    });
+    const nodeCount = options?.seedNodesCount ?? nodes.length;
+    const config = buildNewNodeConfig(nodeCount, canvasWidth);
 
     try {
       const response = await fetch(`/api/faqs/${encodeURIComponent(clientId)}`, {
@@ -387,13 +363,75 @@ const FaqEditorPage = () => {
         ...currentNodes,
         { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
       ]);
-      setNotice({ tone: "success", message: "New card created." });
+      if (!options?.quiet) {
+        setNotice({ tone: "success", message: "New card created." });
+      }
     } catch (error) {
       setNotice({ tone: "error", message: error instanceof Error ? error.message : "Unable to create card." });
     } finally {
       setIsCreatingNode(false);
     }
-  };
+  }, [canvasWidth, clientId, nodes.length]);
+
+  useEffect(() => {
+    const loadNodes = async () => {
+      if (!clientId) {
+        setNodes([]);
+        setIsLoadingNodes(false);
+        return;
+      }
+
+      setIsLoadingNodes(true);
+
+      try {
+        const data = await fetchFlowNodes(clientId);
+
+        if (data.length === 0) {
+          const config = buildNewNodeConfig(0, MIN_CANVAS_WIDTH);
+          const response = await fetch(`/api/faqs/${encodeURIComponent(clientId)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              keywords: [],
+              answer: serializeBotFlowNodeConfig(config),
+              image_attachment_id: "",
+            }),
+          });
+
+          const result = (await response.json().catch(() => null)) as
+            | { error?: string; faqId?: string }
+            | null;
+
+          if (!response.ok || !result?.faqId) {
+            throw new Error(result?.error || "Unable to create starter card");
+          }
+
+          const faqId = result.faqId;
+          startTransition(() => {
+            setNodes([
+              { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
+            ]);
+          });
+          return;
+        }
+
+        startTransition(() => {
+          setNodes(data.map((entry) => toFlowNodeRecord(entry)));
+        });
+      } catch (error) {
+        console.error(error);
+        setNodes([]);
+        setNotice({
+          tone: "error",
+          message: error instanceof Error ? error.message : "Failed to load bot flow.",
+        });
+      } finally {
+        setIsLoadingNodes(false);
+      }
+    };
+
+    void loadNodes();
+  }, [clientId]);
 
   const deleteNode = async (nodeId: string) => {
     if (!clientId) {
