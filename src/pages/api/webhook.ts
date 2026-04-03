@@ -79,7 +79,9 @@ export default async function handler(
 
         const pageAccessToken = client.page_access_token;
         const clientFaqs = (await getFaqsForClient(client.id)).map((faq) => ({
-          keywords: faq.keywords.map((keyword) => keyword.trim().toLowerCase()),
+          keywords: faq.keywords
+            .map((keyword) => normalizeText(keyword))
+            .filter(Boolean),
           answer: faq.answer,
           imageAttachmentId: faq.image_attachment_id,
         }));
@@ -87,10 +89,12 @@ export default async function handler(
         for (const event of entry.messaging ?? []) {
           if (event.message?.text) {
             const userId = event.sender.id;
-            const userMessage = event.message.text.toLowerCase();
+            const userMessage = normalizeText(event.message.text);
 
             const matched = clientFaqs.find((faq) =>
-              faq.keywords.some((keyword: string) => userMessage.includes(keyword))
+              faq.keywords.some((keyword: string) =>
+                messageMatchesKeyword(userMessage, keyword)
+              )
             );
 
             if (matched) {
@@ -211,4 +215,20 @@ function isValidWebhookSignature(
   }
 
   return timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function messageMatchesKeyword(message: string, keyword: string) {
+  if (!message || !keyword) {
+    return false;
+  }
+
+  return message === keyword;
 }
