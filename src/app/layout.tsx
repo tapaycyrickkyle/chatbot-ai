@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
+import chatbotWebIcon from "./chatbot-web-icon.png";
 import "./globals.css";
 
 const inter = Inter({
@@ -15,6 +16,10 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "Business Chatbot",
   description: "Business Chatbot admin dashboard for Facebook Page automation.",
+  icons: {
+    icon: chatbotWebIcon.src,
+    apple: chatbotWebIcon.src,
+  },
 };
 
 export default function RootLayout({
@@ -26,8 +31,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${manrope.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
       </body>
     </html>
