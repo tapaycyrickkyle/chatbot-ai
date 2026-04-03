@@ -217,6 +217,7 @@ const FaqEditorPage = () => {
   const [deletingNodeId, setDeletingNodeId] = useState<string | null>(null);
   const [nodeDragState, setNodeDragState] = useState<NodeDragState | null>(null);
   const [connectionDragState, setConnectionDragState] = useState<ConnectionDragState | null>(null);
+  const [hoveredConnectionTargetId, setHoveredConnectionTargetId] = useState("");
   const [zoom, setZoom] = useState(1);
 
   const filteredNodes = nodes.filter((node) => {
@@ -253,6 +254,12 @@ const FaqEditorPage = () => {
     const timeoutId = window.setTimeout(() => setNotice(null), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [notice]);
+
+  useEffect(() => {
+    if (!connectionDragState && hoveredConnectionTargetId) {
+      setHoveredConnectionTargetId("");
+    }
+  }, [connectionDragState, hoveredConnectionTargetId]);
 
   const updateNode = (nodeId: string, updater: (node: FlowNodeRecord) => FlowNodeRecord) => {
     setNodes((currentNodes) => currentNodes.map((node) => (node.id === nodeId ? updater(node) : node)));
@@ -537,6 +544,15 @@ const FaqEditorPage = () => {
           return;
         }
 
+        const targetNodeId = getDropTargetNodeId(
+          event.clientX,
+          event.clientY,
+          connectionDragState.sourceNodeId,
+          nodeRefs
+        );
+
+        setHoveredConnectionTargetId(targetNodeId);
+
         setConnectionDragState((currentState) =>
           currentState
             ? {
@@ -593,6 +609,7 @@ const FaqEditorPage = () => {
         }
 
         setConnectionDragState(null);
+        setHoveredConnectionTargetId("");
       }
     };
 
@@ -747,6 +764,12 @@ const FaqEditorPage = () => {
                       className="absolute w-[350px] overflow-visible rounded-[1.35rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(29,29,29,0.98),rgba(18,18,18,0.98))] px-4 py-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)]"
                       style={{ left: node.config.position.x, top: node.config.position.y }}
                     >
+                    {connectionDragState && hoveredConnectionTargetId === node.id ? (
+                      <>
+                        <div className="pointer-events-none absolute left-[-18px] top-1/2 h-7 w-7 -translate-y-1/2 rounded-full border border-[var(--accent-bright)] bg-[var(--surface-strong)] shadow-[0_0_0_6px_rgba(62,207,142,0.14)]" />
+                        <div className="pointer-events-none absolute right-[-18px] top-1/2 h-7 w-7 -translate-y-1/2 rounded-full border border-[var(--accent-bright)] bg-[var(--surface-strong)] shadow-[0_0_0_6px_rgba(62,207,142,0.14)]" />
+                      </>
+                    ) : null}
 
                     <div
                       className="flex cursor-grab items-start justify-between gap-3 border-b border-[var(--border)] pb-3 active:cursor-grabbing"
