@@ -11,6 +11,7 @@ export type BotFlowNodeConfig = {
   title: string;
   message: string;
   images: string[];
+  imagePreviews: string[];
   buttons: BotFlowButton[];
   position: {
     x: number;
@@ -33,6 +34,7 @@ export function createDefaultBotFlowNodeConfig(seed?: Partial<BotFlowNodeConfig>
     title: seed?.title?.trim() || "Untitled Card",
     message: seed?.message?.trim() || "",
     images: normalizeImages(seed?.images ?? []),
+    imagePreviews: normalizeImages(seed?.imagePreviews ?? []),
     buttons: normalizeButtons(seed?.buttons ?? []),
     position: {
       x: Number.isFinite(seed?.position?.x) ? Number(seed?.position?.x) : DEFAULT_POSITION.x,
@@ -60,6 +62,7 @@ export function parseBotFlowNodeConfig(value: string, fallbackTitle?: string): B
       title: parsed?.title || fallbackTitle,
       message: typeof parsed?.message === "string" ? parsed.message : value,
       images: Array.isArray(parsed?.images) ? parsed.images : [],
+      imagePreviews: Array.isArray(parsed?.imagePreviews) ? parsed.imagePreviews : [],
       buttons: Array.isArray(parsed?.buttons) ? parsed.buttons : [],
       position:
         parsed?.position && typeof parsed.position === "object"
@@ -125,3 +128,4 @@ export function normalizeImages(images: unknown[]) {
     .map((image) => image.trim())
     .filter(Boolean);
 }
+

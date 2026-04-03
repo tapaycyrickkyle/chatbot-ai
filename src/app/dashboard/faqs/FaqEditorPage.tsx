@@ -91,6 +91,15 @@ async function fetchFlowNodes(clientId: string) {
   return (await response.json()) as FaqEntry[];
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("Unable to preview image"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function toFlowNodeRecord(entry: FaqEntry): FlowNodeRecord {
   const initialKeywordInput = entry.keywords.join(", ");
   const parsedConfig = createDefaultBotFlowNodeConfig(
@@ -108,10 +117,11 @@ function toFlowNodeRecord(entry: FaqEntry): FlowNodeRecord {
     keywordInput: initialKeywordInput,
     manualKeywordInput: initialKeywordInput,
     imageAttachmentIds,
-    imagePreviewUrls: [],
+    imagePreviewUrls: parsedConfig.imagePreviews ?? [],
     config: {
       ...parsedConfig,
       images: imageAttachmentIds,
+      imagePreviews: parsedConfig.imagePreviews ?? [],
     },
   };
 }
@@ -122,6 +132,7 @@ function toApiPayload(node: FlowNodeRecord) {
     answer: serializeBotFlowNodeConfig({
       ...node.config,
       images: node.imageAttachmentIds,
+      imagePreviews: node.imagePreviewUrls,
     }),
     image_attachment_id: node.imageAttachmentIds[0] ?? "",
   };
@@ -253,6 +264,7 @@ function normalizeNodeForSave(node: FlowNodeRecord) {
         ...node.config,
         message: trimmedMessage,
         images: node.imageAttachmentIds,
+        imagePreviews: node.imagePreviewUrls,
         buttons: normalizedButtons,
       },
     },
@@ -289,6 +301,7 @@ function ensureNodeImages(node: FlowNodeRecord): FlowNodeRecord {
     config: {
       ...node.config,
       images: safeImages,
+      imagePreviews: safePreviewUrls,
     },
   };
 }
@@ -518,6 +531,7 @@ const FaqEditorPage = () => {
     setUploadingImageNodeId(nodeId);
 
     try {
+      const previewDataUrl = await readFileAsDataUrl(file);
       const formData = new FormData();
       formData.append("clientId", clientId);
       formData.append("file", file);
@@ -538,10 +552,11 @@ const FaqEditorPage = () => {
       updateNode(nodeId, (current) => ({
         ...current,
         imageAttachmentIds: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
-        imagePreviewUrls: [...current.imagePreviewUrls, URL.createObjectURL(file)],
+        imagePreviewUrls: [...current.imagePreviewUrls, previewDataUrl].filter(Boolean),
         config: {
           ...current.config,
           images: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
+          imagePreviews: [...current.imagePreviewUrls, previewDataUrl].filter(Boolean),
         },
       }));
       setImageCarouselIndexes((current) => ({
@@ -1129,6 +1144,7 @@ const FaqEditorPage = () => {
                                         config: {
                                           ...current.config,
                                           images: nextImages,
+                                          imagePreviews: nextPreviewUrls,
                                         },
                                       };
                                     })
