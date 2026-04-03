@@ -65,21 +65,6 @@ const MAX_ZOOM = 1.6;
 const ZOOM_STEP = 0.1;
 const IMAGE_PREVIEW_STORAGE_KEY = "builder-image-previews";
 
-function getCanvasPointFromElement(
-  element: HTMLElement,
-  canvasElement: HTMLDivElement,
-  side: "left" | "right",
-  zoom: number
-) {
-  const elementRect = element.getBoundingClientRect();
-  const canvasRect = canvasElement.getBoundingClientRect();
-
-  return {
-    x: (side === "left" ? elementRect.left - canvasRect.left : elementRect.right - canvasRect.left) / zoom,
-    y: (elementRect.top - canvasRect.top + elementRect.height / 2) / zoom,
-  };
-}
-
 async function fetchFlowNodes(clientId: string) {
   const response = await fetch(`/api/faqs/${encodeURIComponent(clientId)}`, {
     cache: "no-store",
@@ -220,6 +205,30 @@ function getDropTargetNodeId(
 function getNodeHeight(node: FlowNodeRecord) {
   const extraButtons = Math.max(0, node.config.buttons.length - 1);
   return BASE_NODE_HEIGHT + extraButtons * QUICK_REPLY_ROW_SPACING;
+}
+
+function getConnectionSourcePoint(
+  node: FlowNodeRecord,
+  buttonIndex: number,
+  side: "left" | "right"
+) {
+  return {
+    x:
+      side === "left"
+        ? node.config.position.x - 12
+        : node.config.position.x + NODE_WIDTH + 12,
+    y:
+      node.config.position.y +
+      QUICK_REPLY_ROW_START_Y +
+      buttonIndex * QUICK_REPLY_ROW_SPACING,
+  };
+}
+
+function getConnectionTargetPoint(node: FlowNodeRecord) {
+  return {
+    x: node.config.position.x - 12,
+    y: node.config.position.y + getNodeHeight(node) / 2,
+  };
 }
 
 function normalizeKeywordInput(value: string) {
@@ -877,22 +886,8 @@ const FaqEditorPage = () => {
           return null;
         }
 
-        const sourceButtonElement = quickReplyRefs.current[button.id];
-        const targetNodeElement = nodeRefs.current[targetNode.id];
-        const sourcePoint =
-          sourceButtonElement && canvasRef.current
-            ? getCanvasPointFromElement(sourceButtonElement, canvasRef.current, "right", zoom)
-            : {
-                x: node.config.position.x + NODE_WIDTH,
-                y: node.config.position.y + QUICK_REPLY_ROW_START_Y + index * QUICK_REPLY_ROW_SPACING,
-              };
-        const targetPoint =
-          targetNodeElement && canvasRef.current
-            ? getCanvasPointFromElement(targetNodeElement, canvasRef.current, "left", zoom)
-            : {
-                x: targetNode.config.position.x,
-                y: targetNode.config.position.y + getNodeHeight(targetNode) / 2,
-              };
+        const sourcePoint = getConnectionSourcePoint(node, index, "right");
+        const targetPoint = getConnectionTargetPoint(targetNode);
 
         return {
           id: `${node.id}:${button.id}`,
@@ -1292,17 +1287,7 @@ const FaqEditorPage = () => {
                                   if (!rect) {
                                     return;
                                   }
-                                  const sourceButtonElement = quickReplyRefs.current[button.id];
-                                  const sourcePoint =
-                                    sourceButtonElement && canvasRef.current
-                                      ? getCanvasPointFromElement(sourceButtonElement, canvasRef.current, "left", zoom)
-                                      : {
-                                          x: node.config.position.x,
-                                          y:
-                                            node.config.position.y +
-                                            QUICK_REPLY_ROW_START_Y +
-                                            index * QUICK_REPLY_ROW_SPACING,
-                                        };
+                                  const sourcePoint = getConnectionSourcePoint(node, index, "left");
 
                                   setConnectionDragState({
                                     sourceNodeId: node.id,
@@ -1326,17 +1311,7 @@ const FaqEditorPage = () => {
                                   if (!rect) {
                                     return;
                                   }
-                                  const sourceButtonElement = quickReplyRefs.current[button.id];
-                                  const sourcePoint =
-                                    sourceButtonElement && canvasRef.current
-                                      ? getCanvasPointFromElement(sourceButtonElement, canvasRef.current, "right", zoom)
-                                      : {
-                                          x: node.config.position.x + NODE_WIDTH,
-                                          y:
-                                            node.config.position.y +
-                                            QUICK_REPLY_ROW_START_Y +
-                                            index * QUICK_REPLY_ROW_SPACING,
-                                        };
+                                  const sourcePoint = getConnectionSourcePoint(node, index, "right");
 
                                   setConnectionDragState({
                                     sourceNodeId: node.id,
