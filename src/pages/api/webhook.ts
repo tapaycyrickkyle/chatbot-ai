@@ -32,6 +32,9 @@ type WebhookBody = {
           payload?: string;
         };
       };
+      postback?: {
+        payload?: string;
+      };
     }>;
   }>;
 };
@@ -102,10 +105,10 @@ export default async function handler(
 
         for (const event of entry.messaging ?? []) {
           const userId = event.sender.id;
-          const quickReplyPayload = event.message?.quick_reply?.payload;
+          const flowPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
 
-          if (quickReplyPayload) {
-            const targetNode = resolveQuickReplyTarget(client.id, quickReplyPayload, clientFlowNodes);
+          if (flowPayload) {
+            const targetNode = resolveQuickReplyTarget(client.id, flowPayload, clientFlowNodes);
 
             if (targetNode) {
               await sendFlowNodeMessage(userId, targetNode, client.id, pageAccessToken, clientFlowNodes);
@@ -157,6 +160,19 @@ async function sendFlowNodeMessage(
   }
 
   if (validButtons.length > 0) {
+    if (validButtons.length <= 3) {
+      await sendButtonTemplateMessage(
+        recipientId,
+        config.message || "Choose an option below.",
+        validButtons.map((button) => ({
+          title: button.label,
+          payload: createFlowPayload(clientId, button.targetNodeId),
+        })),
+        pageToken
+      );
+      return;
+    }
+
     await sendQuickRepliesMessage(
       recipientId,
       config.message || "Choose an option below.",
@@ -244,6 +260,34 @@ async function sendQuickRepliesMessage(
     pageToken
   );
 }
+async function sendButtonTemplateMessage(
+  recipientId: string,
+  text: string,
+  buttons: Array<{ title: string; payload: string }>,
+  pageToken: string
+) {
+  await sendMessengerRequest(
+    {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "template",
+          payload: {
+            template_type: "button",
+            text,
+            buttons: buttons.slice(0, 3).map((button) => ({
+              type: "postback",
+              title: button.title,
+              payload: button.payload,
+            })),
+          },
+        },
+      },
+    },
+    pageToken
+  );
+}
+
 
 async function sendImageMessage(
   recipientId: string,
@@ -348,4 +392,7 @@ function messageMatchesKeyword(message: string, keyword: string) {
 
   return message === keyword;
 }
+
+
+
 

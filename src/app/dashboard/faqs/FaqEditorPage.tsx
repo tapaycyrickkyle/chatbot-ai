@@ -592,7 +592,7 @@ const FaqEditorPage = () => {
                       type="button"
                       onClick={() => void saveFlow()}
                       disabled={!clientId || nodes.length === 0 || isSavingFlow}
-                      className="rounded-lg border border-[var(--accent-bright)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-primary)] shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {isSavingFlow ? "Saving..." : "Save Flow"}
                     </button>
@@ -641,7 +641,15 @@ const FaqEditorPage = () => {
                         </p>
                         <p className="mt-1 text-[12px] text-[var(--text-subtle)]">Drag this header to move the card</p>
                       </div>
-                      <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-label)]">{node.config.buttons.length} btn</span>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => void deleteNode(node.id)}
+                        disabled={deletingNodeId === node.id}
+                        className="rounded-full border border-[#5a2626] bg-[#2b1717] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {deletingNodeId === node.id ? "..." : "Delete"}
+                      </button>
                     </div>
 
                     <div className="mt-4 space-y-4">
@@ -794,16 +802,6 @@ const FaqEditorPage = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-start pt-1">
-                        <button
-                          type="button"
-                          onClick={() => void deleteNode(node.id)}
-                          disabled={deletingNodeId === node.id}
-                          className="rounded-xl border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          {deletingNodeId === node.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
                     </div>
                     </article>
                   ))}
