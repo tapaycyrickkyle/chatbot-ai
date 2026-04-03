@@ -44,7 +44,13 @@ const SignInPage = () => {
         | null;
 
       if (!response.ok) {
-        await supabase.auth.signOut();
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (
+          signOutError &&
+          !signOutError.message.toLowerCase().includes("refresh token not found")
+        ) {
+          console.error(signOutError);
+        }
         setError(payload?.error || "Unable to sign in");
         return;
       }

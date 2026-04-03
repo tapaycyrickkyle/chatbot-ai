@@ -17,7 +17,14 @@ const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) =>
 
     try {
       const supabase = getSupabaseBrowserClient();
-      await supabase.auth.signOut();
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (
+        signOutError &&
+        !signOutError.message.toLowerCase().includes("refresh token not found")
+      ) {
+        throw signOutError;
+      }
 
       const response = await fetch("/api/auth/admin/logout", {
         method: "POST",
