@@ -430,8 +430,26 @@ async function upsertReplyCaptureSession(session: ReplyCaptureSessionRow) {
       { onConflict: "client_id,recipient_id" }
     );
 
-  if (error) {
-    console.warn("Failed to save reply capture session", error);
+  if (!error) {
+    return;
+  }
+
+  const { error: fallbackDeleteError } = await supabaseAdmin
+    .from("bot_flow_reply_sessions")
+    .delete()
+    .eq("client_id", session.client_id)
+    .eq("recipient_id", session.recipient_id);
+
+  if (fallbackDeleteError) {
+    console.warn("Failed to clear existing reply capture session", fallbackDeleteError);
+  }
+
+  const { error: fallbackInsertError } = await supabaseAdmin
+    .from("bot_flow_reply_sessions")
+    .insert(session);
+
+  if (fallbackInsertError) {
+    console.warn("Failed to save reply capture session", fallbackInsertError);
   }
 }
 
@@ -1151,6 +1169,7 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
 
 
 
