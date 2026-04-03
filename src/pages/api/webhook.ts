@@ -12,6 +12,8 @@ export const config = {
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const MAX_QUICK_REPLIES = 13;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
+const GET_STARTED_PAYLOAD = "GET_STARTED";
+const WELCOME_KEYWORDS = new Set(["get started", "get_started", "welcome", "start"]);
 
 type ClientFlowNode = {
   id: string;
@@ -108,6 +110,16 @@ export default async function handler(
           const flowPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
 
           if (flowPayload) {
+            if (flowPayload === GET_STARTED_PAYLOAD) {
+              const welcomeNode = resolveWelcomeNode(clientFlowNodes);
+
+              if (welcomeNode) {
+                await sendFlowNodeMessage(userId, welcomeNode, client.id, pageAccessToken, clientFlowNodes);
+              }
+
+              continue;
+            }
+
             const targetNode = resolveQuickReplyTarget(client.id, flowPayload, clientFlowNodes);
 
             if (targetNode) {
@@ -202,6 +214,41 @@ function resolveQuickReplyTarget(
   }
 
   return nodes.find((node) => node.id === parsed.nodeId) ?? null;
+}
+
+function resolveWelcomeNode(nodes: ClientFlowNode[]) {
+  if (!nodes.length) {
+    return null;
+  }
+
+  const explicitWelcomeNode = nodes.find((node) =>
+    node.keywords.some((keyword) => WELCOME_KEYWORDS.has(keyword))
+  );
+
+  if (explicitWelcomeNode) {
+    return explicitWelcomeNode;
+  }
+
+  const sortByCanvasPosition = (left: ClientFlowNode, right: ClientFlowNode) => {
+    const leftConfig = parseBotFlowNodeConfig(left.answer, left.keywords[0] || "Flow Card");
+    const rightConfig = parseBotFlowNodeConfig(right.answer, right.keywords[0] || "Flow Card");
+
+    if (leftConfig.position.y !== rightConfig.position.y) {
+      return leftConfig.position.y - rightConfig.position.y;
+    }
+
+    return leftConfig.position.x - rightConfig.position.x;
+  };
+
+  const keywordlessNodes = nodes
+    .filter((node) => node.keywords.length === 0)
+    .sort(sortByCanvasPosition);
+
+  if (keywordlessNodes.length > 0) {
+    return keywordlessNodes[0] ?? null;
+  }
+
+  return [...nodes].sort(sortByCanvasPosition)[0] ?? null;
 }
 
 function createFlowPayload(clientId: string, nodeId: string) {
@@ -392,6 +439,9 @@ function messageMatchesKeyword(message: string, keyword: string) {
 
   return message === keyword;
 }
+
+
+
 
 
 

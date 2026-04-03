@@ -14,6 +14,72 @@ function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
+async function subscribePageToWebhook(pageId: string, pageAccessToken: string) {
+  const subscribeResponse = await fetch(
+    `https://graph.facebook.com/v20.0/${pageId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        access_token: pageAccessToken,
+        subscribed_fields: ["messages", "messaging_postbacks"],
+      }),
+    }
+  );
+
+  if (!subscribeResponse.ok) {
+    const subscribeData = (await subscribeResponse.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+
+    throw new Error(
+      subscribeData?.error?.message ?? "Webhook subscription failed for this page"
+    );
+  }
+}
+
+async function configureMessengerProfile(clientName: string, pageAccessToken: string) {
+  const profileResponse = await fetch(
+    `https://graph.facebook.com/v20.0/me/messenger_profile?access_token=${encodeURIComponent(
+      pageAccessToken
+    )}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        get_started: {
+          payload: "GET_STARTED",
+        },
+        greeting: [
+          {
+            locale: "default",
+            text: `Welcome to ${clientName}. Tap Get Started to open the chat.`,
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!profileResponse.ok) {
+    const profileData = (await profileResponse.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+
+    throw new Error(
+      profileData?.error?.message ?? "Messenger profile setup failed for this page"
+    );
+  }
+}
+
+async function finalizeClientConnection(clientName: string, pageId: string, pageAccessToken: string) {
+  await subscribePageToWebhook(pageId, pageAccessToken);
+  await configureMessengerProfile(clientName, pageAccessToken);
+}
+
 function buildPagePictureUrl(pageId: string) {
   return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
 }
@@ -99,32 +165,18 @@ export async function POST(req: NextRequest) {
 
       await addClient(validatedPayload);
 
-      const subscribeResponse = await fetch(
-        `https://graph.facebook.com/v20.0/${validatedPayload.page_id}/subscribed_apps`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            access_token: matchedPage.access_token,
-            subscribed_fields: ["messages", "messaging_postbacks"],
-          }),
-        }
-      );
-
-      if (!subscribeResponse.ok) {
-        const subscribeData = (await subscribeResponse.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-
+      try {
+        await finalizeClientConnection(
+          validatedPayload.client_name,
+          validatedPayload.page_id,
+          matchedPage.access_token
+        );
+      } catch (error) {
         await deleteClientByPageId(validatedPayload.page_id);
 
         return NextResponse.json(
           {
-            error:
-              subscribeData?.error?.message ??
-              "Webhook subscription failed for this page",
+            error: error instanceof Error ? error.message : "Facebook page setup failed",
           },
           { status: 400 }
         );
@@ -140,6 +192,20 @@ export async function POST(req: NextRequest) {
     }
 
     await addClient({ client_name, page_id, page_access_token });
+
+    try {
+      await finalizeClientConnection(client_name, page_id, page_access_token);
+    } catch (error) {
+      await deleteClientByPageId(page_id);
+
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : "Facebook page setup failed",
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);

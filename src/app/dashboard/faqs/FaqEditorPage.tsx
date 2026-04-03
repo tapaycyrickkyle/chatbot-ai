@@ -56,6 +56,7 @@ const BASE_NODE_HEIGHT = 440;
 const CARD_PADDING = 24;
 const QUICK_REPLY_ROW_START_Y = 404;
 const QUICK_REPLY_ROW_SPACING = 62;
+const MAX_FLOW_BUTTONS = 3;
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 1.6;
 const ZOOM_STEP = 0.1;
@@ -289,6 +290,14 @@ const FaqEditorPage = () => {
         setNotice({
           tone: "error",
           message: "Connect every quick reply button to a target card before saving.",
+        });
+        return false;
+      }
+
+      if (normalizedButtons.length > MAX_FLOW_BUTTONS) {
+        setNotice({
+          tone: "error",
+          message: `A message card can only have up to ${MAX_FLOW_BUTTONS} buttons.`,
         });
         return false;
       }
@@ -743,8 +752,25 @@ const FaqEditorPage = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={() => updateNode(node.id, (current) => ({ ...current, config: { ...current.config, buttons: [...current.config.buttons, createBotFlowButton()] } }))}
-                            className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[var(--accent-hover)]"
+                            onClick={() => {
+                              if (node.config.buttons.length >= MAX_FLOW_BUTTONS) {
+                                setNotice({
+                                  tone: "error",
+                                  message: `Only ${MAX_FLOW_BUTTONS} buttons are allowed per message card.`,
+                                });
+                                return;
+                              }
+
+                              updateNode(node.id, (current) => ({
+                                ...current,
+                                config: {
+                                  ...current.config,
+                                  buttons: [...current.config.buttons, createBotFlowButton()],
+                                },
+                              }));
+                            }}
+                            disabled={node.config.buttons.length >= MAX_FLOW_BUTTONS}
+                            className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Add Button
                           </button>
