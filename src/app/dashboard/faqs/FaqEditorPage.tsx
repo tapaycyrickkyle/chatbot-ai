@@ -513,6 +513,19 @@ const FaqEditorPage = () => {
         pushNotice("error", `A message card can only have up to ${MAX_FLOW_BUTTONS} buttons.`);
         return false;
       }
+
+      if (normalizedNode.config.captureNextReply && normalizedButtons.length > 0) {
+        pushNotice("error", "A wait-for-reply card cannot also include buttons.");
+        return false;
+      }
+
+      if (
+        normalizedNode.config.captureNextReply &&
+        !normalizedNode.config.replyTargetNodeId.trim()
+      ) {
+        pushNotice("error", "Connect the wait-for-reply step to the next card before saving.");
+        return false;
+      }
     }
 
     setNodes((currentNodes) =>
