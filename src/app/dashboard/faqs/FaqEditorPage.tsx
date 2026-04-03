@@ -916,15 +916,22 @@ const FaqEditorPage = () => {
   return (
     <DashboardShell activeNav="Clients" searchPlaceholder="Search flow cards..." showTopBar={false}>
       <div className="flex flex-col gap-6">
-        {notice && !(notice.tone === "success" && notice.message === "Flow saved successfully.") ? (
-          <div className={`rounded-2xl border px-4 py-3 text-[13px] ${notice.tone === "success" ? "border-[var(--accent-bright)]/50 bg-[rgba(8,62,35,0.52)] text-[var(--text-primary)]" : "border-[#5b2a2a] bg-[rgba(58,19,19,0.82)] text-[#ffc1c1]"}`}>
-            {notice.message}
-          </div>
-        ) : null}
-        {notice?.tone === "success" && notice.message === "Flow saved successfully." ? (
+        {notice ? (
           <div className="fixed bottom-5 right-5 z-[60] animate-[fadeIn_180ms_ease-out]">
-            <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
+            <div
+              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
+                notice.tone === "success"
+                  ? "border-[var(--accent-bright)] bg-[var(--surface)]"
+                  : "border-[#6a2d2d] bg-[#2b1717]"
+              }`}
+            >
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  notice.tone === "success"
+                    ? "bg-[var(--accent)]/20 text-[var(--accent-bright)]"
+                    : "bg-[#5a2626]/60 text-[#ffc1c1]"
+                }`}
+              >
                 <svg
                   aria-hidden="true"
                   className="h-4 w-4"
@@ -933,14 +940,25 @@ const FaqEditorPage = () => {
                   stroke="currentColor"
                   strokeWidth="2"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m5 13 4 4L19 7"
-                  />
+                  {notice.tone === "success" ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m5 13 4 4L19 7"
+                    />
+                  ) : (
+                    <>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v5" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16h.01" />
+                    </>
+                  )}
                 </svg>
               </span>
-              <p className="text-[13px] font-medium text-[var(--text-primary)]">
+              <p
+                className={`text-[13px] font-medium ${
+                  notice.tone === "success" ? "text-[var(--text-primary)]" : "text-[#ffd4d4]"
+                }`}
+              >
                 {notice.message}
               </p>
             </div>
