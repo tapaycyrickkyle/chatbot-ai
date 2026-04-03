@@ -7,7 +7,6 @@ import {
   startTransition,
   useEffect,
   useState,
-  type ChangeEvent,
   type ReactNode,
 } from "react";
 import DashboardIcon from "./DashboardIcons";
@@ -37,6 +36,7 @@ const DashboardShell = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
+  const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const isDesktopSidebarExpanded = isSidebarOpen;
 
   useEffect(() => {
@@ -54,28 +54,39 @@ const DashboardShell = ({
     window.localStorage.setItem("dashboard-sidebar-open", String(isSidebarOpen));
   }, [isSidebarOpen]);
 
+  useEffect(() => {
+    setSearchInputValue(searchValue);
+  }, [searchValue]);
+
   const closeSidebarOnMobile = () => {
     if (window.innerWidth < 1280) {
       setIsSidebarOpen(false);
     }
   };
 
-  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextValue = event.target.value;
-    const nextSearchParams = new URLSearchParams(searchParams?.toString());
-
-    if (nextValue.trim()) {
-      nextSearchParams.set("q", nextValue);
-    } else {
-      nextSearchParams.delete("q");
+  useEffect(() => {
+    if (searchInputValue === searchValue) {
+      return;
     }
 
-    const nextQuery = nextSearchParams.toString();
+    const timeoutId = window.setTimeout(() => {
+      const nextSearchParams = new URLSearchParams(searchParams?.toString());
 
-    startTransition(() => {
-      router.replace(nextQuery ? `${currentPathname}?${nextQuery}` : currentPathname);
-    });
-  };
+      if (searchInputValue.trim()) {
+        nextSearchParams.set("q", searchInputValue);
+      } else {
+        nextSearchParams.delete("q");
+      }
+
+      const nextQuery = nextSearchParams.toString();
+
+      startTransition(() => {
+        router.replace(nextQuery ? `${currentPathname}?${nextQuery}` : currentPathname);
+      });
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentPathname, router, searchInputValue, searchParams, searchValue]);
 
   return (
     <main className="page-enter flex min-h-screen bg-background text-foreground">
@@ -216,8 +227,8 @@ const DashboardShell = ({
                 <div className="relative min-w-0 flex-1 sm:max-w-[320px] lg:w-[320px]">
                   <input
                     type="search"
-                    value={searchValue}
-                    onChange={handleSearchChange}
+                    value={searchInputValue}
+                    onChange={(event) => setSearchInputValue(event.target.value)}
                     placeholder={searchPlaceholder}
                     className="w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   />
