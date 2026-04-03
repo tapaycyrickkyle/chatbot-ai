@@ -60,9 +60,10 @@ const CARD_PADDING = 24;
 const QUICK_REPLY_ROW_START_Y = 404;
 const QUICK_REPLY_ROW_SPACING = 62;
 const MAX_FLOW_BUTTONS = 3;
-const MIN_ZOOM = 0.6;
-const MAX_ZOOM = 1.6;
-const ZOOM_STEP = 0.1;
+const DEFAULT_ZOOM = 0.8;
+const MIN_ZOOM = 0.48;
+const MAX_ZOOM = 1.28;
+const ZOOM_STEP = 0.08;
 const IMAGE_PREVIEW_STORAGE_KEY = "builder-image-previews";
 
 async function fetchFlowNodes(clientId: string) {
@@ -358,6 +359,7 @@ function ensureNodeImages(node: FlowNodeRecord): FlowNodeRecord {
 const FaqEditorPage = () => {
   const searchParams = useSearchParams();
   const clientId = searchParams?.get("clientId") ?? "";
+  const clientName = (searchParams?.get("clientName") ?? "").trim();
   const flowQuery = (searchParams?.get("q") ?? "").trim().toLowerCase();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -376,7 +378,7 @@ const FaqEditorPage = () => {
   const [nodeDragState, setNodeDragState] = useState<NodeDragState | null>(null);
   const [connectionDragState, setConnectionDragState] = useState<ConnectionDragState | null>(null);
   const [hoveredConnectionTargetId, setHoveredConnectionTargetId] = useState("");
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -914,9 +916,34 @@ const FaqEditorPage = () => {
   return (
     <DashboardShell activeNav="Clients" searchPlaceholder="Search flow cards..." showTopBar={false}>
       <div className="flex flex-col gap-6">
-        {notice ? (
+        {notice && !(notice.tone === "success" && notice.message === "Flow saved successfully.") ? (
           <div className={`rounded-2xl border px-4 py-3 text-[13px] ${notice.tone === "success" ? "border-[var(--accent-bright)]/50 bg-[rgba(8,62,35,0.52)] text-[var(--text-primary)]" : "border-[#5b2a2a] bg-[rgba(58,19,19,0.82)] text-[#ffc1c1]"}`}>
             {notice.message}
+          </div>
+        ) : null}
+        {notice?.tone === "success" && notice.message === "Flow saved successfully." ? (
+          <div className="fixed bottom-5 right-5 z-[60] animate-[fadeIn_180ms_ease-out]">
+            <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m5 13 4 4L19 7"
+                  />
+                </svg>
+              </span>
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                {notice.message}
+              </p>
+            </div>
           </div>
         ) : null}
 
@@ -940,46 +967,56 @@ const FaqEditorPage = () => {
                 style={{ width: canvasWidth * zoom, height: canvasHeight * zoom }}
               >
                 <div className="pointer-events-none absolute right-3 top-3 z-20 flex justify-end">
-                  <div className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-background/95 px-1.5 py-1 shadow-[0_10px_20px_rgba(0,0,0,0.12)] backdrop-blur">
-                    <div className="inline-flex items-center gap-1">
+                  <div className="pointer-events-auto flex flex-col items-stretch gap-2 rounded-lg border border-[var(--border)] bg-background/95 px-2 py-2 shadow-[0_10px_20px_rgba(0,0,0,0.12)] backdrop-blur">
+                    <div className="min-w-[180px] rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                        Flow Builder
+                      </p>
+                      <p className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">
+                        {clientName || "Selected Page"}
+                      </p>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => adjustZoom("out")}
+                          disabled={zoom <= MIN_ZOOM}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[14px] font-semibold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label="Zoom out"
+                        >
+                          -
+                        </button>
+                        <span className="min-w-[48px] text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                          {Math.round((zoom / DEFAULT_ZOOM) * 100)}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => adjustZoom("in")}
+                          disabled={zoom >= MAX_ZOOM}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[14px] font-semibold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label="Zoom in"
+                        >
+                          +
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => adjustZoom("out")}
-                        disabled={zoom <= MIN_ZOOM}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[14px] font-semibold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Zoom out"
+                        onClick={() => void createNode()}
+                        disabled={!clientId || isCreatingNode}
+                        className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        -
+                        {isCreatingNode ? "Creating..." : "Add Card"}
                       </button>
-                      <span className="min-w-[48px] text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                        {Math.round(zoom * 100)}%
-                      </span>
                       <button
                         type="button"
-                        onClick={() => adjustZoom("in")}
-                        disabled={zoom >= MAX_ZOOM}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[14px] font-semibold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Zoom in"
+                        onClick={() => void saveFlow()}
+                        disabled={!clientId || nodes.length === 0 || isSavingFlow}
+                        className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        +
+                        {isSavingFlow ? "Saving..." : "Save Flow"}
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void createNode()}
-                      disabled={!clientId || isCreatingNode}
-                      className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isCreatingNode ? "Creating..." : "Add Card"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveFlow()}
-                      disabled={!clientId || nodes.length === 0 || isSavingFlow}
-                      className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isSavingFlow ? "Saving..." : "Save Flow"}
-                    </button>
                   </div>
                 </div>
                 <div
