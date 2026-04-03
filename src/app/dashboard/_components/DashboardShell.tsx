@@ -40,10 +40,14 @@ const DashboardShell = ({
   const isDesktopSidebarExpanded = isSidebarOpen;
 
   useEffect(() => {
-    const storedSidebarPreference =
-      window.localStorage.getItem("dashboard-sidebar-open") !== "false";
+    const timeoutId = window.setTimeout(() => {
+      const storedSidebarPreference =
+        window.localStorage.getItem("dashboard-sidebar-open") !== "false";
 
-    setIsSidebarOpen(storedSidebarPreference);
+      setIsSidebarOpen(storedSidebarPreference);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {

@@ -21,13 +21,9 @@ const BULK_MESSAGE_DELAY_MS = 350;
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_FORMATTED_TEXT_CHUNK_LENGTH = 280;
 const MAX_TEMPLATE_TEXT_LENGTH = 640;
-const RATE_LIMIT_LOG_RETENTION_DAYS = 30;
-const RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const WELCOME_KEYWORDS = new Set(["get started", "get_started", "welcome", "start"]);
-let lastRateLimitLogCleanupAt = 0;
-let pendingRateLimitLogCleanup: Promise<void> | null = null;
 
 type ClientFlowNode = {
   id: string;
@@ -632,44 +628,6 @@ function parseMessengerErrorPayload(responseText: string) {
   }
 }
 
-async function cleanupRateLimitLogsIfNeeded() {
-  const now = Date.now();
-
-  if (pendingRateLimitLogCleanup) {
-    return pendingRateLimitLogCleanup;
-  }
-
-  if (now - lastRateLimitLogCleanupAt < RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS) {
-    return;
-  }
-
-  pendingRateLimitLogCleanup = (async () => {
-    try {
-      const cutoffDate = new Date(
-        now - RATE_LIMIT_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      ).toISOString();
-
-      const { error } = await supabaseAdmin
-        .from("rate_limit_logs")
-        .delete()
-        .lt("created_at", cutoffDate);
-
-      if (error) {
-        console.warn("Failed to clean up rate limit logs", error);
-        return;
-      }
-
-      lastRateLimitLogCleanupAt = now;
-    } catch (error) {
-      console.warn("Failed to clean up rate limit logs", error);
-    } finally {
-      pendingRateLimitLogCleanup = null;
-    }
-  })();
-
-  return pendingRateLimitLogCleanup;
-}
-
 async function logRateLimitEvent(details: {
   clientId: string;
   pageId: string;
@@ -928,28 +886,6 @@ function formatMessengerTextParts(text: string) {
   return parts;
 }
 
-function buildInteractiveMessagePlan(messageParts: string[], fallbackText: string) {
-  const combinedMessage = messageParts.join("\n\n").trim();
-
-  if (combinedMessage && combinedMessage.length <= MAX_TEMPLATE_TEXT_LENGTH) {
-    return {
-      leadTextParts: [] as string[],
-      templateText: combinedMessage,
-    };
-  }
-
-  if (messageParts.length === 0) {
-    return {
-      leadTextParts: [] as string[],
-      templateText: fallbackText,
-    };
-  }
-
-  return {
-    leadTextParts: messageParts.slice(0, -1),
-    templateText: messageParts[messageParts.length - 1] || fallbackText,
-  };
-}
 function splitLongTextBlock(text: string, maxLength: number) {
   const words = text.split(/\s+/).filter(Boolean);
   const parts: string[] = [];
@@ -1051,19 +987,6 @@ function createImageMessageBody(recipientId: string, attachmentId: string): Mess
   };
 }
 
-async function sendBulkMessages(users: string[], text: string, pageToken: string, pageId = "unknown", clientId = "unknown") {
-  for (let index = 0; index < users.length; index += 1) {
-    const userId = users[index];
-
-    if (!userId) {
-      continue;
-    }
-
-    await safeSendMessage(userId, text, pageToken, 0, pageId, clientId);
-    await sleep(100);
-  }
-}
-
 async function readRawBody(req: NextApiRequest) {
   const contentLengthHeader = req.headers["content-length"];
   const contentLength =
@@ -1138,6 +1061,9 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
+
 
 
 

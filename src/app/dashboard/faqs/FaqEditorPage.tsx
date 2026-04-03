@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { startTransition, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useSearchParams } from "next/navigation";
 import DashboardShell from "../_components/DashboardShell";
@@ -353,6 +354,7 @@ const FaqEditorPage = () => {
   const nodeRefs = useRef<Record<string, HTMLElement | null>>({});
   const quickReplyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const nodesRef = useRef<FlowNodeRecord[]>([]);
 
   const [nodes, setNodes] = useState<FlowNodeRecord[]>([]);
   const [isLoadingNodes, setIsLoadingNodes] = useState(true);
@@ -366,6 +368,10 @@ const FaqEditorPage = () => {
   const [connectionDragState, setConnectionDragState] = useState<ConnectionDragState | null>(null);
   const [hoveredConnectionTargetId, setHoveredConnectionTargetId] = useState("");
   const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   const filteredNodes = nodes.filter((node) => {
     if (!flowQuery) {
@@ -805,7 +811,7 @@ const FaqEditorPage = () => {
 
     const handlePointerUp = async (event: PointerEvent) => {
       if (nodeDragState) {
-        const draggedNode = nodes.find((node) => node.id === nodeDragState.nodeId);
+        const draggedNode = nodesRef.current.find((node) => node.id === nodeDragState.nodeId);
         setNodeDragState(null);
         if (draggedNode) {
           await persistNode(draggedNode, { quiet: true, skipContentValidation: true });
@@ -821,25 +827,30 @@ const FaqEditorPage = () => {
         );
 
         if (targetNodeId) {
-          const nextNodes = syncKeywordsFromConnections(nodes.map((node) => {
-            if (node.id !== connectionDragState.sourceNodeId) {
-              return node;
-            }
+          let nextNodes: FlowNodeRecord[] = [];
+          setNodes((currentNodes) => {
+            nextNodes = syncKeywordsFromConnections(
+              currentNodes.map((node) => {
+                if (node.id !== connectionDragState.sourceNodeId) {
+                  return node;
+                }
 
-            return {
-              ...node,
-              config: {
-                ...node.config,
-                buttons: node.config.buttons.map((button) =>
-                  button.id === connectionDragState.buttonId
-                    ? { ...button, targetNodeId }
-                    : button
-                ),
-              },
-            };
-          }));
+                return {
+                  ...node,
+                  config: {
+                    ...node.config,
+                    buttons: node.config.buttons.map((button) =>
+                      button.id === connectionDragState.buttonId
+                        ? { ...button, targetNodeId }
+                        : button
+                    ),
+                  },
+                };
+              })
+            );
 
-          setNodes(nextNodes);
+            return nextNodes;
+          });
           const updatedNode = nextNodes.find((node) => node.id === connectionDragState.sourceNodeId);
           if (updatedNode) {
             await persistNode(updatedNode, { quiet: true, skipContentValidation: true });
@@ -858,7 +869,7 @@ const FaqEditorPage = () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [nodeDragState, connectionDragState, nodes, canvasHeight, canvasWidth, zoom, persistNode]);
+  }, [nodeDragState, connectionDragState, canvasHeight, canvasWidth, zoom, persistNode]);
 
   const renderedConnections = filteredNodes.flatMap((node) =>
     node.config.buttons
@@ -1110,10 +1121,13 @@ const FaqEditorPage = () => {
                           <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
                             <div className="relative aspect-[16/10] w-full overflow-hidden">
                               {node.imagePreviewUrls?.[imageCarouselIndexes[node.id] ?? 0] ? (
-                                <img
+                                <Image
                                   src={node.imagePreviewUrls[imageCarouselIndexes[node.id] ?? 0]}
                                   alt={`Uploaded preview ${Math.min((imageCarouselIndexes[node.id] ?? 0) + 1, node.imageAttachmentIds.length)}`}
-                                  className="h-full w-full object-cover"
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, 320px"
+                                  className="object-cover"
+                                  unoptimized
                                 />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.16),_transparent_45%),linear-gradient(135deg,#1d3025_0%,#101010_100%)] px-6 text-center">

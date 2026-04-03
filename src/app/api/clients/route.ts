@@ -80,9 +80,6 @@ async function finalizeClientConnection(clientName: string, pageId: string, page
   await configureMessengerProfile(clientName, pageAccessToken);
 }
 
-function buildPagePictureUrl(pageId: string) {
-  return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
-}
 
 export async function GET(req: NextRequest) {
   const session = await verifyAdminAccessToken(
@@ -296,3 +293,5 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+
+

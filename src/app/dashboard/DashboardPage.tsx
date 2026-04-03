@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -278,6 +279,32 @@ const DashboardPage = () => {
     return `${month} ${day}, ${year}`;
   };
 
+  const getReconnectCountdown = (createdAt: string) => {
+    if (!createdAt) {
+      return { label: "Unknown", tone: "muted" as const };
+    }
+
+    const connectedAt = new Date(createdAt);
+
+    if (Number.isNaN(connectedAt.getTime())) {
+      return { label: "Unknown", tone: "muted" as const };
+    }
+
+    const reconnectAt = connectedAt.getTime() + 60 * 24 * 60 * 60 * 1000;
+    const remainingMs = reconnectAt - Date.now();
+    const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+
+    if (remainingDays <= 0) {
+      return { label: "Reconnect now", tone: "danger" as const };
+    }
+
+    if (remainingDays <= 7) {
+      return { label: `${remainingDays} day${remainingDays === 1 ? "" : "s"} left`, tone: "warning" as const };
+    }
+
+    return { label: `${remainingDays} days left`, tone: "safe" as const };
+  };
+
   const canConfirmDisconnect = disconnectConfirmation.trim().toLowerCase() === "disconnect";
 
   return (
@@ -363,6 +390,9 @@ const DashboardPage = () => {
             ) : null}
 
             {filteredClients.map((client) => (
+              (() => {
+                const reconnectCountdown = getReconnectCountdown(client.created_at);
+                return (
               <article
                 key={client.id}
                 className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
@@ -371,10 +401,13 @@ const DashboardPage = () => {
                   <div className="flex min-w-0 flex-1 items-center gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.2),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
                       {client.picture_url ? (
-                        <img
+                        <Image
                           src={client.picture_url}
                           alt={`${client.client_name} page profile picture`}
+                          width={56}
+                          height={56}
                           className="h-full w-full object-cover"
+                          unoptimized
                         />
                       ) : (
                         <span className="text-[15px] font-bold text-[var(--accent-bright)]">
@@ -409,6 +442,24 @@ const DashboardPage = () => {
                         {formatClientTime(client.created_at)}
                       </p>
                     </div>
+                    <div className="min-w-[140px]">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                        Reconnect
+                      </p>
+                      <p
+                        className={`mt-1.5 text-[14px] font-semibold ${
+                          reconnectCountdown.tone === "danger"
+                            ? "text-[#ff8f8f]"
+                            : reconnectCountdown.tone === "warning"
+                              ? "text-[#ffd37a]"
+                              : reconnectCountdown.tone === "safe"
+                                ? "text-[var(--accent-bright)]"
+                                : "text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {reconnectCountdown.label}
+                      </p>
+                    </div>
 
                     <div className="flex flex-wrap gap-2">
                       <Link
@@ -429,6 +480,8 @@ const DashboardPage = () => {
                   </div>
                 </div>
               </article>
+                );
+              })()
             ))}
           </div>
         </div>
@@ -557,10 +610,13 @@ const DashboardPage = () => {
                       <div className="flex items-center gap-4">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
                           {page.picture_url ? (
-                            <img
+                            <Image
                               src={page.picture_url}
                               alt={`${page.name} page profile picture`}
+                              width={56}
+                              height={56}
                               className="h-full w-full object-cover"
+                              unoptimized
                             />
                           ) : (
                             <span className="text-[15px] font-bold text-[var(--accent-bright)]">
