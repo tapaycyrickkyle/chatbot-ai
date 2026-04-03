@@ -40,7 +40,8 @@ type NodeDragState = {
 
 type ConnectionDragState = {
   sourceNodeId: string;
-  buttonId: string;
+  sourceId: string;
+  sourceType: "button" | "capture";
   side: "left" | "right";
   startX: number;
   startY: number;
@@ -52,6 +53,7 @@ const MIN_CANVAS_WIDTH = 1100;
 const MIN_CANVAS_HEIGHT = 860;
 const NODE_WIDTH = 350;
 const BASE_NODE_HEIGHT = 440;
+const WAIT_FOR_REPLY_SECTION_HEIGHT = 86;
 const CARD_PADDING = 24;
 const QUICK_REPLY_ROW_START_Y = 404;
 const QUICK_REPLY_ROW_SPACING = 62;
@@ -201,7 +203,11 @@ function getDropTargetNodeId(
 
 function getNodeHeight(node: FlowNodeRecord) {
   const extraButtons = Math.max(0, node.config.buttons.length - 1);
-  return BASE_NODE_HEIGHT + extraButtons * QUICK_REPLY_ROW_SPACING;
+  return (
+    BASE_NODE_HEIGHT +
+    extraButtons * QUICK_REPLY_ROW_SPACING +
+    (node.config.captureNextReply ? WAIT_FOR_REPLY_SECTION_HEIGHT : 0)
+  );
 }
 
 function getConnectionSourcePoint(
@@ -225,6 +231,19 @@ function getConnectionTargetPoint(node: FlowNodeRecord) {
   return {
     x: node.config.position.x - 12,
     y: node.config.position.y + getNodeHeight(node) / 2,
+  };
+}
+
+function getReplyCaptureSourcePoint(
+  node: FlowNodeRecord,
+  side: "left" | "right"
+) {
+  return {
+    x:
+      side === "left"
+        ? node.config.position.x - 12
+        : node.config.position.x + NODE_WIDTH + 12,
+    y: node.config.position.y + getNodeHeight(node) - 46,
   };
 }
 
@@ -821,11 +840,18 @@ const FaqEditorPage = () => {
                 ...node,
                 config: {
                   ...node.config,
-                  buttons: node.config.buttons.map((button) =>
-                    button.id === connectionDragState.buttonId
-                      ? { ...button, targetNodeId }
-                      : button
-                  ),
+                  buttons:
+                    connectionDragState.sourceType === "button"
+                      ? node.config.buttons.map((button) =>
+                          button.id === connectionDragState.sourceId
+                            ? { ...button, targetNodeId }
+                            : button
+                        )
+                      : node.config.buttons,
+                  replyTargetNodeId:
+                    connectionDragState.sourceType === "capture"
+                      ? targetNodeId
+                      : node.config.replyTargetNodeId,
                 },
               };
             })
@@ -853,8 +879,8 @@ const FaqEditorPage = () => {
     };
   }, [nodeDragState, connectionDragState, canvasHeight, canvasWidth, zoom, persistNode]);
 
-  const renderedConnections = filteredNodes.flatMap((node) =>
-    node.config.buttons
+  const renderedConnections = filteredNodes.flatMap((node) => {
+    const buttonConnections = node.config.buttons
       .map((button, index) => {
         const targetNode = filteredNodes.find((candidate) => candidate.id === button.targetNodeId);
         if (!targetNode) {
@@ -874,8 +900,28 @@ const FaqEditorPage = () => {
           ),
         };
       })
-      .filter(Boolean) as Array<{ id: string; path: string }>
-  );
+      .filter(Boolean) as Array<{ id: string; path: string }>;
+
+    const captureTargetNode = filteredNodes.find(
+      (candidate) => candidate.id === node.config.replyTargetNodeId
+    );
+    const captureConnection =
+      node.config.captureNextReply && captureTargetNode
+        ? [
+            {
+              id: `${node.id}:capture`,
+              path: buildConnectionPath(
+                getReplyCaptureSourcePoint(node, "right").x,
+                getReplyCaptureSourcePoint(node, "right").y,
+                getConnectionTargetPoint(captureTargetNode).x,
+                getConnectionTargetPoint(captureTargetNode).y
+              ),
+            },
+          ]
+        : [];
+
+    return [...buttonConnections, ...captureConnection];
+  });
 
   const draftConnectionPath = connectionDragState
     ? buildConnectionPath(
@@ -1238,7 +1284,7 @@ const FaqEditorPage = () => {
                                 },
                               }));
                             }}
-                            disabled={node.config.buttons.length >= MAX_FLOW_BUTTONS}
+                            disabled={node.config.captureNextReply || node.config.buttons.length >= MAX_FLOW_BUTTONS}
                             className="rounded-lg border border-[var(--accent-bright)] bg-[var(--accent)] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Add Button
@@ -1267,7 +1313,8 @@ const FaqEditorPage = () => {
 
                                   setConnectionDragState({
                                     sourceNodeId: node.id,
-                                    buttonId: button.id,
+                                    sourceId: button.id,
+                                    sourceType: "button",
                                     side: "left",
                                     startX: sourcePoint.x,
                                     startY: sourcePoint.y,
@@ -1291,7 +1338,8 @@ const FaqEditorPage = () => {
 
                                   setConnectionDragState({
                                     sourceNodeId: node.id,
-                                    buttonId: button.id,
+                                    sourceId: button.id,
+                                    sourceType: "button",
                                     side: "right",
                                     startX: sourcePoint.x,
                                     startY: sourcePoint.y,
@@ -1393,6 +1441,125 @@ const FaqEditorPage = () => {
                         </div>
                       </div>
 
+                      <div className="rounded-2xl border border-[var(--border)] bg-background/80 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                              Reply Capture
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!node.config.captureNextReply && node.config.buttons.length > 0) {
+                                pushNotice("error", "Remove the buttons first before turning this into a wait-for-reply card.");
+                                return;
+                              }
+
+                              updateNode(node.id, (current) => ({
+                                ...current,
+                                config: {
+                                  ...current.config,
+                                  captureNextReply: !current.config.captureNextReply,
+                                  replyTargetNodeId: current.config.captureNextReply ? "" : current.config.replyTargetNodeId,
+                                },
+                              }));
+                            }}
+                            className={`rounded-lg border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                              node.config.captureNextReply
+                                ? "border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
+                                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-bright)]"
+                            }`}
+                          >
+                            {node.config.captureNextReply ? "Waiting" : "Enable"}
+                          </button>
+                        </div>
+
+                        {node.config.captureNextReply ? (
+                          <div className="group relative mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                            <button
+                              type="button"
+                              onPointerDown={(event) => {
+                                event.stopPropagation();
+                                const rect = canvasRef.current?.getBoundingClientRect();
+                                if (!rect) {
+                                  return;
+                                }
+                                const sourcePoint = getReplyCaptureSourcePoint(node, "left");
+
+                                setConnectionDragState({
+                                  sourceNodeId: node.id,
+                                  sourceId: "capture",
+                                  sourceType: "capture",
+                                  side: "left",
+                                  startX: sourcePoint.x,
+                                  startY: sourcePoint.y,
+                                  pointerX: (event.clientX - rect.left) / zoom,
+                                  pointerY: (event.clientY - rect.top) / zoom,
+                                });
+                              }}
+                              className="absolute left-[-12px] top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-[var(--accent-bright)] bg-[var(--surface-strong)] opacity-0 shadow-[0_0_0_4px_rgba(62,207,142,0.08)] transition-opacity group-hover:opacity-100"
+                              title="Connect the next step"
+                              aria-label="Connect the next step from the left side"
+                            />
+                            <button
+                              type="button"
+                              onPointerDown={(event) => {
+                                event.stopPropagation();
+                                const rect = canvasRef.current?.getBoundingClientRect();
+                                if (!rect) {
+                                  return;
+                                }
+                                const sourcePoint = getReplyCaptureSourcePoint(node, "right");
+
+                                setConnectionDragState({
+                                  sourceNodeId: node.id,
+                                  sourceId: "capture",
+                                  sourceType: "capture",
+                                  side: "right",
+                                  startX: sourcePoint.x,
+                                  startY: sourcePoint.y,
+                                  pointerX: (event.clientX - rect.left) / zoom,
+                                  pointerY: (event.clientY - rect.top) / zoom,
+                                });
+                              }}
+                              className="absolute right-[-12px] top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-[var(--accent-bright)] bg-[var(--surface-strong)] opacity-0 shadow-[0_0_0_4px_rgba(62,207,142,0.08)] transition-opacity group-hover:opacity-100"
+                              title="Connect the next step"
+                              aria-label="Connect the next step from the right side"
+                            />
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                                  Wait for any customer reply
+                                </p>
+                                <p className="mt-1 text-[12px] text-[var(--text-subtle)]">
+                                  The next text message will automatically continue to the connected card.
+                                </p>
+                              </div>
+                              {node.config.replyTargetNodeId ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateNode(node.id, (current) => ({
+                                      ...current,
+                                      config: {
+                                        ...current.config,
+                                        replyTargetNodeId: "",
+                                      },
+                                    }))
+                                  }
+                                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-subtle)]"
+                                >
+                                  Unlink
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-[13px] text-[var(--text-muted)]">Disabled. Turn this on if the card should wait for any text before continuing.</p>
+                        )}
+                      </div>
+
                     </div>
                     </article>
                       );
@@ -1409,5 +1576,19 @@ const FaqEditorPage = () => {
 };
 
 export default FaqEditorPage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

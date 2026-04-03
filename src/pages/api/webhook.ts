@@ -89,6 +89,14 @@ type SafeSendContext = {
   messageType: "text" | "quick_replies" | "button_template" | "image";
 };
 
+type ReplyCaptureSessionRow = {
+  client_id: string;
+  page_id: string;
+  recipient_id: string;
+  waiting_node_id: string;
+  next_node_id: string;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -158,6 +166,7 @@ export default async function handler(
           const flowPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
 
           if (flowPayload) {
+            await clearReplyCaptureSession(client.id, userId);
             if (flowPayload === GET_STARTED_PAYLOAD) {
               const welcomeNode = resolveWelcomeNode(clientFlowNodes);
 
@@ -202,6 +211,30 @@ export default async function handler(
           const rawText = event.message?.text;
 
           if (!rawText) {
+            continue;
+          }
+
+          const pendingReplySession = await getReplyCaptureSession(client.id, userId);
+          if (pendingReplySession?.next_node_id) {
+            await clearReplyCaptureSession(client.id, userId);
+            const replyTargetNode = clientFlowNodes.find(
+              (node) => node.id === pendingReplySession.next_node_id
+            );
+
+            if (replyTargetNode) {
+              await safelyHandleFlowSend(
+                () =>
+                  sendFlowNodeMessage(
+                    userId,
+                    replyTargetNode,
+                    client.id,
+                    pageId,
+                    pageAccessToken,
+                    clientFlowNodes
+                  ),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+            }
             continue;
           }
 
@@ -251,6 +284,9 @@ async function sendFlowNodeMessage(
   const validButtons = config.buttons.filter((button) =>
     clientFlowNodes.some((candidate) => candidate.id === button.targetNodeId)
   );
+  const replyCaptureTargetNode = config.captureNextReply
+    ? clientFlowNodes.find((candidate) => candidate.id === config.replyTargetNodeId)
+    : null;
   const messages: Array<{ body: MessengerRequestBody; type: SafeSendContext["messageType"] }> = [];
 
   for (const imageAttachmentId of imageAttachmentIds) {
@@ -332,6 +368,16 @@ async function sendFlowNodeMessage(
       await safeSendMessage(recipientId, messagePart, pageToken, 0, pageId, clientId);
     }
   }
+
+  if (replyCaptureTargetNode) {
+    await upsertReplyCaptureSession({
+      client_id: clientId,
+      page_id: pageId,
+      recipient_id: recipientId,
+      waiting_node_id: node.id,
+      next_node_id: replyCaptureTargetNode.id,
+    });
+  }
 }
 
 async function sendMessageBatch(
@@ -354,6 +400,50 @@ async function sendMessageBatch(
       ...baseContext,
       messageType: message.type,
     });
+  }
+}
+
+async function getReplyCaptureSession(clientId: string, recipientId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("bot_flow_reply_sessions")
+    .select("client_id, page_id, recipient_id, waiting_node_id, next_node_id")
+    .eq("client_id", clientId)
+    .eq("recipient_id", recipientId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Failed to load reply capture session", error);
+    return null;
+  }
+
+  return (data as ReplyCaptureSessionRow | null) ?? null;
+}
+
+async function upsertReplyCaptureSession(session: ReplyCaptureSessionRow) {
+  const { error } = await supabaseAdmin
+    .from("bot_flow_reply_sessions")
+    .upsert(
+      {
+        ...session,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "client_id,recipient_id" }
+    );
+
+  if (error) {
+    console.warn("Failed to save reply capture session", error);
+  }
+}
+
+async function clearReplyCaptureSession(clientId: string, recipientId: string) {
+  const { error } = await supabaseAdmin
+    .from("bot_flow_reply_sessions")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("recipient_id", recipientId);
+
+  if (error) {
+    console.warn("Failed to clear reply capture session", error);
   }
 }
 
@@ -1061,6 +1151,11 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
+
+
+
 
 
 
