@@ -22,6 +22,7 @@ type FlowNodeRecord = {
   id: string;
   keywords: string[];
   keywordInput: string;
+  manualKeywordInput: string;
   imageAttachmentId: string;
   config: BotFlowNodeConfig;
 };
@@ -90,10 +91,13 @@ async function fetchFlowNodes(clientId: string) {
 }
 
 function toFlowNodeRecord(entry: FaqEntry): FlowNodeRecord {
+  const initialKeywordInput = entry.keywords.join(", ");
+
   return {
     id: entry.id,
     keywords: entry.keywords,
-    keywordInput: entry.keywords.join(", "),
+    keywordInput: initialKeywordInput,
+    manualKeywordInput: initialKeywordInput,
     imageAttachmentId: entry.image_attachment_id ?? "",
     config: createDefaultBotFlowNodeConfig(
       parseBotFlowNodeConfig(entry.answer, entry.keywords[0] || "Flow Card")
@@ -163,7 +167,7 @@ function normalizeButtonKeyword(value: string) {
   return normalizeKeywordInput(value).replace(/,\s*/g, " ").trim();
 }
 
-function syncKeywordsFromConnections(nodes: FlowNodeRecord[]) {
+function getIncomingButtonLabelsMap(nodes: FlowNodeRecord[]) {
   const incomingButtonLabels = new Map<string, string[]>();
 
   for (const node of nodes) {
@@ -183,14 +187,24 @@ function syncKeywordsFromConnections(nodes: FlowNodeRecord[]) {
     }
   }
 
+  return incomingButtonLabels;
+}
+
+function syncKeywordsFromConnections(nodes: FlowNodeRecord[]) {
+  const incomingButtonLabels = getIncomingButtonLabelsMap(nodes);
+
   return nodes.map((node) => {
     const derivedKeywords = incomingButtonLabels.get(node.id) ?? [];
 
     if (derivedKeywords.length === 0) {
+      const manualKeywordInput = normalizeKeywordInput(node.manualKeywordInput);
       return {
         ...node,
-        keywords: [],
-        keywordInput: "",
+        keywords: manualKeywordInput
+          .split(",")
+          .map((keyword) => keyword.trim())
+          .filter(Boolean),
+        keywordInput: manualKeywordInput,
       };
     }
 
@@ -219,6 +233,7 @@ function normalizeNodeForSave(node: FlowNodeRecord) {
     normalizedNode: {
       ...node,
       keywordInput: normalizedKeywordInput,
+      manualKeywordInput: normalizedKeywordInput,
       keywords: normalizedKeywords,
       config: {
         ...node.config,
@@ -288,6 +303,7 @@ const FaqEditorPage = () => {
     MIN_CANVAS_HEIGHT,
     ...filteredNodes.map((node) => node.config.position.y + getNodeHeight(node) + CARD_PADDING * 2)
   );
+  const incomingButtonLabels = getIncomingButtonLabelsMap(nodes);
 
   useEffect(() => {
     if (!notice) {
@@ -440,7 +456,7 @@ const FaqEditorPage = () => {
       setNodes((currentNodes) =>
         syncKeywordsFromConnections([
           ...currentNodes,
-          { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
+          { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentId: "", config },
         ])
       );
       if (!options?.quiet) {
@@ -490,7 +506,7 @@ const FaqEditorPage = () => {
           startTransition(() => {
             setNodes(
               syncKeywordsFromConnections([
-                { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
+                { id: faqId, keywords: [], keywordInput: "", manualKeywordInput: "", imageAttachmentId: "", config },
               ])
             );
           });
@@ -804,6 +820,9 @@ const FaqEditorPage = () => {
                   </svg>
 
                   {filteredNodes.map((node) => (
+                    (() => {
+                      const isKeywordLocked = (incomingButtonLabels.get(node.id) ?? []).length > 0;
+                      return (
                     <article
                       key={node.id}
                       data-node-id={node.id}
@@ -853,9 +872,23 @@ const FaqEditorPage = () => {
                       <input
                         type="text"
                         value={node.keywordInput}
-                        readOnly
-                        placeholder="Keywords are filled from connected buttons"
-                        className="w-full rounded-xl border border-[var(--border-input)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
+                        readOnly={isKeywordLocked}
+                        onChange={(event) =>
+                          updateNode(node.id, (current) => {
+                            const nextKeywordInput = normalizeKeywordInput(event.target.value);
+                            return {
+                              ...current,
+                              keywordInput: nextKeywordInput,
+                              manualKeywordInput: nextKeywordInput,
+                              keywords: nextKeywordInput
+                                .split(",")
+                                .map((keyword) => keyword.trim())
+                                .filter(Boolean),
+                            };
+                          })
+                        }
+                        placeholder={isKeywordLocked ? "Keyword is controlled by the connected button" : "Trigger keywords, comma separated"}
+                        className={`w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${isKeywordLocked ? "bg-[rgba(255,255,255,0.03)]" : "bg-background"}`}
                       />
 
                       <textarea
@@ -1011,31 +1044,62 @@ const FaqEditorPage = () => {
                                   placeholder={`Button ${index + 1}`}
                                   className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setNodes((currentNodes) =>
-                                      syncKeywordsFromConnections(
-                                        currentNodes.map((currentNode) =>
-                                          currentNode.id === node.id
-                                            ? {
-                                                ...currentNode,
-                                                config: {
-                                                  ...currentNode.config,
-                                                  buttons: currentNode.config.buttons.filter(
-                                                    (candidate) => candidate.id !== button.id
-                                                  ),
-                                                },
-                                              }
-                                            : currentNode
+                                <div className="flex shrink-0 items-center gap-2">
+                                  {button.targetNodeId ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setNodes((currentNodes) =>
+                                          syncKeywordsFromConnections(
+                                            currentNodes.map((currentNode) =>
+                                              currentNode.id === node.id
+                                                ? {
+                                                    ...currentNode,
+                                                    config: {
+                                                      ...currentNode.config,
+                                                      buttons: currentNode.config.buttons.map((candidate) =>
+                                                        candidate.id === button.id
+                                                          ? { ...candidate, targetNodeId: "" }
+                                                          : candidate
+                                                      ),
+                                                    },
+                                                  }
+                                                : currentNode
+                                            )
+                                          )
+                                        )
+                                      }
+                                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-subtle)]"
+                                    >
+                                      Unlink
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setNodes((currentNodes) =>
+                                        syncKeywordsFromConnections(
+                                          currentNodes.map((currentNode) =>
+                                            currentNode.id === node.id
+                                              ? {
+                                                  ...currentNode,
+                                                  config: {
+                                                    ...currentNode.config,
+                                                    buttons: currentNode.config.buttons.filter(
+                                                      (candidate) => candidate.id !== button.id
+                                                    ),
+                                                  },
+                                                }
+                                              : currentNode
+                                          )
                                         )
                                       )
-                                    )
-                                  }
-                                  className="shrink-0 rounded-full border border-[#5a2626] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#ffb4b4]"
-                                >
-                                  Remove
-                                </button>
+                                    }
+                                    className="rounded-full border border-[#5a2626] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#ffb4b4]"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1044,6 +1108,8 @@ const FaqEditorPage = () => {
 
                     </div>
                     </article>
+                      );
+                    })()
                   ))}
                 </div>
               </div>
