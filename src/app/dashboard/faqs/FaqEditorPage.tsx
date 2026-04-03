@@ -159,6 +159,49 @@ function normalizeKeywordInput(value: string) {
     .replace(/\s{2,}/g, " ");
 }
 
+function normalizeButtonKeyword(value: string) {
+  return normalizeKeywordInput(value).replace(/,\s*/g, " ").trim();
+}
+
+function syncKeywordsFromConnections(nodes: FlowNodeRecord[]) {
+  const incomingButtonLabels = new Map<string, string[]>();
+
+  for (const node of nodes) {
+    for (const button of node.config.buttons) {
+      const targetNodeId = button.targetNodeId.trim();
+      const normalizedLabel = normalizeButtonKeyword(button.label);
+
+      if (!targetNodeId || !normalizedLabel) {
+        continue;
+      }
+
+      const existingLabels = incomingButtonLabels.get(targetNodeId) ?? [];
+      if (!existingLabels.includes(normalizedLabel)) {
+        existingLabels.push(normalizedLabel);
+        incomingButtonLabels.set(targetNodeId, existingLabels);
+      }
+    }
+  }
+
+  return nodes.map((node) => {
+    const derivedKeywords = incomingButtonLabels.get(node.id) ?? [];
+
+    if (derivedKeywords.length === 0) {
+      return {
+        ...node,
+        keywords: [],
+        keywordInput: "",
+      };
+    }
+
+    return {
+      ...node,
+      keywords: derivedKeywords,
+      keywordInput: derivedKeywords.join(", "),
+    };
+  });
+}
+
 function normalizeNodeForSave(node: FlowNodeRecord) {
   const normalizedKeywordInput = normalizeKeywordInput(node.keywordInput).trim();
   const normalizedKeywords = normalizedKeywordInput
@@ -394,10 +437,12 @@ const FaqEditorPage = () => {
       }
 
       const faqId = result.faqId;
-      setNodes((currentNodes) => [
-        ...currentNodes,
-        { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
-      ]);
+      setNodes((currentNodes) =>
+        syncKeywordsFromConnections([
+          ...currentNodes,
+          { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
+        ])
+      );
       if (!options?.quiet) {
         setNotice({ tone: "success", message: "New card created." });
       }
@@ -443,9 +488,11 @@ const FaqEditorPage = () => {
 
           const faqId = result.faqId;
           startTransition(() => {
-            setNodes([
-              { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
-            ]);
+            setNodes(
+              syncKeywordsFromConnections([
+                { id: faqId, keywords: [], keywordInput: "", imageAttachmentId: "", config },
+              ])
+            );
           });
           return;
         }
@@ -486,17 +533,19 @@ const FaqEditorPage = () => {
       }
 
       setNodes((currentNodes) =>
-        currentNodes
-          .filter((node) => node.id !== nodeId)
-          .map((node) => ({
-            ...node,
-            config: {
-              ...node.config,
-              buttons: node.config.buttons.map((button) =>
-                button.targetNodeId === nodeId ? { ...button, targetNodeId: "" } : button
-              ),
-            },
-          }))
+        syncKeywordsFromConnections(
+          currentNodes
+            .filter((node) => node.id !== nodeId)
+            .map((node) => ({
+              ...node,
+              config: {
+                ...node.config,
+                buttons: node.config.buttons.map((button) =>
+                  button.targetNodeId === nodeId ? { ...button, targetNodeId: "" } : button
+                ),
+              },
+            }))
+        )
       );
       setNotice({ tone: "success", message: "Card deleted." });
     } catch (error) {
@@ -583,7 +632,7 @@ const FaqEditorPage = () => {
         );
 
         if (targetNodeId) {
-          const nextNodes = nodes.map((node) => {
+          const nextNodes = syncKeywordsFromConnections(nodes.map((node) => {
             if (node.id !== connectionDragState.sourceNodeId) {
               return node;
             }
@@ -599,7 +648,7 @@ const FaqEditorPage = () => {
                 ),
               },
             };
-          });
+          }));
 
           setNodes(nextNodes);
           const updatedNode = nextNodes.find((node) => node.id === connectionDragState.sourceNodeId);
@@ -804,21 +853,9 @@ const FaqEditorPage = () => {
                       <input
                         type="text"
                         value={node.keywordInput}
-                        onChange={(event) =>
-                          updateNode(node.id, (current) => {
-                            const nextKeywordInput = normalizeKeywordInput(event.target.value);
-                            return {
-                              ...current,
-                              keywordInput: nextKeywordInput,
-                              keywords: nextKeywordInput
-                                .split(",")
-                                .map((keyword) => keyword.trim())
-                                .filter(Boolean),
-                            };
-                          })
-                        }
-                        placeholder="Trigger keywords, comma separated"
-                        className="w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                        readOnly
+                        placeholder="Keywords are filled from connected buttons"
+                        className="w-full rounded-xl border border-[var(--border-input)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
                       />
 
                       <textarea
@@ -950,13 +987,51 @@ const FaqEditorPage = () => {
                                 <input
                                   type="text"
                                   value={button.label}
-                                  onChange={(event) => updateNode(node.id, (current) => ({ ...current, config: { ...current.config, buttons: current.config.buttons.map((candidate) => candidate.id === button.id ? { ...candidate, label: event.target.value } : candidate) } }))}
+                                  onChange={(event) =>
+                                    setNodes((currentNodes) =>
+                                      syncKeywordsFromConnections(
+                                        currentNodes.map((currentNode) =>
+                                          currentNode.id === node.id
+                                            ? {
+                                                ...currentNode,
+                                                config: {
+                                                  ...currentNode.config,
+                                                  buttons: currentNode.config.buttons.map((candidate) =>
+                                                    candidate.id === button.id
+                                                      ? { ...candidate, label: event.target.value }
+                                                      : candidate
+                                                  ),
+                                                },
+                                              }
+                                            : currentNode
+                                        )
+                                      )
+                                    )
+                                  }
                                   placeholder={`Button ${index + 1}`}
                                   className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:outline-none"
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => updateNode(node.id, (current) => ({ ...current, config: { ...current.config, buttons: current.config.buttons.filter((candidate) => candidate.id !== button.id) } }))}
+                                  onClick={() =>
+                                    setNodes((currentNodes) =>
+                                      syncKeywordsFromConnections(
+                                        currentNodes.map((currentNode) =>
+                                          currentNode.id === node.id
+                                            ? {
+                                                ...currentNode,
+                                                config: {
+                                                  ...currentNode.config,
+                                                  buttons: currentNode.config.buttons.filter(
+                                                    (candidate) => candidate.id !== button.id
+                                                  ),
+                                                },
+                                              }
+                                            : currentNode
+                                        )
+                                      )
+                                    )
+                                  }
                                   className="shrink-0 rounded-full border border-[#5a2626] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#ffb4b4]"
                                 >
                                   Remove
