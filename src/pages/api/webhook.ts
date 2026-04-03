@@ -107,12 +107,6 @@ export default async function handler(
                   pageAccessToken
                 );
               }
-            } else {
-              await sendTextMessage(
-                userId,
-                "Sorry, I didn't understand. Type 'menu' for options.",
-                pageAccessToken
-              );
             }
           }
         }
