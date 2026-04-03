@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useToast } from "../_components/ToastProvider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import SignInFooter from "./SignInFooter";
 
@@ -11,12 +12,11 @@ const SignInPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
     setIsSubmitting(true);
 
     try {
@@ -27,7 +27,10 @@ const SignInPage = () => {
       });
 
       if (signInError || !data.session?.access_token) {
-        setError(signInError?.message || "Unable to sign in");
+        showToast({
+          tone: "error",
+          message: signInError?.message || "Unable to sign in",
+        });
         return;
       }
 
@@ -51,16 +54,20 @@ const SignInPage = () => {
         ) {
           console.error(signOutError);
         }
-        setError(payload?.error || "Unable to sign in");
+        showToast({
+          tone: "error",
+          message: payload?.error || "Unable to sign in",
+        });
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Unable to sign in"
-      );
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to sign in",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -211,12 +218,6 @@ const SignInPage = () => {
                   </button>
                 </div>
               </div>
-
-              {error ? (
-                <p className="rounded-xl border border-[#4a1f1f] bg-[#221313] px-4 py-3 text-[13px] text-[#ffb4b4]">
-                  {error}
-                </p>
-              ) : null}
 
               <button
                 type="submit"

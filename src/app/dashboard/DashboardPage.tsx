@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useToast } from "../_components/ToastProvider";
 import DashboardShell from "./_components/DashboardShell";
 
 type ClientRow = {
@@ -30,8 +31,7 @@ const DashboardPage = () => {
   const [isDisconnectingClientId, setIsDisconnectingClientId] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<ClientRow | null>(null);
   const [disconnectConfirmation, setDisconnectConfirmation] = useState("");
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [facebookPagesMessage, setFacebookPagesMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const loadClients = async () => {
     try {
@@ -54,34 +54,6 @@ const DashboardPage = () => {
   useEffect(() => {
     void loadClients();
   }, []);
-
-  useEffect(() => {
-    if (!successMessage) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setSuccessMessage(null);
-    }, 3200);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [successMessage]);
-
-  useEffect(() => {
-    if (!facebookPagesMessage) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setFacebookPagesMessage(null);
-    }, 5200);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [facebookPagesMessage]);
 
   useEffect(() => {
     const fbConnectedFromQuery = searchParams?.get("fb_connected") === "true";
@@ -112,13 +84,21 @@ const DashboardPage = () => {
         } else {
           setPages([]);
           setShowModal(true);
-          setFacebookPagesMessage(
-            "No Facebook Pages were returned for this account. Make sure you are connecting an actual Facebook Page, not just a personal profile, and that the account has page access."
-          );
+          showToast({
+            tone: "error",
+            durationMs: 5200,
+            message:
+              "No Facebook Pages were returned for this account. Make sure you are connecting an actual Facebook Page, not just a personal profile, and that the account has page access.",
+          });
         }
       } catch (error) {
         console.error(error);
-        setFacebookPagesMessage("Unable to load Facebook Pages right now. Please reconnect your Facebook account and try again.");
+        showToast({
+          tone: "error",
+          durationMs: 5200,
+          message:
+            "Unable to load Facebook Pages right now. Please reconnect your Facebook account and try again.",
+        });
       } finally {
         document.cookie = "fb_connected=; Max-Age=0; path=/; SameSite=Lax";
         window.history.replaceState({}, "", "/dashboard");
@@ -126,7 +106,7 @@ const DashboardPage = () => {
     };
 
     void openFacebookPagesModal();
-  }, [searchParams]);
+  }, [searchParams, showToast]);
 
   const clearFacebookPagesCookie = () => {
     document.cookie = "fb_pages=; Max-Age=0; path=/; SameSite=Lax";
@@ -174,13 +154,19 @@ const DashboardPage = () => {
           | null;
 
         if (data?.error === "Missing Facebook session") {
-          window.alert("Session expired. Please reconnect your Facebook account.");
+          showToast({
+            tone: "error",
+            message: "Session expired. Please reconnect your Facebook account.",
+          });
           window.location.href = "/api/auth/facebook/login";
           return;
         }
 
         if (data?.error === "Client already connected") {
-          window.alert("This page is already connected.");
+          showToast({
+            tone: "error",
+            message: "This page is already connected.",
+          });
           await loadClients();
           closeModal();
           return;
@@ -191,14 +177,14 @@ const DashboardPage = () => {
 
       await loadClients();
       closeModal();
-      setSuccessMessage("Page connected successfully.");
+      showToast({ tone: "success", message: "Page connected successfully." });
     } catch (error) {
       console.error(error);
       const message =
         error instanceof Error
           ? error.message
           : "Failed to connect page. See console.";
-      window.alert(message);
+      showToast({ tone: "error", message });
       setIsConnectingPageId(null);
     }
   };
@@ -232,7 +218,7 @@ const DashboardPage = () => {
       setClients((currentClients) =>
         currentClients.filter((currentClient) => currentClient.id !== disconnectTarget.id)
       );
-      setSuccessMessage("Page disconnected successfully.");
+      showToast({ tone: "success", message: "Page disconnected successfully." });
       setDisconnectTarget(null);
       setDisconnectConfirmation("");
     } catch (error) {
@@ -241,7 +227,7 @@ const DashboardPage = () => {
         error instanceof Error
           ? error.message
           : "Failed to disconnect client. See console.";
-      window.alert(message);
+      showToast({ tone: "error", message });
     } finally {
       setIsDisconnectingClientId(null);
     }
@@ -309,40 +295,6 @@ const DashboardPage = () => {
 
   return (
     <>
-      {successMessage ? (
-        <div className="fixed right-5 bottom-5 z-[60] animate-[fadeIn_180ms_ease-out]">
-          <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent-bright)] bg-[var(--surface)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/20 text-[var(--accent-bright)]">
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m5 13 4 4L19 7"
-                />
-              </svg>
-            </span>
-            <p className="text-[13px] font-medium text-[var(--text-primary)]">
-              {successMessage}
-            </p>
-          </div>
-        </div>
-      ) : null}
-      {facebookPagesMessage ? (
-        <div className="fixed right-5 bottom-5 z-[60] animate-[fadeIn_180ms_ease-out]">
-          <div className="max-w-[360px] rounded-2xl border border-[#5b2a2a] bg-[rgba(58,19,19,0.94)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-            <p className="text-[13px] font-medium text-[#ffd0d0]">
-              {facebookPagesMessage}
-            </p>
-          </div>
-        </div>
-      ) : null}
       <DashboardShell activeNav="Clients" searchPlaceholder="Search clients...">
         <div className="flex flex-col gap-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { startTransition, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useSearchParams } from "next/navigation";
+import { useToast } from "../../_components/ToastProvider";
 import DashboardShell from "../_components/DashboardShell";
 import {
   createBotFlowButton,
@@ -27,11 +28,6 @@ type FlowNodeRecord = {
   imageAttachmentIds: string[];
   imagePreviewUrls: string[];
   config: BotFlowNodeConfig;
-};
-
-type NoticeState = {
-  tone: "success" | "error";
-  message: string;
 };
 
 type NodeDragState = {
@@ -361,6 +357,7 @@ const FaqEditorPage = () => {
   const clientId = searchParams?.get("clientId") ?? "";
   const clientName = (searchParams?.get("clientName") ?? "").trim();
   const flowQuery = (searchParams?.get("q") ?? "").trim().toLowerCase();
+  const { showToast } = useToast();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLElement | null>>({});
   const quickReplyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -369,7 +366,6 @@ const FaqEditorPage = () => {
 
   const [nodes, setNodes] = useState<FlowNodeRecord[]>([]);
   const [isLoadingNodes, setIsLoadingNodes] = useState(true);
-  const [notice, setNotice] = useState<NoticeState | null>(null);
   const [isCreatingNode, setIsCreatingNode] = useState(false);
   const [isSavingFlow, setIsSavingFlow] = useState(false);
   const [deletingNodeId, setDeletingNodeId] = useState<string | null>(null);
@@ -410,15 +406,6 @@ const FaqEditorPage = () => {
     ...filteredNodes.map((node) => node.config.position.y + getNodeHeight(node) + CARD_PADDING * 2)
   );
   const incomingButtonLabels = getIncomingButtonLabelsMap(nodes);
-
-  useEffect(() => {
-    if (!notice) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => setNotice(null), 3200);
-    return () => window.clearTimeout(timeoutId);
-  }, [notice]);
 
   useEffect(() => {
     if (!connectionDragState && hoveredConnectionTargetId) {
@@ -466,6 +453,13 @@ const FaqEditorPage = () => {
     });
   };
 
+  const pushNotice = useCallback(
+    (tone: "success" | "error", message: string, durationMs?: number) => {
+      showToast({ tone, message, durationMs });
+    },
+    [showToast]
+  );
+
   const persistNode = useCallback(async (node: FlowNodeRecord, options?: { quiet?: boolean; skipContentValidation?: boolean }) => {
     if (!clientId) {
       return false;
@@ -479,37 +473,25 @@ const FaqEditorPage = () => {
     } = normalizeNodeForSave(node);
 
     if (!options?.skipContentValidation && normalizedKeywords.length === 0 && !trimmedMessage) {
-      setNotice({
-        tone: "error",
-        message: "Add at least one keyword or a reply message before saving.",
-      });
+      pushNotice("error", "Add at least one keyword or a reply message before saving.");
       return false;
     }
 
     if (!options?.skipContentValidation) {
       const hasButtonWithoutLabel = normalizedButtons.some((button) => !button.label);
       if (hasButtonWithoutLabel) {
-        setNotice({
-          tone: "error",
-          message: "Every quick reply button needs a label before saving.",
-        });
+        pushNotice("error", "Every quick reply button needs a label before saving.");
         return false;
       }
 
       const hasButtonWithoutTarget = normalizedButtons.some((button) => button.label && !button.targetNodeId);
       if (hasButtonWithoutTarget) {
-        setNotice({
-          tone: "error",
-          message: "Connect every quick reply button to a target card before saving.",
-        });
+        pushNotice("error", "Connect every quick reply button to a target card before saving.");
         return false;
       }
 
       if (normalizedButtons.length > MAX_FLOW_BUTTONS) {
-        setNotice({
-          tone: "error",
-          message: `A message card can only have up to ${MAX_FLOW_BUTTONS} buttons.`,
-        });
+        pushNotice("error", `A message card can only have up to ${MAX_FLOW_BUTTONS} buttons.`);
         return false;
       }
     }
@@ -532,17 +514,14 @@ const FaqEditorPage = () => {
       }
 
       if (!options?.quiet) {
-        setNotice({ tone: "success", message: "Card saved successfully." });
+        pushNotice("success", "Card saved successfully.");
       }
       return true;
     } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Unable to save card.",
-      });
+      pushNotice("error", error instanceof Error ? error.message : "Unable to save card.");
       return false;
     }
-  }, [clientId]);
+  }, [clientId, pushNotice]);
 
   const saveFlow = async () => {
     if (!clientId || nodes.length === 0) {
@@ -559,7 +538,7 @@ const FaqEditorPage = () => {
         }
       }
 
-      setNotice({ tone: "success", message: "Flow saved successfully." });
+      pushNotice("success", "Flow saved successfully.");
     } finally {
       setIsSavingFlow(false);
     }
@@ -595,14 +574,14 @@ const FaqEditorPage = () => {
         ])
       );
       if (!options?.quiet) {
-        setNotice({ tone: "success", message: "New card created." });
+        pushNotice("success", "New card created.");
       }
     } catch (error) {
-      setNotice({ tone: "error", message: error instanceof Error ? error.message : "Unable to create card." });
+      pushNotice("error", error instanceof Error ? error.message : "Unable to create card.");
     } finally {
       setIsCreatingNode(false);
     }
-  }, [canvasWidth, clientId, nodes.length]);
+  }, [canvasWidth, clientId, nodes.length, pushNotice]);
 
   const uploadNodeImage = async (nodeId: string, file: File | null) => {
     if (!clientId || !file) {
@@ -644,12 +623,9 @@ const FaqEditorPage = () => {
         ...current,
         [nodeId]: Math.max(0, (nodes.find((node) => node.id === nodeId)?.imageAttachmentIds.length ?? 0)),
       }));
-      setNotice({ tone: "success", message: "Image uploaded and attached to the card." });
+      pushNotice("success", "Image uploaded and attached to the card.");
     } catch (error) {
-      setNotice({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Unable to upload image.",
-      });
+      pushNotice("error", error instanceof Error ? error.message : "Unable to upload image.");
     } finally {
       setUploadingImageNodeId(null);
       const input = imageInputRefs.current[nodeId];
@@ -709,17 +685,14 @@ const FaqEditorPage = () => {
       } catch (error) {
         console.error(error);
         setNodes([]);
-        setNotice({
-          tone: "error",
-          message: error instanceof Error ? error.message : "Failed to load bot flow.",
-        });
+        pushNotice("error", error instanceof Error ? error.message : "Failed to load bot flow.");
       } finally {
         setIsLoadingNodes(false);
       }
     };
 
     void loadNodes();
-  }, [clientId]);
+  }, [clientId, pushNotice]);
 
   const deleteNode = async (nodeId: string) => {
     if (!clientId) {
@@ -753,9 +726,9 @@ const FaqEditorPage = () => {
             }))
         )
       );
-      setNotice({ tone: "success", message: "Card deleted." });
+      pushNotice("success", "Card deleted.");
     } catch (error) {
-      setNotice({ tone: "error", message: error instanceof Error ? error.message : "Unable to delete card." });
+      pushNotice("error", error instanceof Error ? error.message : "Unable to delete card.");
     } finally {
       setDeletingNodeId(null);
     }
@@ -916,55 +889,6 @@ const FaqEditorPage = () => {
   return (
     <DashboardShell activeNav="Clients" searchPlaceholder="Search flow cards..." showTopBar={false}>
       <div className="flex flex-col gap-6">
-        {notice ? (
-          <div className="fixed bottom-5 right-5 z-[60] animate-[fadeIn_180ms_ease-out]">
-            <div
-              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
-                notice.tone === "success"
-                  ? "border-[var(--accent-bright)] bg-[var(--surface)]"
-                  : "border-[#6a2d2d] bg-[#2b1717]"
-              }`}
-            >
-              <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  notice.tone === "success"
-                    ? "bg-[var(--accent)]/20 text-[var(--accent-bright)]"
-                    : "bg-[#5a2626]/60 text-[#ffc1c1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  {notice.tone === "success" ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="m5 13 4 4L19 7"
-                    />
-                  ) : (
-                    <>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v5" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16h.01" />
-                    </>
-                  )}
-                </svg>
-              </span>
-              <p
-                className={`text-[13px] font-medium ${
-                  notice.tone === "success" ? "text-[var(--text-primary)]" : "text-[#ffd4d4]"
-                }`}
-              >
-                {notice.message}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
         <section className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-2.5 sm:p-3">
           {isLoadingNodes ? (
             <div className="rounded-2xl border border-[var(--border)] bg-background px-5 py-5">
@@ -1302,10 +1226,7 @@ const FaqEditorPage = () => {
                             type="button"
                             onClick={() => {
                               if (node.config.buttons.length >= MAX_FLOW_BUTTONS) {
-                                setNotice({
-                                  tone: "error",
-                                  message: `Only ${MAX_FLOW_BUTTONS} buttons are allowed per message card.`,
-                                });
+                                pushNotice("error", `Only ${MAX_FLOW_BUTTONS} buttons are allowed per message card.`);
                                 return;
                               }
 

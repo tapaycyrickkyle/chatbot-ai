@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useToast } from "../../_components/ToastProvider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type SidebarLogoutButtonProps = {
@@ -11,6 +12,7 @@ type SidebarLogoutButtonProps = {
 const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) => {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { showToast } = useToast();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -38,7 +40,7 @@ const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) =>
       router.refresh();
     } catch (error) {
       console.error(error);
-      window.alert("Failed to log out. Please try again.");
+      showToast({ tone: "error", message: "Failed to log out. Please try again." });
       setIsLoggingOut(false);
     }
   };
