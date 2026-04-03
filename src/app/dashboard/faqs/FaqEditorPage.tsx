@@ -62,6 +62,7 @@ const MAX_FLOW_BUTTONS = 3;
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 1.6;
 const ZOOM_STEP = 0.1;
+const IMAGE_PREVIEW_STORAGE_KEY = "builder-image-previews";
 
 function getCanvasPointFromElement(
   element: HTMLElement,
@@ -91,6 +92,48 @@ async function fetchFlowNodes(clientId: string) {
   return (await response.json()) as FaqEntry[];
 }
 
+function getStoredImagePreviewMap() {
+  if (typeof window === "undefined") {
+    return {} as Record<string, string>;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(IMAGE_PREVIEW_STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as Record<string, string>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function setStoredImagePreview(imageId: string, previewUrl: string) {
+  if (typeof window === "undefined" || !imageId || !previewUrl) {
+    return;
+  }
+
+  const currentMap = getStoredImagePreviewMap();
+  currentMap[imageId] = previewUrl;
+  window.localStorage.setItem(IMAGE_PREVIEW_STORAGE_KEY, JSON.stringify(currentMap));
+}
+
+function removeStoredImagePreview(imageId: string) {
+  if (typeof window === "undefined" || !imageId) {
+    return;
+  }
+
+  const currentMap = getStoredImagePreviewMap();
+  if (!(imageId in currentMap)) {
+    return;
+  }
+
+  delete currentMap[imageId];
+  window.localStorage.setItem(IMAGE_PREVIEW_STORAGE_KEY, JSON.stringify(currentMap));
+}
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -117,11 +160,10 @@ function toFlowNodeRecord(entry: FaqEntry): FlowNodeRecord {
     keywordInput: initialKeywordInput,
     manualKeywordInput: initialKeywordInput,
     imageAttachmentIds,
-    imagePreviewUrls: parsedConfig.imagePreviews ?? [],
+    imagePreviewUrls: [],
     config: {
       ...parsedConfig,
       images: imageAttachmentIds,
-      imagePreviews: parsedConfig.imagePreviews ?? [],
     },
   };
 }
@@ -132,7 +174,6 @@ function toApiPayload(node: FlowNodeRecord) {
     answer: serializeBotFlowNodeConfig({
       ...node.config,
       images: node.imageAttachmentIds,
-      imagePreviews: node.imagePreviewUrls,
     }),
     image_attachment_id: node.imageAttachmentIds[0] ?? "",
   };
@@ -264,7 +305,6 @@ function normalizeNodeForSave(node: FlowNodeRecord) {
         ...node.config,
         message: trimmedMessage,
         images: node.imageAttachmentIds,
-        imagePreviews: node.imagePreviewUrls,
         buttons: normalizedButtons,
       },
     },
@@ -301,7 +341,6 @@ function ensureNodeImages(node: FlowNodeRecord): FlowNodeRecord {
     config: {
       ...node.config,
       images: safeImages,
-      imagePreviews: safePreviewUrls,
     },
   };
 }
@@ -369,6 +408,31 @@ const FaqEditorPage = () => {
       setHoveredConnectionTargetId("");
     }
   }, [connectionDragState, hoveredConnectionTargetId]);
+
+  useEffect(() => {
+    if (nodes.length === 0) {
+      return;
+    }
+
+    const storedPreviewMap = getStoredImagePreviewMap();
+
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        const nextPreviewUrls = node.imageAttachmentIds.map(
+          (imageId, index) => node.imagePreviewUrls[index] || storedPreviewMap[imageId] || ""
+        );
+
+        if (nextPreviewUrls.every((previewUrl, index) => previewUrl === (node.imagePreviewUrls[index] || ""))) {
+          return node;
+        }
+
+        return ensureNodeImages({
+          ...node,
+          imagePreviewUrls: nextPreviewUrls,
+        });
+      })
+    );
+  }, [nodes.length, clientId]);
 
   const updateNode = (nodeId: string, updater: (node: FlowNodeRecord) => FlowNodeRecord) => {
     setNodes((currentNodes) =>
@@ -549,6 +613,7 @@ const FaqEditorPage = () => {
         throw new Error(result?.error || "Unable to upload image");
       }
 
+      setStoredImagePreview(result.attachmentId, previewDataUrl);
       updateNode(nodeId, (current) => ({
         ...current,
         imageAttachmentIds: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
@@ -556,7 +621,6 @@ const FaqEditorPage = () => {
         config: {
           ...current.config,
           images: [...current.imageAttachmentIds, result.attachmentId ?? ""].filter(Boolean),
-          imagePreviews: [...current.imagePreviewUrls, previewDataUrl].filter(Boolean),
         },
       }));
       setImageCarouselIndexes((current) => ({
@@ -1131,6 +1195,11 @@ const FaqEditorPage = () => {
                                       const nextPreviewUrls = current.imagePreviewUrls.filter(
                                         (_, currentIndex) => currentIndex !== activeIndex
                                       );
+                                      const removedImageId = current.imageAttachmentIds[activeIndex] ?? "";
+
+                                      if (removedImageId) {
+                                        removeStoredImagePreview(removedImageId);
+                                      }
 
                                       setImageCarouselIndexes((indexes) => ({
                                         ...indexes,
@@ -1144,7 +1213,6 @@ const FaqEditorPage = () => {
                                         config: {
                                           ...current.config,
                                           images: nextImages,
-                                          imagePreviews: nextPreviewUrls,
                                         },
                                       };
                                     })

@@ -19,9 +19,13 @@ const HIGH_USAGE_THRESHOLD = 80;
 const HIGH_USAGE_DELAY_MS = 1500;
 const BULK_MESSAGE_DELAY_MS = 350;
 const REQUEST_TIMEOUT_MS = 15000;
+const RATE_LIMIT_LOG_RETENTION_DAYS = 30;
+const RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const WELCOME_KEYWORDS = new Set(["get started", "get_started", "welcome", "start"]);
+let lastRateLimitLogCleanupAt = 0;
+let pendingRateLimitLogCleanup: Promise<void> | null = null;
 
 type ClientFlowNode = {
   id: string;
@@ -593,6 +597,44 @@ function parseMessengerErrorPayload(responseText: string) {
   }
 }
 
+async function cleanupRateLimitLogsIfNeeded() {
+  const now = Date.now();
+
+  if (pendingRateLimitLogCleanup) {
+    return pendingRateLimitLogCleanup;
+  }
+
+  if (now - lastRateLimitLogCleanupAt < RATE_LIMIT_LOG_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  pendingRateLimitLogCleanup = (async () => {
+    try {
+      const cutoffDate = new Date(
+        now - RATE_LIMIT_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const { error } = await supabaseAdmin
+        .from("rate_limit_logs")
+        .delete()
+        .lt("created_at", cutoffDate);
+
+      if (error) {
+        console.warn("Failed to clean up rate limit logs", error);
+        return;
+      }
+
+      lastRateLimitLogCleanupAt = now;
+    } catch (error) {
+      console.warn("Failed to clean up rate limit logs", error);
+    } finally {
+      pendingRateLimitLogCleanup = null;
+    }
+  })();
+
+  return pendingRateLimitLogCleanup;
+}
+
 async function logRateLimitEvent(details: {
   clientId: string;
   pageId: string;
@@ -939,4 +981,6 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
 
