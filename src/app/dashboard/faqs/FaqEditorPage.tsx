@@ -125,6 +125,36 @@ function normalizeKeywordInput(value: string) {
     .replace(/\s{2,}/g, " ");
 }
 
+function normalizeNodeForSave(node: FlowNodeRecord) {
+  const normalizedKeywordInput = normalizeKeywordInput(node.keywordInput).trim();
+  const normalizedKeywords = normalizedKeywordInput
+    .split(",")
+    .map((keyword) => keyword.trim())
+    .filter(Boolean);
+  const trimmedMessage = node.config.message.trim();
+  const normalizedButtons = node.config.buttons.map((button) => ({
+    ...button,
+    label: button.label.trim(),
+    targetNodeId: button.targetNodeId.trim(),
+  }));
+
+  return {
+    normalizedNode: {
+      ...node,
+      keywordInput: normalizedKeywordInput,
+      keywords: normalizedKeywords,
+      config: {
+        ...node.config,
+        message: trimmedMessage,
+        buttons: normalizedButtons,
+      },
+    },
+    normalizedKeywords,
+    trimmedMessage,
+    normalizedButtons,
+  };
+}
+
 const FaqEditorPage = () => {
   const searchParams = useSearchParams();
   const clientId = searchParams?.get("clientId") ?? "";
@@ -224,12 +254,12 @@ const FaqEditorPage = () => {
       return false;
     }
 
-    const normalizedKeywordInput = normalizeKeywordInput(node.keywordInput).trim();
-    const normalizedKeywords = normalizedKeywordInput
-      .split(",")
-      .map((keyword) => keyword.trim())
-      .filter(Boolean);
-    const trimmedMessage = node.config.message.trim();
+    const {
+      normalizedNode,
+      normalizedKeywords,
+      trimmedMessage,
+      normalizedButtons,
+    } = normalizeNodeForSave(node);
 
     if (!options?.skipContentValidation && normalizedKeywords.length === 0 && !trimmedMessage) {
       setNotice({
@@ -239,15 +269,25 @@ const FaqEditorPage = () => {
       return false;
     }
 
-    const normalizedNode = {
-      ...node,
-      keywordInput: normalizedKeywordInput,
-      keywords: normalizedKeywords,
-      config: {
-        ...node.config,
-        message: trimmedMessage,
-      },
-    };
+    if (!options?.skipContentValidation) {
+      const hasButtonWithoutLabel = normalizedButtons.some((button) => !button.label);
+      if (hasButtonWithoutLabel) {
+        setNotice({
+          tone: "error",
+          message: "Every quick reply button needs a label before saving.",
+        });
+        return false;
+      }
+
+      const hasButtonWithoutTarget = normalizedButtons.some((button) => button.label && !button.targetNodeId);
+      if (hasButtonWithoutTarget) {
+        setNotice({
+          tone: "error",
+          message: "Connect every quick reply button to a target card before saving.",
+        });
+        return false;
+      }
+    }
 
     setNodes((currentNodes) =>
       currentNodes.map((currentNode) => (currentNode.id === node.id ? normalizedNode : currentNode))
