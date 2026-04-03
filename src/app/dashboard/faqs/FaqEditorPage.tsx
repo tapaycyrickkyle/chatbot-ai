@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useSearchParams } from "next/navigation";
 import DashboardShell from "../_components/DashboardShell";
 import {
@@ -116,6 +116,34 @@ function clampPosition(value: number, max: number) {
 function buildConnectionPath(startX: number, startY: number, endX: number, endY: number) {
   const controlOffset = Math.max(120, Math.abs(endX - startX) * 0.35);
   return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+}
+
+function getDropTargetNodeId(
+  pointerX: number,
+  pointerY: number,
+  sourceNodeId: string,
+  nodeRefs: MutableRefObject<Record<string, HTMLElement | null>>
+) {
+  const hitPadding = 18;
+  const entries = Object.entries(nodeRefs.current);
+
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const [nodeId, element] = entries[index] ?? [];
+
+    if (!nodeId || !element || nodeId === sourceNodeId) {
+      continue;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const withinX = pointerX >= rect.left - hitPadding && pointerX <= rect.right + hitPadding;
+    const withinY = pointerY >= rect.top - hitPadding && pointerY <= rect.bottom + hitPadding;
+
+    if (withinX && withinY) {
+      return nodeId;
+    }
+  }
+
+  return "";
 }
 
 function getNodeHeight(node: FlowNodeRecord) {
@@ -531,11 +559,14 @@ const FaqEditorPage = () => {
       }
 
       if (connectionDragState) {
-        const dropTarget = document.elementFromPoint(event.clientX, event.clientY);
-        const nodeElement = dropTarget instanceof HTMLElement ? dropTarget.closest("[data-node-id]") : null;
-        const targetNodeId = nodeElement instanceof HTMLElement ? nodeElement.dataset.nodeId ?? "" : "";
+        const targetNodeId = getDropTargetNodeId(
+          event.clientX,
+          event.clientY,
+          connectionDragState.sourceNodeId,
+          nodeRefs
+        );
 
-        if (targetNodeId && targetNodeId !== connectionDragState.sourceNodeId) {
+        if (targetNodeId) {
           const nextNodes = nodes.map((node) => {
             if (node.id !== connectionDragState.sourceNodeId) {
               return node;
