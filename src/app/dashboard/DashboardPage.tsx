@@ -30,6 +30,7 @@ const DashboardPage = () => {
   const [disconnectTarget, setDisconnectTarget] = useState<ClientRow | null>(null);
   const [disconnectConfirmation, setDisconnectConfirmation] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [facebookPagesMessage, setFacebookPagesMessage] = useState<string | null>(null);
 
   const loadClients = async () => {
     try {
@@ -68,6 +69,20 @@ const DashboardPage = () => {
   }, [successMessage]);
 
   useEffect(() => {
+    if (!facebookPagesMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFacebookPagesMessage(null);
+    }, 5200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [facebookPagesMessage]);
+
+  useEffect(() => {
     const fbConnectedFromQuery = searchParams?.get("fb_connected") === "true";
     const fbConnectedFromCookie = document.cookie
       .split("; ")
@@ -93,9 +108,16 @@ const DashboardPage = () => {
         if (nextPages.length > 0) {
           setPages(nextPages);
           setShowModal(true);
+        } else {
+          setPages([]);
+          setShowModal(true);
+          setFacebookPagesMessage(
+            "No Facebook Pages were returned for this account. Make sure you are connecting an actual Facebook Page, not just a personal profile, and that the account has page access."
+          );
         }
       } catch (error) {
         console.error(error);
+        setFacebookPagesMessage("Unable to load Facebook Pages right now. Please reconnect your Facebook account and try again.");
       } finally {
         document.cookie = "fb_connected=; Max-Age=0; path=/; SameSite=Lax";
         window.history.replaceState({}, "", "/dashboard");
@@ -281,6 +303,15 @@ const DashboardPage = () => {
             </span>
             <p className="text-[13px] font-medium text-[var(--text-primary)]">
               {successMessage}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {facebookPagesMessage ? (
+        <div className="fixed right-5 bottom-5 z-[60] animate-[fadeIn_180ms_ease-out]">
+          <div className="max-w-[360px] rounded-2xl border border-[#5b2a2a] bg-[rgba(58,19,19,0.94)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+            <p className="text-[13px] font-medium text-[#ffd0d0]">
+              {facebookPagesMessage}
             </p>
           </div>
         </div>
@@ -506,6 +537,13 @@ const DashboardPage = () => {
               </p>
 
               <div className="mt-6 space-y-4">
+                {pages.length === 0 ? (
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-5">
+                    <p className="text-[14px] leading-6 text-[var(--text-muted)]">
+                      No Facebook Pages are available for this account yet. Make sure this account has access to a real Facebook Page and then reconnect.
+                    </p>
+                  </div>
+                ) : null}
                 {pages.map((page) => {
                   const isAlreadyConnected = clients.some(
                     (client) => client.page_id === page.id
