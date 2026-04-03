@@ -265,12 +265,32 @@ async function sendFlowNodeMessage(
   }
 
   if (validButtons.length > 0) {
+    const templateText =
+      combinedFormattedMessage.length > 0 && combinedFormattedMessage.length <= MAX_TEMPLATE_TEXT_LENGTH
+        ? combinedFormattedMessage
+        : "";
+    const leadTextParts =
+      templateText || formattedMessageParts.length === 0
+        ? []
+        : formattedMessageParts.slice(0, -1);
+    const finalTemplateText =
+      templateText ||
+      formattedMessageParts[formattedMessageParts.length - 1] ||
+      "Choose an option below.";
+
+    for (const textPart of leadTextParts) {
+      messages.push({
+        type: "text",
+        body: createTextMessageBody(recipientId, textPart),
+      });
+    }
+
     if (validButtons.length <= 3) {
       messages.push({
         type: "button_template",
         body: createButtonTemplateMessageBody(
           recipientId,
-          formattedMessageParts[0] || "Choose an option below.",
+          finalTemplateText,
           validButtons.map((button) => ({
             title: button.label,
             payload: createFlowPayload(clientId, button.targetNodeId),
@@ -282,7 +302,7 @@ async function sendFlowNodeMessage(
         type: "quick_replies",
         body: createQuickRepliesMessageBody(
           recipientId,
-          formattedMessageParts[0] || "Choose an option below.",
+          finalTemplateText,
           validButtons.map((button) => ({
             title: button.label,
             payload: createFlowPayload(clientId, button.targetNodeId),
@@ -291,19 +311,30 @@ async function sendFlowNodeMessage(
       });
     }
   }
-
   await sendMessageBatch(messages, pageToken, {
     clientId,
     pageId,
     recipientId,
   });
 
-  if (!validButtons.length && config.message) {
+  if (!validButtons.length && formattedMessageParts.length > 0) {
     if (messages.length > 0) {
       await sleep(BULK_MESSAGE_DELAY_MS);
     }
 
-    await safeSendMessage(recipientId, config.message, pageToken, 0, pageId, clientId);
+    for (let index = 0; index < formattedMessageParts.length; index += 1) {
+      const messagePart = formattedMessageParts[index];
+
+      if (!messagePart) {
+        continue;
+      }
+
+      if (index > 0) {
+        await sleep(BULK_MESSAGE_DELAY_MS);
+      }
+
+      await safeSendMessage(recipientId, messagePart, pageToken, 0, pageId, clientId);
+    }
   }
 }
 
@@ -897,6 +928,28 @@ function formatMessengerTextParts(text: string) {
   return parts;
 }
 
+function buildInteractiveMessagePlan(messageParts: string[], fallbackText: string) {
+  const combinedMessage = messageParts.join("\n\n").trim();
+
+  if (combinedMessage && combinedMessage.length <= MAX_TEMPLATE_TEXT_LENGTH) {
+    return {
+      leadTextParts: [] as string[],
+      templateText: combinedMessage,
+    };
+  }
+
+  if (messageParts.length === 0) {
+    return {
+      leadTextParts: [] as string[],
+      templateText: fallbackText,
+    };
+  }
+
+  return {
+    leadTextParts: messageParts.slice(0, -1),
+    templateText: messageParts[messageParts.length - 1] || fallbackText,
+  };
+}
 function splitLongTextBlock(text: string, maxLength: number) {
   const words = text.split(/\s+/).filter(Boolean);
   const parts: string[] = [];
@@ -1085,6 +1138,7 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
 
 
 
