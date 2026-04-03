@@ -104,9 +104,6 @@ export function validateFaqPayload(payload: unknown) {
     .map((keyword) => keyword.trim())
     .filter(Boolean);
 
-  if (normalizedKeywords.length === 0) {
-    throw new Error("At least one keyword is required");
-  }
 
   if (normalizedKeywords.length > MAX_KEYWORDS) {
     throw new Error("Too many keywords");

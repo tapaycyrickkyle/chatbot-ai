@@ -235,6 +235,18 @@ input[type="search"]::-webkit-search-cancel-button {
   -webkit-mask-size: contain;
   mask-size: contain;
 }
+
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

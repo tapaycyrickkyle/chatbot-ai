@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import FaqEditorPage from "./FaqEditorPage";
 
 export const metadata: Metadata = {
-  title: "FAQ Editor | Business Chatbot",
-  description: "Manage and organize FAQ responses for connected clients.",
+  title: "Flow Builder | Business Chatbot",
+  description: "Manage chatbot flow cards and quick replies.",
 };
 
 const Page = () => {
@@ -16,3 +16,4 @@ const Page = () => {
 };
 
 export default Page;
+

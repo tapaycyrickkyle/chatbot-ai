@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getClients, getFaqsForClient } from "@/lib/database";
+import { parseBotFlowNodeConfig } from "@/lib/bot-flow";
 
 export const config = {
   api: {
@@ -9,6 +10,15 @@ export const config = {
 };
 
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
+const MAX_QUICK_REPLIES = 13;
+const FLOW_PAYLOAD_PREFIX = "FLOW_NODE:";
+
+type ClientFlowNode = {
+  id: string;
+  keywords: string[];
+  answer: string;
+  imageAttachmentId: string;
+};
 
 type WebhookBody = {
   object?: string;
@@ -16,7 +26,12 @@ type WebhookBody = {
     id: string;
     messaging?: Array<{
       sender: { id: string };
-      message?: { text?: string };
+      message?: {
+        text?: string;
+        quick_reply?: {
+          payload?: string;
+        };
+      };
     }>;
   }>;
 };
@@ -78,41 +93,43 @@ export default async function handler(
         }
 
         const pageAccessToken = client.page_access_token;
-        const clientFaqs = (await getFaqsForClient(client.id)).map((faq) => ({
-          keywords: faq.keywords
-            .map((keyword) => normalizeText(keyword))
-            .filter(Boolean),
+        const clientFlowNodes = (await getFaqsForClient(client.id)).map((faq) => ({
+          id: faq.id,
+          keywords: faq.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean),
           answer: faq.answer,
-          imageAttachmentId: faq.image_attachment_id,
+          imageAttachmentId: faq.image_attachment_id ?? "",
         }));
 
         for (const event of entry.messaging ?? []) {
-          if (event.message?.text) {
-            const userId = event.sender.id;
-            const userMessage = normalizeText(event.message.text);
+          const userId = event.sender.id;
+          const quickReplyPayload = event.message?.quick_reply?.payload;
 
-            const matched = clientFaqs.find((faq) =>
-              faq.keywords.some((keyword: string) =>
-                messageMatchesKeyword(userMessage, keyword)
-              )
-            );
+          if (quickReplyPayload) {
+            const targetNode = resolveQuickReplyTarget(client.id, quickReplyPayload, clientFlowNodes);
 
-            if (matched) {
-              if (matched.imageAttachmentId) {
-                await sendImageMessage(
-                  userId,
-                  matched.imageAttachmentId,
-                  pageAccessToken
-                );
-              } else {
-                await sendTextMessage(
-                  userId,
-                  matched.answer,
-                  pageAccessToken
-                );
-              }
+            if (targetNode) {
+              await sendFlowNodeMessage(userId, targetNode, client.id, pageAccessToken, clientFlowNodes);
             }
+
+            continue;
           }
+
+          const rawText = event.message?.text;
+
+          if (!rawText) {
+            continue;
+          }
+
+          const userMessage = normalizeText(rawText);
+          const matchedNode = clientFlowNodes.find((node) =>
+            node.keywords.some((keyword) => messageMatchesKeyword(userMessage, keyword))
+          );
+
+          if (!matchedNode) {
+            continue;
+          }
+
+          await sendFlowNodeMessage(userId, matchedNode, client.id, pageAccessToken, clientFlowNodes);
         }
       }
     }
@@ -123,22 +140,109 @@ export default async function handler(
   return res.status(405).json({ error: "Method not allowed" });
 }
 
+async function sendFlowNodeMessage(
+  recipientId: string,
+  node: ClientFlowNode,
+  clientId: string,
+  pageToken: string,
+  clientFlowNodes: ClientFlowNode[]
+) {
+  const config = parseBotFlowNodeConfig(node.answer, node.keywords[0] || "Flow Card");
+  const validButtons = config.buttons.filter((button) =>
+    clientFlowNodes.some((candidate) => candidate.id === button.targetNodeId)
+  );
+
+  if (node.imageAttachmentId) {
+    await sendImageMessage(recipientId, node.imageAttachmentId, pageToken);
+  }
+
+  if (validButtons.length > 0) {
+    await sendQuickRepliesMessage(
+      recipientId,
+      config.message || "Choose an option below.",
+      validButtons.map((button) => ({
+        title: button.label,
+        payload: createFlowPayload(clientId, button.targetNodeId),
+      })),
+      pageToken
+    );
+    return;
+  }
+
+  if (config.message) {
+    await sendTextMessage(recipientId, config.message, pageToken);
+  }
+}
+
+function resolveQuickReplyTarget(
+  clientId: string,
+  payload: string,
+  nodes: ClientFlowNode[]
+) {
+  const parsed = parseFlowPayload(payload);
+
+  if (!parsed || parsed.clientId !== clientId) {
+    return null;
+  }
+
+  return nodes.find((node) => node.id === parsed.nodeId) ?? null;
+}
+
+function createFlowPayload(clientId: string, nodeId: string) {
+  return `${FLOW_PAYLOAD_PREFIX}${clientId}:${nodeId}`;
+}
+
+function parseFlowPayload(payload: string) {
+  if (!payload.startsWith(FLOW_PAYLOAD_PREFIX)) {
+    return null;
+  }
+
+  const raw = payload.slice(FLOW_PAYLOAD_PREFIX.length);
+  const [clientId, nodeId] = raw.split(":");
+
+  if (!clientId || !nodeId) {
+    return null;
+  }
+
+  return { clientId, nodeId };
+}
+
 async function sendTextMessage(
   recipientId: string,
   text: string,
   pageToken: string
 ) {
-  await fetch("https://graph.facebook.com/v20.0/me/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${pageToken}`,
-    },
-    body: JSON.stringify({
+  await sendMessengerRequest(
+    {
       recipient: { id: recipientId },
       message: { text },
-    }),
-  });
+    },
+    pageToken
+  );
+}
+
+async function sendQuickRepliesMessage(
+  recipientId: string,
+  text: string,
+  quickReplies: Array<{ title: string; payload: string }>,
+  pageToken: string
+) {
+  const limitedQuickReplies = quickReplies.slice(0, MAX_QUICK_REPLIES);
+
+  await sendMessengerRequest(
+    {
+      recipient: { id: recipientId },
+      message: {
+        text,
+        quick_replies: limitedQuickReplies.map((quickReply) => ({
+          content_type: "text",
+          title: quickReply.title,
+          payload: quickReply.payload,
+        })),
+      },
+    },
+    pageToken
+  );
 }
 
 async function sendImageMessage(
@@ -146,13 +250,8 @@ async function sendImageMessage(
   attachmentId: string,
   pageToken: string
 ) {
-  await fetch("https://graph.facebook.com/v20.0/me/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${pageToken}`,
-    },
-    body: JSON.stringify({
+  await sendMessengerRequest(
+    {
       recipient: { id: recipientId },
       message: {
         attachment: {
@@ -163,8 +262,25 @@ async function sendImageMessage(
           },
         },
       },
-    }),
+    },
+    pageToken
+  );
+}
+
+async function sendMessengerRequest(body: unknown, pageToken: string) {
+  const response = await fetch("https://graph.facebook.com/v20.0/me/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${pageToken}`,
+    },
+    body: JSON.stringify(body),
   });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "");
+    throw new Error(`Messenger API request failed (${response.status}): ${errorBody || response.statusText}`);
+  }
 }
 
 async function readRawBody(req: NextApiRequest) {
@@ -232,3 +348,4 @@ function messageMatchesKeyword(message: string, keyword: string) {
 
   return message === keyword;
 }
+

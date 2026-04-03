@@ -384,7 +384,7 @@ const DashboardPage = () => {
                         href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
                         className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
                       >
-                        Edit FAQs
+                        Open Builder
                       </Link>
                       <button
                         type="button"
@@ -574,3 +574,5 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
+
+
