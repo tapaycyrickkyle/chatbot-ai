@@ -3,6 +3,7 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
 const FALLBACK_REPLY = "I don't have that information.";
+const AI_UNAVAILABLE_REPLY = "Our AI assistant is temporarily unavailable. Please try again later.";
 
 function getGeminiClient() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -26,10 +27,15 @@ Customer Question: ${userMessage}
 
 Answer (concise, friendly, helpful):`;
 
-  const response = await getGeminiClient().models.generateContent({
-    model: "gemini-2.5-flash-lite",
-    contents: prompt,
-  });
+  try {
+    const response = await getGeminiClient().models.generateContent({
+      model: "gemini-2.5-flash-lite",
+      contents: prompt,
+    });
 
-  return response.text?.trim() || FALLBACK_REPLY;
+    return response.text?.trim() || FALLBACK_REPLY;
+  } catch (error) {
+    console.error("Gemini request failed", error);
+    return AI_UNAVAILABLE_REPLY;
+  }
 }
