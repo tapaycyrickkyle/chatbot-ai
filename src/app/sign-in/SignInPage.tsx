@@ -1,5 +1,12 @@
 "use client";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faEnvelope,
+  faEye,
+  faEyeSlash,
+  faLock,
+} from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -107,20 +114,7 @@ const SignInPage = () => {
                 </label>
                 <div className="group relative">
                   <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[#8a8a8f] transition-colors group-focus-within:text-[#006139]">
-                    <svg
-                      aria-hidden="true"
-                      className="h-4.5 w-4.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 7.5 12 13l8-5.5M5.5 6h13A1.5 1.5 0 0 1 20 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5v-9A1.5 1.5 0 0 1 5.5 6Z"
-                      />
-                    </svg>
+                    <FontAwesomeIcon aria-hidden="true" className="h-4.5 w-4.5" icon={faEnvelope} />
                   </span>
                   <input
                     id="email"
@@ -150,27 +144,14 @@ const SignInPage = () => {
                 </div>
                 <div className="group relative">
                   <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[#8a8a8f] transition-colors group-focus-within:text-[#006139]">
-                    <svg
-                      aria-hidden="true"
-                      className="h-4.5 w-4.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M8.5 10V8a3.5 3.5 0 1 1 7 0v2m-8 0h9a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z"
-                      />
-                    </svg>
+                    <FontAwesomeIcon aria-hidden="true" className="h-4.5 w-4.5" icon={faLock} />
                   </span>
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="••••••••"
+                    placeholder="********"
                     className="w-full rounded-xl border border-[#303030] bg-[#171717] py-2.5 pr-12 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                   />
                   <button
@@ -179,42 +160,11 @@ const SignInPage = () => {
                     onClick={() => setShowPassword((value) => !value)}
                     className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md border-none p-1 text-[#8a8a8f] transition-colors hover:text-[#3ECF8E]"
                   >
-                    {showPassword ? (
-                      <svg
-                        aria-hidden="true"
-                        className="h-4.5 w-4.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M3 3l18 18M10.73 10.73A3 3 0 0 0 15 15m3.61 3.61A11.8 11.8 0 0 1 12 20C7 20 3.73 16.89 2 12c.78-2.2 2.03-4.08 3.7-5.49m3.03-1.72A11.72 11.72 0 0 1 12 4c5 0 8.27 3.11 10 8a12.27 12.27 0 0 1-1.67 3.06"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        aria-hidden="true"
-                        className="h-4.5 w-4.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2 12s3.27-8 10-8 10 8 10 8-3.27 8-10 8S2 12 2 12Z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-                        />
-                      </svg>
-                    )}
+                    <FontAwesomeIcon
+                      aria-hidden="true"
+                      className="h-4.5 w-4.5"
+                      icon={showPassword ? faEyeSlash : faEye}
+                    />
                   </button>
                 </div>
               </div>
@@ -237,4 +187,3 @@ const SignInPage = () => {
 };
 
 export default SignInPage;
-

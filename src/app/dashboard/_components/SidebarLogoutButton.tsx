@@ -1,5 +1,7 @@
 "use client";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../../_components/ToastProvider";
@@ -55,24 +57,10 @@ const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) =>
       }`}
       title={collapsed ? (isLoggingOut ? "Logging out..." : "Logout") : undefined}
     >
-      <svg
-        aria-hidden="true"
-        className="h-5 w-5 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3-3-3-3m3 3H9"
-        />
-      </svg>
+      <FontAwesomeIcon aria-hidden="true" className="h-5 w-5 shrink-0" icon={faRightFromBracket} />
       {collapsed ? null : <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>}
     </button>
   );
 };
 
 export default SidebarLogoutButton;
-

@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGear, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "../_components/ToastProvider";
@@ -13,6 +15,7 @@ type ClientRow = {
   page_id: string;
   created_at: string;
   picture_url?: string;
+  bot_type?: "keyword" | "ai";
 };
 
 type FacebookPage = {
@@ -415,7 +418,7 @@ const DashboardPage = () => {
 
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`}
+                        href={`/dashboard/clients/${encodeURIComponent(client.id)}/builder`}
                         className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
                       >
                         Open Builder
@@ -428,6 +431,14 @@ const DashboardPage = () => {
                       >
                         {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
                       </button>
+                      <Link
+                        href={`/dashboard/clients/${encodeURIComponent(client.id)}`}
+                        aria-label={`Open settings for ${client.client_name}`}
+                        title="Settings"
+                        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
+                      >
+                        <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faGear} />
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -452,20 +463,7 @@ const DashboardPage = () => {
                 className="rounded-full border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Close disconnect modal"
               >
-                <svg
-                  aria-hidden="true"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 6l12 12M18 6 6 18"
-                  />
-                </svg>
+<FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
               </button>
             </div>
 
@@ -518,20 +516,7 @@ const DashboardPage = () => {
                 className="rounded-full border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 aria-label="Close modal"
               >
-                <svg
-                  aria-hidden="true"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 6l12 12M18 6 6 18"
-                  />
-                </svg>
+<FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
               </button>
             </div>
 
@@ -620,5 +605,9 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
+
+
+
+
 
 

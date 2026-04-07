@@ -8,6 +8,8 @@ type ClientRow = {
   page_id: string;
   page_access_token: string;
   created_at: string;
+  bot_type?: string | null;
+  business_info?: string | null;
 };
 
 type FaqRow = {
@@ -29,6 +31,8 @@ function normalizeClient(row: ClientRow) {
     page_id: row.page_id,
     page_access_token: row.page_access_token,
     created_at: row.created_at,
+    bot_type: row.bot_type === "ai" ? "ai" : "keyword",
+    business_info: row.business_info ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -51,7 +55,7 @@ export async function getClients() {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -102,7 +106,7 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -115,6 +119,21 @@ export async function getClientById(clientId: string) {
   }
 
   return normalizeClient(data as ClientRow);
+}
+
+export async function updateClientSettings(
+  clientId: string,
+  updates: Partial<{
+    bot_type: "keyword" | "ai";
+    business_info: string;
+  }>
+) {
+  const supabase = getDb();
+  const { error } = await supabase.from("clients").update(updates).eq("id", clientId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to update client settings");
+  }
 }
 
 export async function deleteFaqsForClient(clientId: string) {

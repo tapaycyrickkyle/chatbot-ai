@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 
 type ToastTone = "success" | "error";
 
@@ -110,23 +112,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     : "bg-[#5a2626]/60 text-[#ffc1c1]"
                 }`}
               >
-                <svg
+                <FontAwesomeIcon
                   aria-hidden="true"
                   className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  {toast.tone === "success" ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                  ) : (
-                    <>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v5" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16h.01" />
-                    </>
-                  )}
-                </svg>
+                  icon={toast.tone === "success" ? faCheck : faCircleExclamation}
+                />
               </span>
               <p
                 className={`text-[13px] font-medium ${

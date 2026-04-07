@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { parseBotFlowNodeConfig } from "@/lib/bot-flow";
 import { getClients, getFaqsForClient } from "@/lib/database";
+import { askGemini } from "@/lib/gemini";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -163,7 +164,40 @@ export default async function handler(
 
         for (const event of entry.messaging ?? []) {
           const userId = event.sender.id;
+          const rawText = event.message?.text;
           const flowPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
+
+          if (client.bot_type === "ai") {
+            await clearReplyCaptureSession(client.id, userId);
+
+            if (rawText) {
+              await safelyHandleFlowSend(
+                async () => {
+                  const aiReply = await askGemini(rawText, client.business_info || "");
+                  await safeSendMessage(userId, aiReply, pageAccessToken, 0, pageId, client.id);
+                },
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+              continue;
+            }
+
+            if (flowPayload === GET_STARTED_PAYLOAD) {
+              await safelyHandleFlowSend(
+                () =>
+                  safeSendMessage(
+                    userId,
+                    "Hi! How can I help you today?",
+                    pageAccessToken,
+                    0,
+                    pageId,
+                    client.id
+                  ).then(() => undefined),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+            }
+
+            continue;
+          }
 
           if (flowPayload) {
             await clearReplyCaptureSession(client.id, userId);
@@ -207,8 +241,6 @@ export default async function handler(
 
             continue;
           }
-
-          const rawText = event.message?.text;
 
           if (!rawText) {
             continue;
@@ -1169,6 +1201,9 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
+
+
+
 
 
 

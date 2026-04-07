@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import chatbotWebIcon from "./chatbot-web-icon.png";
 import { ToastProvider } from "./_components/ToastProvider";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+import { config } from "@fortawesome/fontawesome-svg-core";
 import "./globals.css";
+
+config.autoAddCss = false;
 
 const inter = Inter({
   variable: "--font-inter",

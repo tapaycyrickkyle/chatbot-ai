@@ -1,5 +1,7 @@
 "use client";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -97,11 +99,7 @@ const DashboardShell = ({
           className={`fixed left-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden ${showTopBar ? "top-4 xl:top-5" : "top-4"}`}
           aria-label="Open sidebar"
         >
-          <span className="flex flex-col gap-1.5">
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-          </span>
+          <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
         </button>
       ) : null}
 
@@ -152,18 +150,7 @@ const DashboardShell = ({
               }`}
               aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
             >
-              {isDesktopSidebarExpanded ? (
-                <span className="relative block h-4 w-4">
-                  <span className="absolute left-0 top-1/2 block h-0.5 w-4 -translate-y-1/2 rotate-45 rounded-full bg-current" />
-                  <span className="absolute left-0 top-1/2 block h-0.5 w-4 -translate-y-1/2 -rotate-45 rounded-full bg-current" />
-                </span>
-              ) : (
-                <span className="flex flex-col gap-1.5">
-                  <span className="block h-0.5 w-4 rounded-full bg-current" />
-                  <span className="block h-0.5 w-4 rounded-full bg-current" />
-                  <span className="block h-0.5 w-4 rounded-full bg-current" />
-                </span>
-              )}
+              <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={isDesktopSidebarExpanded ? faXmark : faBars} />
             </button>
           </div>
 
