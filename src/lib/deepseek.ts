@@ -14,6 +14,28 @@ type DeepSeekChatCompletionResponse = {
   }>;
 };
 
+function detectReplyLanguage(userMessage: string) {
+  const normalizedMessage = userMessage.toLowerCase();
+  const hasTagalogCue =
+    /\b(ang|mga|naman|po|opo|pwede|pede|ano|saan|kailan|magkano|meron|wala|para|ako|ikaw|siya|kami|tayo|nila|dito|iyan|yan|lang|talaga|ba|na)\b/.test(
+      normalizedMessage
+    );
+  const hasEnglishCue =
+    /\b(the|and|is|are|can|do|does|how|what|when|where|price|available|order|buy|shipping|delivery)\b/.test(
+      normalizedMessage
+    );
+
+  if (hasTagalogCue && hasEnglishCue) {
+    return "Taglish";
+  }
+
+  if (hasTagalogCue) {
+    return "Tagalog";
+  }
+
+  return "English";
+}
+
 function getErrorSummary(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -29,6 +51,7 @@ function getErrorSummary(error: unknown) {
 }
 
 export async function askDeepSeek(userMessage: string, businessContext: string) {
+  const detectedLanguage = detectReplyLanguage(userMessage);
   const systemPrompt = `You are a strong sales agent for a business. You are confident, empathetic, persuasive, and practical. You speak naturally and can mix English and Tagalog (Taglish).
 
 YOUR SALES PROCESS:
@@ -43,7 +66,11 @@ RULES:
 - ONLY use the business information provided below. Never invent prices, products, or policies.
 - If the answer isn't there, say: "Great question! Let me connect you with our specialist - one moment please."
 - Be proactive: suggest add-ons, upsells, and popular items.
-- Reply in the same language as the customer (English, Tagalog, or Taglish).
+- Detect the language used in the customer's latest message and reply in that same language.
+- If the customer's latest message is in English, reply in English.
+- If the customer's latest message is in Tagalog, reply in Tagalog.
+- If the customer's latest message mixes English and Tagalog, reply in Taglish.
+- Prioritize the customer's latest message over any earlier tone or language.
 - Keep replies short: 1 to 3 sentences only.
 - Do not start every reply with greetings like "Hello", "Hi there", or similar unless the customer is clearly greeting first.
 - Do not repeat greetings, filler phrases, or long introductions.
@@ -72,7 +99,10 @@ ${businessContext}`;
         model,
         temperature: 0.7,
         messages: [
-          { role: "system", content: systemPrompt },
+          {
+            role: "system",
+            content: `${systemPrompt}\n\nLATEST CUSTOMER LANGUAGE: ${detectedLanguage}`,
+          },
           { role: "user", content: userMessage },
         ],
       }),
