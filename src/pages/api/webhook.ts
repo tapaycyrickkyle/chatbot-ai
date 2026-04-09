@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { parseBotFlowNodeConfig } from "@/lib/bot-flow";
 import { getClients, getFaqsForClient } from "@/lib/database";
-import { askGemini } from "@/lib/gemini";
+import { askDeepSeek } from "@/lib/deepseek";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -98,6 +98,16 @@ type ReplyCaptureSessionRow = {
   next_node_id: string;
 };
 
+function summarizeWebhookEvent(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
+) {
+  return {
+    hasText: Boolean(event.message?.text),
+    hasQuickReply: Boolean(event.message?.quick_reply?.payload),
+    hasPostback: Boolean(event.postback?.payload),
+  };
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -170,10 +180,32 @@ export default async function handler(
           if (client.bot_type === "ai") {
             await clearReplyCaptureSession(client.id, userId);
 
+            console.info("AI webhook event received", {
+              clientId: client.id,
+              clientName: client.client_name,
+              pageId,
+              userId,
+              botType: client.bot_type,
+              hasBusinessInfo: Boolean(client.business_info?.trim()),
+              ...summarizeWebhookEvent(event),
+            });
+
             if (rawText) {
               await safelyHandleFlowSend(
                 async () => {
-                  const aiReply = await askGemini(rawText, client.business_info || "");
+                  console.info("AI webhook processing text message", {
+                    clientId: client.id,
+                    pageId,
+                    userId,
+                    preview: rawText.slice(0, 120),
+                  });
+                  const aiReply = await askDeepSeek(rawText, client.business_info || "");
+                  console.info("AI webhook generated reply", {
+                    clientId: client.id,
+                    pageId,
+                    userId,
+                    preview: aiReply.slice(0, 120),
+                  });
                   await safeSendMessage(userId, aiReply, pageAccessToken, 0, pageId, client.id);
                 },
                 { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
@@ -194,7 +226,21 @@ export default async function handler(
                   ).then(() => undefined),
                 { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
               );
+              continue;
             }
+
+            await safelyHandleFlowSend(
+              () =>
+                safeSendMessage(
+                  userId,
+                  "I can help best with text messages right now. Send me your question in a message and I'll reply right away.",
+                  pageAccessToken,
+                  0,
+                  pageId,
+                  client.id
+                ).then(() => undefined),
+              { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+            );
 
             continue;
           }
@@ -1201,25 +1247,4 @@ function withJitter(durationMs: number) {
   const jitter = Math.round(durationMs * 0.25 * Math.random());
   return durationMs + jitter;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
