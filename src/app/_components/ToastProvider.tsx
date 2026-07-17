@@ -99,7 +99,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             }`}
           >
             <div
-              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
+              className={`flex items-center gap-3 rounded border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
                 toast.tone === "success"
                   ? "border-[var(--accent-bright)] bg-[var(--surface)]"
                   : "border-[#6a2d2d] bg-[#2b1717]"

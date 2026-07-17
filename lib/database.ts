@@ -31,7 +31,7 @@ function normalizeClient(row: ClientRow) {
     page_id: row.page_id,
     page_access_token: row.page_access_token,
     created_at: row.created_at,
-    bot_type: row.bot_type === "ai" ? "ai" : "keyword",
+    bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
@@ -73,7 +73,7 @@ export async function addClient(clientData: {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .insert(clientData)
+    .insert({ ...clientData, bot_type: "ai" })
     .select("id")
     .single();
 
@@ -124,7 +124,7 @@ export async function getClientById(clientId: string) {
 export async function updateClientSettings(
   clientId: string,
   updates: Partial<{
-    bot_type: "keyword" | "ai";
+    bot_type: "ai";
     business_info: string;
   }>
 ) {

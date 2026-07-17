@@ -36,13 +36,18 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-text: var(--accent-text);
   --color-accent-text-hover: var(--accent-text-hover);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-poppins);
+  --font-mono: var(--font-poppins);
+}
+
+* {
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
 }
 
 html {
@@ -55,7 +60,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-heading), Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
   color: var(--text-heading);
 }
 
@@ -85,7 +90,10 @@ a:hover {
 }
 
 input,
+button,
+select,
 textarea {
+  font: inherit;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,

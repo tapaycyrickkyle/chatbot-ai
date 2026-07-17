@@ -165,12 +165,6 @@ export default async function handler(
         }
 
         const pageAccessToken = client.page_access_token;
-        const clientFlowNodes = (await getFaqsForClient(client.id)).map((faq) => ({
-          id: faq.id,
-          keywords: faq.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean),
-          answer: faq.answer,
-          imageAttachmentId: faq.image_attachment_id ?? "",
-        }));
 
         for (const event of entry.messaging ?? []) {
           const userId = event.sender.id;
@@ -244,6 +238,13 @@ export default async function handler(
 
             continue;
           }
+
+          const clientFlowNodes = (await getFaqsForClient(client.id)).map((faq) => ({
+            id: faq.id,
+            keywords: faq.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean),
+            answer: faq.answer,
+            imageAttachmentId: faq.image_attachment_id ?? "",
+          }));
 
           if (flowPayload) {
             await clearReplyCaptureSession(client.id, userId);

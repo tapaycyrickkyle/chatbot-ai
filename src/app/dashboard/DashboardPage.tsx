@@ -15,7 +15,7 @@ type ClientRow = {
   page_id: string;
   created_at: string;
   picture_url?: string;
-  bot_type?: "keyword" | "ai";
+  bot_type?: "ai";
 };
 
 type FacebookPage = {
@@ -306,14 +306,14 @@ const DashboardPage = () => {
                 Connected Clients
               </h2>
               <p className="mt-2.5 max-w-[640px] text-[14px] leading-6 text-[var(--text-muted)]">
-                Manage your automated Facebook environments and FAQ logic from
-                one architectural command center.
+                Manage connected Facebook Pages and their Full AI prompt knowledge
+                from one command center.
               </p>
             </div>
 
             <Link
               href="/api/auth/facebook/login"
-              className="self-start rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] shadow-[0_8px_22px_rgba(0,0,0,0.16)]"
+              className="self-start rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] shadow-[0_8px_22px_rgba(0,0,0,0.16)]"
             >
               + Connect New Page
             </Link>
@@ -321,7 +321,7 @@ const DashboardPage = () => {
 
           <div className="space-y-3.5">
             {isLoadingClients ? (
-              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
                   Loading connected clients...
                 </p>
@@ -329,7 +329,7 @@ const DashboardPage = () => {
             ) : null}
 
             {!isLoadingClients && clients.length === 0 ? (
-              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
                   No clients found yet. Connect a new page to get started.
                 </p>
@@ -337,7 +337,7 @@ const DashboardPage = () => {
             ) : null}
 
             {!isLoadingClients && clients.length > 0 && filteredClients.length === 0 ? (
-              <article className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
                   No clients match your current search.
                 </p>
@@ -350,11 +350,11 @@ const DashboardPage = () => {
                 return (
               <article
                 key={client.id}
-                className="card-hover rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
+                className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 flex-1 items-center gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.2),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.2),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
                       {client.picture_url ? (
                         <Image
                           src={client.picture_url}
@@ -418,16 +418,16 @@ const DashboardPage = () => {
 
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/dashboard/clients/${encodeURIComponent(client.id)}/builder`}
-                        className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                        href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
+                        className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
                       >
-                        Open Builder
+                        Open Prompt
                       </Link>
                       <button
                         type="button"
                         onClick={() => openDisconnectModal(client)}
                         disabled={isDisconnectingClientId === client.id}
-                        className="inline-flex w-fit items-center justify-center rounded-xl border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="inline-flex w-fit items-center justify-center rounded-md border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
                       </button>
@@ -435,7 +435,7 @@ const DashboardPage = () => {
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}`}
                         aria-label={`Open settings for ${client.client_name}`}
                         title="Settings"
-                        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
+                        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
                       >
                         <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faGear} />
                       </Link>
@@ -451,7 +451,7 @@ const DashboardPage = () => {
       </DashboardShell>
       {disconnectTarget ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
+          <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#5a2626] px-7 py-6">
               <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em] text-[#ffdfdf]">
                 Confirm Disconnect
@@ -460,7 +460,7 @@ const DashboardPage = () => {
                 type="button"
                 onClick={closeDisconnectModal}
                 disabled={Boolean(isDisconnectingClientId)}
-                className="rounded-full border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-md border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Close disconnect modal"
               >
 <FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
@@ -479,14 +479,14 @@ const DashboardPage = () => {
                 value={disconnectConfirmation}
                 onChange={(event) => setDisconnectConfirmation(event.target.value)}
                 placeholder="Type disconnect"
-                className="w-full rounded-xl border border-[#5a2626] bg-[#171717] px-4 py-2.5 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#8e3434] focus:outline-none focus:ring-2 focus:ring-[#8e3434]/25"
+                className="w-full rounded-md border border-[#5a2626] bg-[#171717] px-4 py-2.5 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#8e3434] focus:outline-none focus:ring-2 focus:ring-[#8e3434]/25"
               />
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeDisconnectModal}
                   disabled={Boolean(isDisconnectingClientId)}
-                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -494,7 +494,7 @@ const DashboardPage = () => {
                   type="button"
                   onClick={() => void disconnectClient()}
                   disabled={!canConfirmDisconnect || Boolean(isDisconnectingClientId)}
-                  className="rounded-xl border border-[#5a2626] bg-[#7a2222] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#912929] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-[#5a2626] bg-[#7a2222] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#912929] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isDisconnectingClientId ? "Disconnecting..." : "Disconnect Page"}
                 </button>
@@ -505,7 +505,7 @@ const DashboardPage = () => {
       ) : null}
       {showModal ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
+          <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-7 py-6">
               <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em]">
                 Connect a New Facebook Page
@@ -513,7 +513,7 @@ const DashboardPage = () => {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-full border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                className="rounded-md border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 aria-label="Close modal"
               >
 <FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
@@ -528,7 +528,7 @@ const DashboardPage = () => {
 
               <div className="mt-6 space-y-4">
                 {pages.length === 0 ? (
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-5">
+                  <div className="rounded border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-5">
                     <p className="text-[14px] leading-6 text-[var(--text-muted)]">
                       No Facebook Pages are available for this account yet. Make sure this account has access to a real Facebook Page and then reconnect.
                     </p>
@@ -542,10 +542,10 @@ const DashboardPage = () => {
                   return (
                     <div
                       key={page.id}
-                      className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
                           {page.picture_url ? (
                             <Image
                               src={page.picture_url}
@@ -580,7 +580,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={isAlreadyConnected ? undefined : () => void connectPage(page)}
                         disabled={isAlreadyConnected || isConnectingPageId === page.id}
-                        className={`rounded-xl px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed ${
+                        className={`rounded-md px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed ${
                           isAlreadyConnected
                             ? "border border-[#2f5f49] bg-[#173126] text-[#9ce3c1] opacity-80"
                             : "border border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-70"

@@ -11,11 +11,5 @@ export default async function ClientBuilderRedirectPage(
     redirect("/dashboard");
   }
 
-  if (client.bot_type === "ai") {
-    redirect(`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`);
-  }
-
-  redirect(
-    `/dashboard/faqs?clientId=${encodeURIComponent(client.id)}&clientName=${encodeURIComponent(client.client_name)}`
-  );
+  redirect(`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`);
 }

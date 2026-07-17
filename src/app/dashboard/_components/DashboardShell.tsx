@@ -96,7 +96,7 @@ const DashboardShell = ({
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className={`fixed left-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden ${showTopBar ? "top-4 xl:top-5" : "top-4"}`}
+          className={`fixed left-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden ${showTopBar ? "top-4 xl:top-5" : "top-4"}`}
           aria-label="Open sidebar"
         >
           <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
@@ -126,7 +126,7 @@ const DashboardShell = ({
                 <Image
                   src={chatbotWebIcon}
                   alt="Business Chatbot"
-                  className={`${isDesktopSidebarExpanded ? "h-10 w-10" : "h-11 w-11"} rounded-xl object-cover`}
+                  className={`${isDesktopSidebarExpanded ? "h-10 w-10" : "h-11 w-11"} rounded-md object-cover`}
                   priority
                 />
               </div>
@@ -145,7 +145,7 @@ const DashboardShell = ({
             <button
               type="button"
               onClick={() => setIsSidebarOpen((current) => !current)}
-              className={`inline-flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] ${
+              className={`inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] ${
                 isDesktopSidebarExpanded ? "h-9 w-9" : "h-10 w-[calc(100%-14px)]"
               }`}
               aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
@@ -170,7 +170,7 @@ const DashboardShell = ({
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    className={`flex w-full items-center rounded-xl border py-2.5 transition-colors ${
+                    className={`flex w-full items-center rounded-md border py-2.5 transition-colors ${
                       isDesktopSidebarExpanded ? "justify-start gap-3 px-3.5 text-left" : "justify-center px-2.5"
                     } ${
                       isActive
@@ -217,7 +217,7 @@ const DashboardShell = ({
                     value={searchInputValue}
                     onChange={(event) => setSearchInputValue(event.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    className="w-full rounded-md border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   />
                 </div>
               </div>

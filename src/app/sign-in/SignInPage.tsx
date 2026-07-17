@@ -97,7 +97,7 @@ const SignInPage = () => {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
+          <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
             <form className="space-y-4.5" onSubmit={handleSubmit}>
               <div className="border-b border-[#2a2a2a] pb-4 text-center">
                 <h2 className="text-[1.5rem] font-extrabold tracking-[-0.04em] text-[#f3f4f6]">
@@ -122,7 +122,8 @@ const SignInPage = () => {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="emailhehe@gmail.com"
-                    className="w-full rounded-xl border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    suppressHydrationWarning
                   />
                 </div>
               </div>
@@ -152,13 +153,15 @@ const SignInPage = () => {
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="********"
-                    className="w-full rounded-xl border border-[#303030] bg-[#171717] py-2.5 pr-12 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-12 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    suppressHydrationWarning
                   />
                   <button
                     type="button"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowPassword((value) => !value)}
                     className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md border-none p-1 text-[#8a8a8f] transition-colors hover:text-[#3ECF8E]"
+                    suppressHydrationWarning
                   >
                     <FontAwesomeIcon
                       aria-hidden="true"
@@ -172,7 +175,8 @@ const SignInPage = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-3 w-full rounded-xl border border-[#3ECF8E] bg-[#006139] py-2.5 text-[15px] font-semibold text-white transition-colors hover:border-[#3ECF8E] hover:bg-[#0a7a4a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                className="mt-3 w-full rounded-md border border-[#3ECF8E] bg-[#006139] py-2.5 text-[15px] font-semibold text-white transition-colors hover:border-[#3ECF8E] hover:bg-[#0a7a4a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                suppressHydrationWarning
               >
                 {isSubmitting ? "Signing In..." : "Sign In"}
               </button>

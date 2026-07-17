@@ -10,7 +10,7 @@ type ClientSettings = {
   id: string;
   client_name: string;
   page_id: string;
-  bot_type: "keyword" | "ai";
+  bot_type: "ai";
   business_info: string;
 };
 
@@ -20,9 +20,8 @@ export default function ClientSettingsPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
-  const [botType, setBotType] = useState<"keyword" | "ai">("keyword");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [cleaningStorage, setCleaningStorage] = useState(false);
 
   useEffect(() => {
     if (!clientId) {
@@ -46,7 +45,6 @@ export default function ClientSettingsPage() {
 
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
-        setBotType(data.bot_type === "ai" ? "ai" : "keyword");
       } catch (error) {
         console.error(error);
         showToast({
@@ -61,35 +59,46 @@ export default function ClientSettingsPage() {
     void loadClient();
   }, [clientId, showToast]);
 
-  const saveSettings = async () => {
-    if (!clientId) {
-      return;
-    }
-
-    setSaving(true);
+  const cleanupStorage = async () => {
+    setCleaningStorage(true);
 
     try {
-      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bot_type: botType }),
+      const response = await fetch("/api/admin/storage-cleanup", {
+        method: "POST",
       });
 
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            deletedRateLimitLogs?: number;
+            deletedReplySessions?: number;
+            logRetentionDays?: number;
+            sessionRetentionHours?: number;
+            warnings?: string[];
+          }
+        | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to save settings");
+        throw new Error(data?.error || "Failed to clean old storage data");
       }
 
-      showToast({ tone: "success", message: "Bot mode updated." });
+      const warnings = data?.warnings ?? [];
+
+      showToast({
+        tone: warnings.length > 0 ? "error" : "success",
+        message:
+          warnings.length > 0
+            ? `Cleanup finished with ${warnings.length} skipped table${warnings.length === 1 ? "" : "s"}. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows and ${data?.deletedReplySessions ?? 0} old reply sessions.`
+            : `Cleanup finished. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows and ${data?.deletedReplySessions ?? 0} old reply sessions.`,
+      });
     } catch (error) {
       console.error(error);
       showToast({
         tone: "error",
-        message: error instanceof Error ? error.message : "Failed to save settings.",
+        message: error instanceof Error ? error.message : "Failed to clean old storage data.",
       });
     } finally {
-      setSaving(false);
+      setCleaningStorage(false);
     }
   };
 
@@ -105,25 +114,25 @@ export default function ClientSettingsPage() {
               {clientName || "Client"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Choose which chatbot builder this page should use.
+              Manage this page&apos;s Full AI prompt and maintenance tools.
             </p>
           </div>
           <Link
             href="/dashboard"
-            className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+            className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
           >
             Back to Clients
           </Link>
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
             Loading client settings...
           </div>
         ) : (
-          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--border)] bg-background/80 px-4 py-4">
+              <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Client Name
                 </p>
@@ -131,7 +140,7 @@ export default function ClientSettingsPage() {
                   {clientName || "Unknown client"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[var(--border)] bg-background/80 px-4 py-4">
+              <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Page ID
                 </p>
@@ -141,39 +150,26 @@ export default function ClientSettingsPage() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="bot-type">
-                Bot Mode
-              </label>
-              <select
-                id="bot-type"
-                value={botType}
-                onChange={(event) => setBotType(event.target.value === "ai" ? "ai" : "keyword")}
-                className="mt-2 w-full rounded-xl border border-[var(--border-input)] bg-background px-4 py-2.5 text-[14px] text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              >
-                <option value="keyword">Chatbot Free - Flow Builder</option>
-                <option value="ai">Full AI - Prompt Builder</option>
-              </select>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Free mode uses the existing keyword flow builder. Full AI mode uses a dedicated prompt builder.
+            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Storage Cleanup
               </p>
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => void saveSettings()}
-                disabled={saving || loading}
-                className="inline-flex items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {saving ? "Saving..." : "Save Settings"}
-              </button>
-              <Link
-                href={`/dashboard/clients/${encodeURIComponent(clientId)}/builder`}
-                className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
-              >
-                Open Builder
-              </Link>
+              <p className="mt-2 text-[14px] text-[var(--text-primary)]">
+                Delete old temporary data that tends to grow faster than client business info.
+              </p>
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                This removes `rate_limit_logs` older than 7 days and any legacy reply sessions older than 24 hours.
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => void cleanupStorage()}
+                  disabled={cleaningStorage || loading}
+                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {cleaningStorage ? "Cleaning..." : "Clean Old Logs & Sessions"}
+                </button>
+              </div>
             </div>
           </div>
         )}

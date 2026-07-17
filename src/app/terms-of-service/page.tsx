@@ -72,7 +72,7 @@ export default function TermsOfServicePage() {
   return (
     <main className="page-enter min-h-screen bg-[radial-gradient(circle_at_top,_rgba(62,207,142,0.14),_transparent_32%),linear-gradient(180deg,_#171717_0%,_#121212_100%)] px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl">
-        <section className="panel-enter overflow-hidden rounded-[28px] border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+        <section className="panel-enter overflow-hidden rounded-md border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-sm">
           <div className="border-b border-white/10 px-6 py-8 sm:px-10">
             <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-accent-bright">
               Terms of Service
@@ -91,19 +91,19 @@ export default function TermsOfServicePage() {
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Link
                 href="/privacy-policy"
-                className="rounded-full border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
+                className="rounded-md border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
               >
                 Privacy Policy
               </Link>
               <Link
                 href="/data-deletion"
-                className="rounded-full border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
+                className="rounded-md border border-white/10 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-text-label hover:border-white/20 hover:text-accent-bright"
               >
                 Data Deletion
               </Link>
               <Link
                 href="/terms-of-service"
-                className="rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-accent-bright"
+                className="rounded-md border border-white/10 bg-white/8 px-4 py-2 text-[13px] font-medium uppercase tracking-[0.14em] text-accent-bright"
               >
                 Terms of Service
               </Link>
@@ -114,7 +114,7 @@ export default function TermsOfServicePage() {
             {sections.map((section) => (
               <section
                 key={section.title}
-                className="rounded-2xl border border-white/8 bg-black/15 p-5 sm:p-6"
+                className="rounded border border-white/8 bg-black/15 p-5 sm:p-6"
               >
                 <h2 className="text-[1.5rem] font-semibold text-text-heading">
                   {section.title}
@@ -127,7 +127,7 @@ export default function TermsOfServicePage() {
               </section>
             ))}
 
-            <section className="rounded-2xl border border-white/8 bg-black/15 p-5 sm:p-6">
+            <section className="rounded border border-white/8 bg-black/15 p-5 sm:p-6">
               <h2 className="text-[1.5rem] font-semibold text-text-heading">
                 Contact Us
               </h2>

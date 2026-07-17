@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 import { assertSameOrigin, sanitizeIdentifier } from "@/lib/api-security";
+import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
 function unauthorizedResponse() {
@@ -14,16 +15,16 @@ function validateClientSettingsPayload(payload: unknown) {
 
   const { bot_type, business_info } = payload as Record<string, unknown>;
   const updates: Partial<{
-    bot_type: "keyword" | "ai";
+    bot_type: "ai";
     business_info: string;
   }> = {};
 
   if (bot_type !== undefined) {
-    if (bot_type !== "keyword" && bot_type !== "ai") {
+    if (bot_type !== "ai") {
       throw new Error("Invalid bot_type");
     }
 
-    updates.bot_type = bot_type;
+    updates.bot_type = "ai";
   }
 
   if (business_info !== undefined) {
@@ -31,7 +32,7 @@ function validateClientSettingsPayload(payload: unknown) {
       throw new Error("Invalid business_info");
     }
 
-    if (business_info.length > 20000) {
+    if (business_info.length > MAX_BUSINESS_INFO_LENGTH) {
       throw new Error("Business information is too long");
     }
 

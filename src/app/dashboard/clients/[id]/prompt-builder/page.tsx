@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
+import {
+  COMPACT_BUSINESS_INFO_TEMPLATE,
+  MAX_BUSINESS_INFO_LENGTH,
+} from "@/lib/business-info";
 import DashboardShell from "../../../_components/DashboardShell";
 
 type ClientSettings = {
   id: string;
   client_name: string;
   page_id: string;
-  bot_type: "keyword" | "ai";
+  bot_type: "ai";
   business_info: string;
 };
 
@@ -19,7 +23,6 @@ export default function PromptBuilderPage() {
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id ?? "";
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
-  const [botType, setBotType] = useState<"keyword" | "ai">("keyword");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,7 +48,6 @@ export default function PromptBuilderPage() {
         }
 
         setClientName(data.client_name || "");
-        setBotType(data.bot_type === "ai" ? "ai" : "keyword");
         setPrompt(data.business_info || "");
       } catch (error) {
         console.error(error);
@@ -93,6 +95,8 @@ export default function PromptBuilderPage() {
     }
   };
 
+  const remainingCharacters = MAX_BUSINESS_INFO_LENGTH - prompt.length;
+
   return (
     <DashboardShell activeNav="Clients" searchPlaceholder="Search clients..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -105,19 +109,19 @@ export default function PromptBuilderPage() {
               {clientName || "Client"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Write the AI prompt and business knowledge for this page.
+              Save only the key business facts this AI needs so each page stays lightweight.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}`}
-              className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
             >
               Settings
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
             >
               Back to Clients
             </Link>
@@ -125,33 +129,37 @@ export default function PromptBuilderPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
             Loading AI builder...
           </div>
-        ) : botType !== "ai" ? (
-          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
-            <p className="text-[15px] text-[var(--text-primary)]">
-              This client is currently in free chatbot mode.
-            </p>
-            <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Switch the bot mode to Full AI in Settings to use the prompt builder.
-            </p>
-          </div>
         ) : (
-          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
             <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
-              AI Prompt
+              Business Knowledge
             </label>
             <textarea
               id="ai-prompt"
               rows={18}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder={"Business Name:\n[Your business name]\n\nBusiness Type:\n[Example: Burger shop, salon, laundry shop, online store]\n\nAbout the Business:\n[Short description of what you sell and who it is for]\n\nProducts / Services:\n- [Item/service 1] - [Price]\n- [Item/service 2] - [Price]\n- [Item/service 3] - [Price]\n\nBest Sellers / Most Popular:\n- [Best seller 1]\n- [Best seller 2]\n- [Best seller 3]\n\nProduct Benefits / Selling Points:\n- [Example: freshly cooked]\n- [Example: affordable]\n- [Example: premium ingredients]\n- [Example: fast service]\n- [Example: good for families / students / offices]\n\nApproved Taste / Quality Descriptions:\n- [Example: delicious and satisfying]\n- [Example: freshly prepared daily]\n- [Example: made with quality ingredients]\n\nTarget Customers:\n- [Example: students, busy workers, families, online shoppers]\n\nStore Hours:\n- [Days and hours]\n\nLocation / Service Area:\n- [Exact location or delivery/service coverage]\n\nDelivery / Booking / Availability:\n- [Example: available within Manila only]\n- [Example: same-day booking available]\n- [Example: subject to slot availability]\n\nPayment Methods:\n- [Cash]\n- [GCash]\n- [Bank transfer]\n- [COD]\n\nPromos / Offers:\n- [Example: Free fries for orders above P500]\n- [Example: Buy 1 Take 1 every Friday]\n\nUrgency Statements Allowed:\n- [Example: Best sellers may sell out during peak hours]\n- [Example: Promo is subject to availability]\n- [Example: Limited slots available today]\n\nPolicies:\n- [Example: No cancellation once order is confirmed]\n- [Example: No refunds for consumed items]\n- [Example: Reservation required for large orders]\n\nObjection Handling Info:\n- [Example: affordable for the serving size]\n- [Example: quality ingredients justify the price]\n- [Example: many customers reorder because of taste and value]\n\nUpsell / Add-on Suggestions:\n- [Example: Offer fries with burgers]\n- [Example: Offer drinks with meals]\n- [Example: Recommend combo upgrades]\n\nContact / Order Instructions:\n- [Example: Send your name, order, address, and contact number]\n- [Example: Message us here to place your order]\n- [Example: We will confirm availability before finalizing]\n\nIf Information Is Missing:\nIf the answer is not included above, tell the customer:\nGreat question! Let me connect you with our specialist - one moment please."}
-              className="mt-2 w-full rounded-2xl border border-[var(--border-input)] bg-background px-4 py-3 font-mono text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              maxLength={MAX_BUSINESS_INFO_LENGTH}
+              placeholder={COMPACT_BUSINESS_INFO_TEMPLATE}
+              className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-4 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
             />
-            <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-              This prompt is what Full AI mode uses to answer customers. It replaces the keyword flow builder for this client.
+            <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
+              <p>
+                Keep this compact. The AI already gets its behavior rules from code, so this field should only contain business facts.
+              </p>
+              <p>
+                {prompt.length} / {MAX_BUSINESS_INFO_LENGTH} characters used
+                {remainingCharacters >= 0 ? `, ${remainingCharacters} left.` : "."}
+              </p>
+              <p>
+                Best format: short labeled lines for products, pricing, payment, delivery, and policy details.
+              </p>
+            </div>
+            <p className="mt-3 text-[12px] leading-6 text-[var(--text-muted)]">
+              Full AI uses this business knowledge to answer customers.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -159,7 +167,7 @@ export default function PromptBuilderPage() {
                 type="button"
                 onClick={() => void savePrompt()}
                 disabled={saving}
-                className="inline-flex items-center justify-center rounded-xl border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {saving ? "Saving..." : "Save Prompt"}
               </button>

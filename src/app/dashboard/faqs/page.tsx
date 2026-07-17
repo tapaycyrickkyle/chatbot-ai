@@ -1,18 +1,13 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
-import FaqEditorPage from "./FaqEditorPage";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Flow Builder | Business Chatbot",
-  description: "Manage chatbot flow cards and quick replies.",
+  title: "Prompt Builder | Business Chatbot",
+  description: "Full AI prompt builder is the only supported chatbot mode.",
 };
 
 const Page = () => {
-  return (
-    <Suspense fallback={null}>
-      <FaqEditorPage />
-    </Suspense>
-  );
+  redirect("/dashboard");
 };
 
 export default Page;

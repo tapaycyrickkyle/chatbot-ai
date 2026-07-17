@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
+import { Poppins } from "next/font/google";
 import chatbotWebIcon from "./chatbot-web-icon.png";
 import { ToastProvider } from "./_components/ToastProvider";
 import "@fortawesome/fontawesome-svg-core/styles.css";
@@ -8,14 +8,11 @@ import "./globals.css";
 
 config.autoAddCss = false;
 
-const inter = Inter({
-  variable: "--font-inter",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
-});
-
-const manrope = Manrope({
-  variable: "--font-heading",
-  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -35,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${manrope.variable} h-full antialiased`}
+      className={`${poppins.variable} ${poppins.className} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
