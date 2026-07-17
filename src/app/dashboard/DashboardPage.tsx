@@ -298,48 +298,47 @@ const DashboardPage = () => {
 
   return (
     <>
-      <DashboardShell activeNav="Clients" searchPlaceholder="Search clients...">
-        <div className="flex flex-col gap-7">
+      <DashboardShell activeNav="Pages" searchPlaceholder="Search pages...">
+        <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-[760px]">
-              <h2 className="text-[2rem] font-extrabold tracking-[-0.05em] sm:text-[2.35rem]">
-                Connected Clients
+              <h2 className="text-[1.8rem] font-extrabold sm:text-[2.1rem]">
+                Connected Pages
               </h2>
               <p className="mt-2.5 max-w-[640px] text-[14px] leading-6 text-[var(--text-muted)]">
-                Manage connected Facebook Pages and their Full AI prompt knowledge
-                from one command center.
+                Review Facebook Page connections, edit AI instructions, and control customer handoff.
               </p>
             </div>
 
             <Link
               href="/api/auth/facebook/login"
-              className="self-start rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] shadow-[0_8px_22px_rgba(0,0,0,0.16)]"
+              className="self-start rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
             >
-              + Connect New Page
+              Connect Page
             </Link>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
             {isLoadingClients ? (
-              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
-                  Loading connected clients...
+                  Loading pages...
                 </p>
               </article>
             ) : null}
 
             {!isLoadingClients && clients.length === 0 ? (
-              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
-                  No clients found yet. Connect a new page to get started.
+                  No pages connected yet. Connect a Facebook Page to start managing its AI.
                 </p>
               </article>
             ) : null}
 
             {!isLoadingClients && clients.length > 0 && filteredClients.length === 0 ? (
-              <article className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5">
+              <article className="px-5 py-5">
                 <p className="text-[14px] text-[var(--text-muted)]">
-                  No clients match your current search.
+                  No pages match your current search.
                 </p>
               </article>
             ) : null}
@@ -350,17 +349,17 @@ const DashboardPage = () => {
                 return (
               <article
                 key={client.id}
-                className="card-hover rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5"
+                className="border-t border-[var(--border)] px-5 py-4 first:border-t-0"
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 flex-1 items-center gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.2),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-strong)]">
                       {client.picture_url ? (
                         <Image
                           src={client.picture_url}
                           alt={`${client.client_name} page profile picture`}
-                          width={56}
-                          height={56}
+                          width={48}
+                          height={48}
                           className="h-full w-full object-cover"
                           unoptimized
                         />
@@ -383,7 +382,7 @@ const DashboardPage = () => {
                         <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
                       </div>
                       <p className="mt-1.5 text-[13px] text-[var(--text-subtle)]">
-                        Page ID: {client.page_id}
+                        Facebook Page {client.page_id}
                       </p>
                     </div>
                   </div>
@@ -391,7 +390,7 @@ const DashboardPage = () => {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
                     <div className="min-w-[120px]">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                        Added
+                        Connected
                       </p>
                       <p className="mt-1.5 text-[14px] text-[var(--text-primary)]">
                         {formatClientTime(client.created_at)}
@@ -399,7 +398,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="min-w-[140px]">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                        Reconnect
+                        Token
                       </p>
                       <p
                         className={`mt-1.5 text-[14px] font-semibold ${
@@ -421,7 +420,7 @@ const DashboardPage = () => {
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
                         className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
                       >
-                        Open Prompt
+                        Prompt
                       </Link>
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/conversations`}
@@ -528,8 +527,7 @@ const DashboardPage = () => {
 
             <div className="px-7 py-6">
               <p className="max-w-[460px] text-[15px] leading-7 text-[var(--text-label)]">
-                Select a page from your Facebook account to integrate with
-                Business Chatbot.
+                Select the Facebook Page that should use this AI workspace.
               </p>
 
               <div className="mt-6 space-y-4">

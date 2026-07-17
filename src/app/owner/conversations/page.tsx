@@ -129,10 +129,10 @@ export default function OwnerConversationsPage() {
   return (
     <OwnerShell
       title="Conversations"
-      description={clientName ? `Control AI replies for ${clientName}.` : "Pause or resume AI replies."}
+      description={clientName ? `${clientName} customer handoff controls.` : "Customer handoff controls."}
     >
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             Conversations
           </p>
@@ -140,7 +140,7 @@ export default function OwnerConversationsPage() {
             {conversations.length}
           </p>
         </div>
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             AI Paused
           </p>
@@ -148,7 +148,7 @@ export default function OwnerConversationsPage() {
             {pausedCount}
           </p>
         </div>
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             AI Active
           </p>
@@ -158,27 +158,27 @@ export default function OwnerConversationsPage() {
         </div>
       </div>
 
-      <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+      <section className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
         {loading ? (
-          <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] text-[var(--text-muted)]">
+          <div className="px-5 py-5 text-[14px] text-[var(--text-muted)]">
             Loading conversations...
           </div>
         ) : conversations.length === 0 ? (
-          <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
+          <div className="px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
             No customer conversations have been recorded yet.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div>
             {conversations.map((conversation) => (
               <article
                 key={conversation.id}
-                className="rounded border border-[var(--border)] bg-background px-5 py-4"
+                className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h2 className="break-all text-[1rem] font-bold text-[var(--text-primary)]">
-                        {conversation.recipient_id}
+                        Customer {conversation.recipient_id.slice(-6)}
                       </h2>
                       <span
                         className={`rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${

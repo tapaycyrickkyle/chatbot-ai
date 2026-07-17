@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Data Deletion Instructions | Business Chatbot",
+  title: "Data Deletion Instructions | AI Inbox",
   description: "Instructions for requesting deletion of data used by the Facebook Messenger chatbot service.",
 };
 
@@ -29,7 +29,7 @@ export default function DataDeletionPage() {
               How to request deletion of your data
             </h1>
             <p className="mt-4 max-w-2xl text-[14px] leading-6 text-text-muted">
-              If you want data related to Business Chatbot to be deleted,
+              If you want data related to AI Inbox to be deleted,
               follow the steps below. These instructions apply to Facebook Page
               connection data and chatbot conversation data stored to operate
               the service.

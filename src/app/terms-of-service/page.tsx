@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Business Chatbot",
+  title: "Terms of Service | AI Inbox",
   description: "Terms of Service for the Facebook Messenger chatbot service.",
 };
 
@@ -12,14 +12,14 @@ const sections = [
   {
     title: "Acceptance of Terms",
     content: [
-      "By accessing or using Business Chatbot, you agree to these Terms of Service.",
+      "By accessing or using AI Inbox, you agree to these Terms of Service.",
       "If you do not agree with these terms, you should not use the service.",
     ],
   },
   {
     title: "Service Description",
     content: [
-      "Business Chatbot provides tools for connecting a Facebook Page to an automated chatbot service and managing related chatbot content and settings.",
+      "AI Inbox provides tools for connecting a Facebook Page to an automated chatbot service and managing related chatbot content and settings.",
       "We may update, improve, suspend, or limit parts of the service at any time.",
     ],
   },
@@ -78,11 +78,11 @@ export default function TermsOfServicePage() {
               Terms of Service
             </p>
             <h1 className="mt-3 text-[2rem] font-semibold tracking-tight sm:text-[2.35rem]">
-              Terms for using Business Chatbot
+              Terms for using AI Inbox
             </h1>
             <p className="mt-4 max-w-2xl text-[14px] leading-6 text-text-muted">
               These terms explain the rules, responsibilities, and limitations
-              that apply when using Business Chatbot with a Facebook Page or
+              that apply when using AI Inbox with a Facebook Page or
               related chatbot workflows.
             </p>
             <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-text-subtle">

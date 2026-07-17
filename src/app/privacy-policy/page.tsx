@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Business Chatbot",
+  title: "Privacy Policy | AI Inbox",
   description: "Privacy policy for the Facebook Messenger chatbot service.",
 };
 
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
               How this chatbot handles data
             </h1>
             <p className="mt-4 max-w-2xl text-[14px] leading-6 text-text-muted">
-              This Privacy Policy explains how Business Chatbot collects, uses, and
+              This Privacy Policy explains how AI Inbox collects, uses, and
               protects information when the service is connected to a Facebook
               Page.
             </p>

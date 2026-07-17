@@ -24,7 +24,7 @@ const SignInFooter = () => {
         </Link>
       </div>
       <div className="text-[13px] text-[#a1a1aa]">
-        &copy; 2026 Business Chatbot. All rights reserved.
+        &copy; 2026 AI Inbox. All rights reserved.
       </div>
     </footer>
   );

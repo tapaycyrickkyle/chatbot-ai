@@ -54,13 +54,13 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
 
   return (
     <main className="page-enter min-h-screen bg-background text-foreground">
-      <header className="border-b border-[var(--border)] bg-[var(--surface)] px-6 py-5 sm:px-8 lg:px-10">
+      <header className="border-b border-[var(--border)] bg-[var(--surface)] px-6 py-4 sm:px-8 lg:px-10">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
-              Business Owner
+              Owner workspace
             </p>
-            <h1 className="mt-1 text-[1.5rem] font-extrabold text-[var(--text-primary)]">
+            <h1 className="mt-1 text-[1.35rem] font-extrabold text-[var(--text-primary)]">
               {title}
             </h1>
             <p className="mt-1 text-[13px] text-[var(--text-muted)]">{description}</p>
@@ -94,7 +94,7 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
           </div>
         </div>
       </header>
-      <section className="mx-auto w-full max-w-6xl px-6 py-7 sm:px-8 lg:px-10">
+      <section className="mx-auto w-full max-w-6xl px-6 py-6 sm:px-8 lg:px-10">
         {children}
       </section>
     </main>

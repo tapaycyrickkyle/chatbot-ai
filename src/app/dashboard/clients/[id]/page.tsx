@@ -40,7 +40,7 @@ export default function ClientSettingsPage() {
           | null;
 
         if (!response.ok || !data || !("id" in data)) {
-          throw new Error(data?.error || "Failed to load client settings");
+          throw new Error(data?.error || "Failed to load page settings");
         }
 
         setClientName(data.client_name || "");
@@ -49,7 +49,7 @@ export default function ClientSettingsPage() {
         console.error(error);
         showToast({
           tone: "error",
-          message: error instanceof Error ? error.message : "Failed to load client settings.",
+          message: error instanceof Error ? error.message : "Failed to load page settings.",
         });
       } finally {
         setLoading(false);
@@ -103,41 +103,41 @@ export default function ClientSettingsPage() {
   };
 
   return (
-    <DashboardShell activeNav="Clients" searchPlaceholder="Search clients..." showTopBar={false}>
+    <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
-              Client Settings
+              Page Settings
             </p>
-            <h1 className="mt-2 text-[2rem] font-extrabold tracking-[-0.05em] text-[var(--text-primary)]">
-              {clientName || "Client"}
+            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+              {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Manage this page&apos;s Full AI prompt and maintenance tools.
+              Manage this page&apos;s AI instructions, handoff controls, and maintenance tools.
             </p>
           </div>
           <Link
             href="/dashboard"
             className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
           >
-            Back to Clients
+            Back to Pages
           </Link>
         </div>
 
         {loading ? (
           <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
-            Loading client settings...
+            Loading page settings...
           </div>
         ) : (
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                  Client Name
+                  Page Name
                 </p>
                 <p className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">
-                  {clientName || "Unknown client"}
+                  {clientName || "Unknown page"}
                 </p>
               </div>
               <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
@@ -155,7 +155,7 @@ export default function ClientSettingsPage() {
                 AI Conversation Control
               </p>
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                Pause or resume AI replies when a human owner takes over a customer conversation.
+                Pause or resume AI replies when a human owner takes over a conversation.
               </p>
               <div className="mt-4">
                 <Link
@@ -172,7 +172,7 @@ export default function ClientSettingsPage() {
                 Storage Cleanup
               </p>
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                Delete old temporary data that tends to grow faster than client business info.
+                Delete old temporary data from logs and legacy reply sessions.
               </p>
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
                 This removes `rate_limit_logs` older than 7 days and any legacy reply sessions older than 24 hours.

@@ -98,18 +98,18 @@ export default function PromptBuilderPage() {
   const remainingCharacters = MAX_BUSINESS_INFO_LENGTH - prompt.length;
 
   return (
-    <DashboardShell activeNav="Clients" searchPlaceholder="Search clients..." showTopBar={false}>
+    <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
-              Prompt Builder
+              AI Instructions
             </p>
-            <h1 className="mt-2 text-[2rem] font-extrabold tracking-[-0.05em] text-[var(--text-primary)]">
-              {clientName || "Client"}
+            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+              {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Save only the key business facts this AI needs so each page stays lightweight.
+              Keep the business facts short, current, and easy for the AI to follow.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -123,7 +123,7 @@ export default function PromptBuilderPage() {
               href="/dashboard"
               className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
             >
-              Back to Clients
+              Back to Pages
             </Link>
           </div>
         </div>
@@ -133,7 +133,7 @@ export default function PromptBuilderPage() {
             Loading AI builder...
           </div>
         ) : (
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-5">
             <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
               Business Knowledge
             </label>
@@ -148,19 +148,13 @@ export default function PromptBuilderPage() {
             />
             <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
               <p>
-                Keep this compact. The AI already gets its behavior rules from code, so this field should only contain business facts.
-              </p>
-              <p>
                 {prompt.length} / {MAX_BUSINESS_INFO_LENGTH} characters used
                 {remainingCharacters >= 0 ? `, ${remainingCharacters} left.` : "."}
               </p>
               <p>
-                Best format: short labeled lines for products, pricing, payment, delivery, and policy details.
+                Use short labeled lines for products, pricing, payment, delivery, and policies.
               </p>
             </div>
-            <p className="mt-3 text-[12px] leading-6 text-[var(--text-muted)]">
-              Full AI uses this business knowledge to answer customers.
-            </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
               <button

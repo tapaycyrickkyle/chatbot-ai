@@ -150,15 +150,15 @@ export default function ConversationsPage() {
   };
 
   return (
-    <DashboardShell activeNav="Clients" searchPlaceholder="Search conversations..." showTopBar={false}>
+    <DashboardShell activeNav="Pages" searchPlaceholder="Search conversations..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               Conversations
             </p>
-            <h1 className="mt-2 text-[2rem] font-extrabold tracking-[-0.05em] text-[var(--text-primary)]">
-              {clientName || "Client"}
+            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+              {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
               Pause or resume AI replies when the owner takes over a customer conversation.
@@ -169,19 +169,19 @@ export default function ConversationsPage() {
               href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
               className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
             >
-              Prompt Builder
+              AI Instructions
             </Link>
             <Link
               href="/dashboard"
               className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
             >
-              Back to Clients
+              Back to Pages
             </Link>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               Conversations
             </p>
@@ -189,7 +189,7 @@ export default function ConversationsPage() {
               {conversations.length}
             </p>
           </div>
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               AI Paused
             </p>
@@ -197,7 +197,7 @@ export default function ConversationsPage() {
               {pausedCount}
             </p>
           </div>
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               AI Active
             </p>
@@ -207,27 +207,27 @@ export default function ConversationsPage() {
           </div>
         </div>
 
-        <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+        <section className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
           {loading ? (
-            <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] text-[var(--text-muted)]">
+            <div className="px-5 py-5 text-[14px] text-[var(--text-muted)]">
               Loading conversations...
             </div>
           ) : conversations.length === 0 ? (
-            <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
-              No customer conversations have been recorded yet. New customer messages will appear here after the database table is set up.
+            <div className="px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
+              No customer conversations have been recorded yet.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {conversations.map((conversation) => (
                 <article
                   key={conversation.id}
-                  className="rounded border border-[var(--border)] bg-background px-5 py-4"
+                  className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <h2 className="break-all text-[1rem] font-bold text-[var(--text-primary)]">
-                          {conversation.recipient_id}
+                          Customer {conversation.recipient_id.slice(-6)}
                         </h2>
                         <span
                           className={`rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${

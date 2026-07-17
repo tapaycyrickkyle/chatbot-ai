@@ -7,7 +7,6 @@ import {
   faEyeSlash,
   faLock,
 } from "@fortawesome/free-solid-svg-icons";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../_components/ToastProvider";
@@ -82,27 +81,32 @@ const SignInPage = () => {
 
   return (
     <main className="page-enter flex min-h-screen flex-col bg-[#171717] text-[#f3f4f6]">
-      <section className="flex flex-1 items-start justify-center px-4 pt-14 pb-10 sm:px-6 sm:pt-16">
+      <section className="flex flex-1 items-start justify-center px-4 pt-12 pb-10 sm:px-6 sm:pt-16">
         <div className="w-full max-w-[420px] panel-enter">
-          <div className="mb-8 text-center">
+          <div className="mb-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a8a8f]">
+              Secure workspace
+            </p>
             <h1
-              className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[1.6rem]"
+              className="mt-2 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem]"
               style={{ color: "var(--accent-text)" }}
             >
-              Business Chatbot
+              AI Inbox
             </h1>
-            <p className="mx-auto mt-3 max-w-[320px] text-[14px] leading-6 text-[#a1a1aa]">
-              Sign in to manage your Facebook Page chatbot and connected client
-              workflows.
+            <p className="mt-3 max-w-[360px] text-[14px] leading-6 text-[#a1a1aa]">
+              Sign in to manage connected Facebook Pages, customer handoff, and order activity.
             </p>
           </div>
 
-          <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 shadow-[0_22px_56px_rgba(0,0,0,0.34)] sm:px-6 sm:py-6 card-hover">
+          <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 sm:px-6 sm:py-6">
             <form className="space-y-4.5" onSubmit={handleSubmit}>
-              <div className="border-b border-[#2a2a2a] pb-4 text-center">
-                <h2 className="text-[1.5rem] font-extrabold tracking-[-0.04em] text-[#f3f4f6]">
-                  Sign In
+              <div className="border-b border-[#2a2a2a] pb-4">
+                <h2 className="text-[1.2rem] font-bold text-[#f3f4f6]">
+                  Sign in
                 </h2>
+                <p className="mt-1 text-[13px] text-[#8a8a8f]">
+                  Admin and business owner accounts use the same login.
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -121,7 +125,7 @@ const SignInPage = () => {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="emailhehe@gmail.com"
+                    placeholder="owner@business.com"
                     className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                     suppressHydrationWarning
                   />
@@ -136,12 +140,6 @@ const SignInPage = () => {
                   >
                     Password
                   </label>
-                  <Link
-                    href="#"
-                    className="text-[13px] font-medium text-[#3aa06f] transition-colors hover:text-[#4fbe8a]"
-                  >
-                    Forgot Password?
-                  </Link>
                 </div>
                 <div className="group relative">
                   <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[#8a8a8f] transition-colors group-focus-within:text-[#006139]">
@@ -178,7 +176,7 @@ const SignInPage = () => {
                 className="mt-3 w-full rounded-md border border-[#3ECF8E] bg-[#006139] py-2.5 text-[15px] font-semibold text-white transition-colors hover:border-[#3ECF8E] hover:bg-[#0a7a4a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
                 suppressHydrationWarning
               >
-                {isSubmitting ? "Signing In..." : "Sign In"}
+                {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
             </form>
           </div>

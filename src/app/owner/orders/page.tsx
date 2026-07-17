@@ -78,23 +78,23 @@ export default function OwnerOrdersPage() {
   return (
     <OwnerShell
       title="Orders"
-      description={clientName ? `Viewing orders for ${clientName}.` : "View customer orders."}
+      description={clientName ? `${clientName} order queue.` : "Customer order queue."}
     >
-      <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+      <div className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
         {loading ? (
-          <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] text-[var(--text-muted)]">
+          <div className="px-5 py-5 text-[14px] text-[var(--text-muted)]">
             Loading orders...
           </div>
         ) : orders.length === 0 ? (
-          <div className="rounded border border-[var(--border)] bg-background px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
-            No orders yet. When the AI order-taking workflow is connected, confirmed customer orders will appear here.
+          <div className="px-5 py-5 text-[14px] leading-6 text-[var(--text-muted)]">
+            No orders yet. New confirmed orders will appear here.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div>
             {orders.map((order) => (
               <article
                 key={order.id}
-                className="rounded border border-[var(--border)] bg-background px-5 py-4"
+                className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">

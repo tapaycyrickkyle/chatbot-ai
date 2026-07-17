@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import DashboardPage from "./DashboardPage";
 
 export const metadata: Metadata = {
-  title: "Admin Panel | Business Chatbot",
-  description: "Secretary dashboard aligned with the project login page design system.",
+  title: "Admin | AI Inbox",
+  description: "Admin workspace for connected pages, prompts, and handoff.",
 };
 
 const Page = () => {

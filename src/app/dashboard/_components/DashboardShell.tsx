@@ -16,20 +16,20 @@ import SidebarLogoutButton from "./SidebarLogoutButton";
 import chatbotWebIcon from "../../chatbot-web-icon.png";
 
 const navigationItems = [
-  { label: "Clients", href: "/dashboard", icon: "clients" as const },
+  { label: "Pages", href: "/dashboard", icon: "clients" as const },
 ];
 
 type DashboardShellProps = {
   children: ReactNode;
-  activeNav?: "Clients";
+  activeNav?: "Pages";
   searchPlaceholder?: string;
   showTopBar?: boolean;
 };
 
 const DashboardShell = ({
   children,
-  activeNav = "Clients",
-  searchPlaceholder = "Search clients...",
+  activeNav = "Pages",
+  searchPlaceholder = "Search pages...",
   showTopBar = true,
 }: DashboardShellProps) => {
   const pathname = usePathname();
@@ -125,18 +125,18 @@ const DashboardShell = ({
               <div className={`${isDesktopSidebarExpanded ? "p-0" : "p-0"}`}>
                 <Image
                   src={chatbotWebIcon}
-                  alt="Business Chatbot"
+                  alt="AI Inbox"
                   className={`${isDesktopSidebarExpanded ? "h-10 w-10" : "h-11 w-11"} rounded-md object-cover`}
                   priority
                 />
               </div>
               {isDesktopSidebarExpanded ? (
                 <div>
-                  <h2 className="text-[1.35rem] font-extrabold leading-tight tracking-[-0.03em]">
-                    Admin Panel
+                  <h2 className="text-[1.25rem] font-extrabold leading-tight">
+                    AI Inbox
                   </h2>
                   <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-                    Business Chatbot
+                    Admin workspace
                   </p>
                 </div>
               ) : null}
@@ -156,7 +156,7 @@ const DashboardShell = ({
 
           {isDesktopSidebarExpanded ? (
             <p className="mt-4 text-[13px] text-[var(--text-muted)]">
-              Manage connected pages and monitor automation performance.
+              Manage pages, prompts, handoff, and owner access.
             </p>
           ) : null}
         </div>
@@ -205,8 +205,8 @@ const DashboardShell = ({
           <header className="border-b border-[var(--border)] bg-background px-6 py-3.5 sm:px-8 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center justify-between gap-4">
-                <h1 className="text-[1.125rem] font-black uppercase tracking-[0.14em]">
-                  Business Chatbot
+                <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
+                  AI Inbox Admin
                 </h1>
               </div>
 
