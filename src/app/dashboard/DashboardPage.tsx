@@ -423,6 +423,12 @@ const DashboardPage = () => {
                       >
                         Open Prompt
                       </Link>
+                      <Link
+                        href={`/dashboard/clients/${encodeURIComponent(client.id)}/conversations`}
+                        className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
+                      >
+                        Conversations
+                      </Link>
                       <button
                         type="button"
                         onClick={() => openDisconnectModal(client)}

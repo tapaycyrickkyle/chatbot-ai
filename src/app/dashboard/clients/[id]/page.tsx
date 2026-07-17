@@ -152,6 +152,23 @@ export default function ClientSettingsPage() {
 
             <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                AI Conversation Control
+              </p>
+              <p className="mt-2 text-[14px] text-[var(--text-primary)]">
+                Pause or resume AI replies when a human owner takes over a customer conversation.
+              </p>
+              <div className="mt-4">
+                <Link
+                  href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
+                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                >
+                  Open Conversations
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 Storage Cleanup
               </p>
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">

@@ -1,7 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { parseBotFlowNodeConfig } from "@/lib/bot-flow";
-import { getClients, getFaqsForClient } from "@/lib/database";
+import {
+  getAiConversation,
+  getClients,
+  getFaqsForClient,
+  pauseAiConversation,
+  recordCustomerConversationMessage,
+} from "@/lib/database";
 import { askDeepSeek } from "@/lib/deepseek";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -39,8 +45,11 @@ type WebhookBody = {
     id: string;
     messaging?: Array<{
       sender: { id: string };
+      recipient?: { id?: string };
       message?: {
         text?: string;
+        is_echo?: boolean;
+        app_id?: string | number;
         quick_reply?: {
           payload?: string;
         };
@@ -108,6 +117,70 @@ function summarizeWebhookEvent(
   };
 }
 
+function getConversationRecipientId(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
+) {
+  if (event.message?.is_echo && event.recipient?.id) {
+    return event.recipient.id;
+  }
+
+  return event.sender.id;
+}
+
+function isOwnerMessageEcho(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
+  pageId: string
+) {
+  if (!event.message?.is_echo || event.sender.id !== pageId || !event.recipient?.id) {
+    return false;
+  }
+
+  const appId = event.message.app_id ? String(event.message.app_id) : "";
+
+  return !appId || appId !== process.env.FACEBOOK_APP_ID;
+}
+
+async function safelyPauseAiForOwnerReply(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+}) {
+  try {
+    await pauseAiConversation({
+      clientId: input.clientId,
+      pageId: input.pageId,
+      recipientId: input.recipientId,
+      pausedBy: "owner",
+    });
+  } catch (error) {
+    console.warn("Failed to pause AI after owner reply", error);
+  }
+}
+
+async function safelyRecordCustomerMessage(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  message: string;
+}) {
+  try {
+    await recordCustomerConversationMessage(input);
+  } catch (error) {
+    console.warn("Failed to record customer conversation", error);
+  }
+}
+
+async function safelyIsAiPaused(clientId: string, recipientId: string) {
+  try {
+    const conversation = await getAiConversation(clientId, recipientId);
+
+    return Boolean(conversation?.ai_paused);
+  } catch (error) {
+    console.warn("Failed to load AI conversation pause state", error);
+    return false;
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -167,9 +240,18 @@ export default async function handler(
         const pageAccessToken = client.page_access_token;
 
         for (const event of entry.messaging ?? []) {
-          const userId = event.sender.id;
+          const userId = getConversationRecipientId(event);
           const rawText = event.message?.text;
           const flowPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
+
+          if (isOwnerMessageEcho(event, pageId)) {
+            await safelyPauseAiForOwnerReply({
+              clientId: client.id,
+              pageId,
+              recipientId: userId,
+            });
+            continue;
+          }
 
           if (client.bot_type === "ai") {
             await clearReplyCaptureSession(client.id, userId);
@@ -183,6 +265,24 @@ export default async function handler(
               hasBusinessInfo: Boolean(client.business_info?.trim()),
               ...summarizeWebhookEvent(event),
             });
+
+            if (rawText) {
+              await safelyRecordCustomerMessage({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                message: rawText,
+              });
+            }
+
+            if (await safelyIsAiPaused(client.id, userId)) {
+              console.info("AI webhook skipped paused conversation", {
+                clientId: client.id,
+                pageId,
+                userId,
+              });
+              continue;
+            }
 
             if (rawText) {
               await safelyHandleFlowSend(

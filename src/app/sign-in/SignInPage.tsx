@@ -50,7 +50,7 @@ const SignInPage = () => {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
+        | { error?: string; redirectTo?: string }
         | null;
 
       if (!response.ok) {
@@ -68,7 +68,7 @@ const SignInPage = () => {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(payload?.redirectTo || "/dashboard");
       router.refresh();
     } catch (error) {
       showToast({

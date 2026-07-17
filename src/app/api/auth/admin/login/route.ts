@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_ACCESS_TOKEN_COOKIE,
   hasConfiguredAdminEmails,
-  verifyAdminAccessToken,
+  verifyAppAccessToken,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
 
@@ -24,13 +24,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing access token" }, { status: 400 });
     }
 
-    const adminUser = await verifyAdminAccessToken(accessToken);
+    const appUser = await verifyAppAccessToken(accessToken);
 
-    if (!adminUser) {
+    if (!appUser) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({
+      success: true,
+      role: appUser.role,
+      redirectTo: appUser.role === "admin" ? "/dashboard" : "/owner",
+    });
     response.cookies.set(ADMIN_ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
