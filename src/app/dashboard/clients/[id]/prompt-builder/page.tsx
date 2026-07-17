@@ -162,7 +162,7 @@ export default function PromptBuilderPage() {
               Full AI uses this business knowledge to answer customers.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => void savePrompt()}
