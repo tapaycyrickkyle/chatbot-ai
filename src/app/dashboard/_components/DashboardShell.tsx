@@ -35,7 +35,7 @@ const DashboardShell = ({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
@@ -46,15 +46,11 @@ const DashboardShell = ({
       const storedSidebarPreference =
         window.localStorage.getItem("dashboard-sidebar-open") !== "false";
 
-      setIsSidebarOpen(storedSidebarPreference);
+      setIsSidebarOpen(window.innerWidth >= 1280 && storedSidebarPreference);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("dashboard-sidebar-open", String(isSidebarOpen));
-  }, [isSidebarOpen]);
 
   useEffect(() => {
     setSearchInputValue(searchValue);
@@ -96,7 +92,7 @@ const DashboardShell = ({
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className={`fixed left-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden ${showTopBar ? "top-4 xl:top-5" : "top-4"}`}
+          className="fixed left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden"
           aria-label="Open sidebar"
         >
           <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
@@ -113,11 +109,9 @@ const DashboardShell = ({
       ) : null}
 
       <aside
-        className={`panel-enter fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:translate-x-0 ${
+        className={`panel-enter fixed inset-y-0 left-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:max-w-none xl:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"
-        } ${isDesktopSidebarExpanded ? "w-[274px]" : "xl:w-[84px]"} ${
-          isSidebarOpen ? "w-[274px]" : "w-[274px] xl:w-[84px]"
-        }`}
+        } ${isDesktopSidebarExpanded ? "xl:w-[274px]" : "xl:w-[84px]"}`}
       >
         <div className={`${isDesktopSidebarExpanded ? "px-5 py-6" : "px-3 py-5 xl:px-3"} `}>
           <div className={`flex ${isDesktopSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
@@ -202,9 +196,17 @@ const DashboardShell = ({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {showTopBar ? (
-          <header className="border-b border-[var(--border)] bg-background px-6 py-3.5 sm:px-8 lg:px-10">
+          <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden"
+                  aria-label="Open sidebar"
+                >
+                  <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
+                </button>
                 <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
                   AI Inbox Admin
                 </h1>
@@ -225,7 +227,7 @@ const DashboardShell = ({
           </header>
         ) : null}
 
-        <section className="px-6 py-7 sm:px-8 lg:px-10">{children}</section>
+        <section className="px-4 py-6 sm:px-8 lg:px-10">{children}</section>
       </div>
     </main>
   );

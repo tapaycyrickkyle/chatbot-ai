@@ -5,6 +5,7 @@ import { faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../../_components/ToastProvider";
+import LoadingModal from "../../_components/LoadingModal";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type SidebarLogoutButtonProps = {
@@ -48,18 +49,21 @@ const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) =>
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => void handleLogout()}
-      disabled={isLoggingOut}
-      className={`flex w-full items-center rounded-md border border-transparent bg-[var(--surface)] text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[#7a2222] hover:bg-[var(--surface)] hover:text-[#ff8f8f] disabled:cursor-not-allowed disabled:opacity-70 ${
-        collapsed ? "justify-center px-2.5 py-2.5" : "justify-start gap-2 px-3.5 py-2.5"
-      }`}
-      title={collapsed ? (isLoggingOut ? "Logging out..." : "Logout") : undefined}
-    >
-      <FontAwesomeIcon aria-hidden="true" className="h-5 w-5 shrink-0" icon={faRightFromBracket} />
-      {collapsed ? null : <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => void handleLogout()}
+        disabled={isLoggingOut}
+        className={`flex w-full items-center rounded-md border border-transparent bg-[var(--surface)] text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[#7a2222] hover:bg-[var(--surface)] hover:text-[#ff8f8f] disabled:cursor-not-allowed disabled:opacity-70 ${
+          collapsed ? "justify-center px-2.5 py-2.5" : "justify-start gap-2 px-3.5 py-2.5"
+        }`}
+        title={collapsed ? (isLoggingOut ? "Logging out..." : "Logout") : undefined}
+      >
+        <FontAwesomeIcon aria-hidden="true" className="h-5 w-5 shrink-0" icon={faRightFromBracket} />
+        {collapsed ? null : <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>}
+      </button>
+      <LoadingModal isOpen={isLoggingOut} message="Logging out..." />
+    </>
   );
 };
 

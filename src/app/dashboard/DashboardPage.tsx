@@ -7,6 +7,7 @@ import { faGear, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "../_components/ToastProvider";
+import LoadingModal from "../_components/LoadingModal";
 import DashboardShell from "./_components/DashboardShell";
 
 type ClientRow = {
@@ -312,7 +313,7 @@ const DashboardPage = () => {
 
             <Link
               href="/api/auth/facebook/login"
-              className="self-start rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
             >
               Connect Page
             </Link>
@@ -349,10 +350,10 @@ const DashboardPage = () => {
                 return (
               <article
                 key={client.id}
-                className="border-t border-[var(--border)] px-5 py-4 first:border-t-0"
+                className="border-t border-[var(--border)] px-4 py-4 first:border-t-0 sm:px-5"
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-strong)]">
                       {client.picture_url ? (
                         <Image
@@ -376,12 +377,12 @@ const DashboardPage = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2.5">
-                        <h3 className="text-[1.125rem] font-bold tracking-[-0.03em]">
+                        <h3 className="break-words text-[1.05rem] font-bold sm:text-[1.125rem]">
                           {client.client_name}
                         </h3>
                         <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
                       </div>
-                      <p className="mt-1.5 text-[13px] text-[var(--text-subtle)]">
+                      <p className="mt-1.5 break-all text-[13px] text-[var(--text-subtle)]">
                         Facebook Page {client.page_id}
                       </p>
                     </div>
@@ -415,16 +416,16 @@ const DashboardPage = () => {
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[repeat(2,minmax(0,auto))] sm:flex sm:flex-wrap">
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
-                        className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
                       >
                         Prompt
                       </Link>
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/conversations`}
-                        className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
                       >
                         Conversations
                       </Link>
@@ -432,7 +433,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={() => openDisconnectModal(client)}
                         disabled={isDisconnectingClientId === client.id}
-                        className="inline-flex w-fit items-center justify-center rounded-md border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
                       >
                         {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
                       </button>
@@ -440,7 +441,7 @@ const DashboardPage = () => {
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}`}
                         aria-label={`Open settings for ${client.client_name}`}
                         title="Settings"
-                        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)]"
+                        className="inline-flex h-[36px] w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-[36px]"
                       >
                         <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faGear} />
                       </Link>
@@ -457,8 +458,8 @@ const DashboardPage = () => {
       {disconnectTarget ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center justify-between border-b border-[#5a2626] px-7 py-6">
-              <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em] text-[#ffdfdf]">
+            <div className="flex items-center justify-between gap-3 border-b border-[#5a2626] px-4 py-5 sm:px-7 sm:py-6">
+              <h3 className="text-[1.2rem] font-extrabold text-[#ffdfdf] sm:text-[1.5rem]">
                 Confirm Disconnect
               </h3>
               <button
@@ -472,7 +473,7 @@ const DashboardPage = () => {
               </button>
             </div>
 
-            <div className="space-y-5 px-7 py-6">
+            <div className="space-y-5 px-4 py-5 sm:px-7 sm:py-6">
               <p className="text-[15px] leading-7 text-[var(--text-label)]">
                 You are about to disconnect <span className="font-semibold text-[var(--text-primary)]">{disconnectTarget.client_name}</span> and remove its connected page data and saved FAQs.
               </p>
@@ -511,8 +512,8 @@ const DashboardPage = () => {
       {showModal ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-7 py-6">
-              <h3 className="text-[1.5rem] font-extrabold tracking-[-0.03em]">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-5 sm:px-7 sm:py-6">
+              <h3 className="text-[1.2rem] font-extrabold sm:text-[1.5rem]">
                 Connect a New Facebook Page
               </h3>
               <button
@@ -525,7 +526,7 @@ const DashboardPage = () => {
               </button>
             </div>
 
-            <div className="px-7 py-6">
+            <div className="px-4 py-5 sm:px-7 sm:py-6">
               <p className="max-w-[460px] text-[15px] leading-7 text-[var(--text-label)]">
                 Select the Facebook Page that should use this AI workspace.
               </p>
@@ -546,9 +547,9 @@ const DashboardPage = () => {
                   return (
                     <div
                       key={page.id}
-                      className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
                           {page.picture_url ? (
                             <Image
@@ -570,11 +571,11 @@ const DashboardPage = () => {
                             </span>
                           )}
                         </div>
-                        <div>
-                          <p className="text-[1.125rem] font-bold tracking-[-0.03em]">
+                        <div className="min-w-0">
+                          <p className="break-words text-[1.05rem] font-bold sm:text-[1.125rem]">
                             {page.name}
                           </p>
-                          <p className="mt-1 text-[14px] text-[var(--text-subtle)]">
+                          <p className="mt-1 break-all text-[14px] text-[var(--text-subtle)]">
                             ID: {page.id}
                           </p>
                         </div>
@@ -584,7 +585,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={isAlreadyConnected ? undefined : () => void connectPage(page)}
                         disabled={isAlreadyConnected || isConnectingPageId === page.id}
-                        className={`rounded-md px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed ${
+                        className={`w-full rounded-md px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed sm:w-auto ${
                           isAlreadyConnected
                             ? "border border-[#2f5f49] bg-[#173126] text-[#9ce3c1] opacity-80"
                             : "border border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-70"
@@ -604,6 +605,10 @@ const DashboardPage = () => {
           </div>
         </div>
       ) : null}
+      <LoadingModal
+        isOpen={Boolean(isConnectingPageId || isDisconnectingClientId)}
+        message={isDisconnectingClientId ? "Disconnecting page..." : "Connecting page..."}
+      />
     </>
   );
 };

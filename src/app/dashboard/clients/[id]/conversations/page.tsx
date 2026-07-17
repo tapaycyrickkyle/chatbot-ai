@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
+import LoadingModal from "@/app/_components/LoadingModal";
 import DashboardShell from "../../../_components/DashboardShell";
 
 type Conversation = {
@@ -96,11 +97,6 @@ export default function ConversationsPage() {
     void loadConversations();
   }, [loadConversations]);
 
-  const pausedCount = useMemo(
-    () => conversations.filter((conversation) => conversation.ai_paused).length,
-    [conversations]
-  );
-
   const updateAiStatus = async (recipientId: string, action: "pause" | "resume") => {
     setUpdatingRecipientId(recipientId);
 
@@ -157,53 +153,26 @@ export default function ConversationsPage() {
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               Conversations
             </p>
-            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
               Pause or resume AI replies when the owner takes over a customer conversation.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
-              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
             >
               AI Instructions
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
             >
               Back to Pages
             </Link>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              Conversations
-            </p>
-            <p className="mt-2 text-[1.5rem] font-extrabold text-[var(--text-primary)]">
-              {conversations.length}
-            </p>
-          </div>
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              AI Paused
-            </p>
-            <p className="mt-2 text-[1.5rem] font-extrabold text-[#ffd37a]">
-              {pausedCount}
-            </p>
-          </div>
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              AI Active
-            </p>
-            <p className="mt-2 text-[1.5rem] font-extrabold text-[var(--accent-bright)]">
-              {Math.max(conversations.length - pausedCount, 0)}
-            </p>
           </div>
         </div>
 
@@ -221,7 +190,7 @@ export default function ConversationsPage() {
               {conversations.map((conversation) => (
                 <article
                   key={conversation.id}
-                  className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
+                  className="border-t border-[var(--border)] bg-background px-4 py-4 first:border-t-0 sm:px-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex-1">
@@ -239,25 +208,25 @@ export default function ConversationsPage() {
                           {conversation.ai_paused ? "AI Paused" : "AI Active"}
                         </span>
                       </div>
-                      <p className="mt-2 line-clamp-2 text-[14px] leading-6 text-[var(--text-muted)]">
+                      <p className="mt-2 line-clamp-2 break-words text-[14px] leading-6 text-[var(--text-muted)]">
                         {conversation.last_customer_message || "No customer message preview available."}
                       </p>
                       <p className="mt-2 text-[12px] text-[var(--text-subtle)]">
                         Last activity: {formatTimestamp(conversation.last_message_at)}
                       </p>
                       {conversation.ai_paused ? (
-                        <p className="mt-1 text-[12px] text-[var(--text-subtle)]">
+                        <p className="mt-1 break-words text-[12px] text-[var(--text-subtle)]">
                           Paused by {conversation.paused_by || "owner"} at {formatTimestamp(conversation.paused_at)}
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-wrap gap-2 lg:w-auto">
                       {conversation.ai_paused ? (
                         <button
                           type="button"
                           onClick={() => void updateAiStatus(conversation.recipient_id, "resume")}
                           disabled={updatingRecipientId === conversation.recipient_id}
-                          className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                          className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                         >
                           {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Resume AI"}
                         </button>
@@ -266,7 +235,7 @@ export default function ConversationsPage() {
                           type="button"
                           onClick={() => void updateAiStatus(conversation.recipient_id, "pause")}
                           disabled={updatingRecipientId === conversation.recipient_id}
-                          className="inline-flex items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70"
+                          className="inline-flex w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                         >
                           {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Pause AI"}
                         </button>
@@ -276,8 +245,9 @@ export default function ConversationsPage() {
                 </article>
               ))}
             </div>
-          )}
-        </section>
+        )}
+      </section>
+      <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
       </div>
     </DashboardShell>
   );

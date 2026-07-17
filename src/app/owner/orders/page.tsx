@@ -94,19 +94,19 @@ export default function OwnerOrdersPage() {
             {orders.map((order) => (
               <article
                 key={order.id}
-                className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
+                className="border-t border-[var(--border)] bg-background px-4 py-4 first:border-t-0 sm:px-5"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <h2 className="text-[1rem] font-bold text-[var(--text-primary)]">
+                      <h2 className="break-words text-[1rem] font-bold text-[var(--text-primary)]">
                         {order.customer_name || `Customer ${order.recipient_id}`}
                       </h2>
                       <span className="rounded-md border border-[var(--border)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                         {order.status}
                       </span>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap text-[14px] leading-6 text-[var(--text-primary)]">
+                    <p className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-6 text-[var(--text-primary)]">
                       {order.order_summary}
                     </p>
                     <div className="mt-3 grid gap-2 text-[12px] text-[var(--text-muted)] sm:grid-cols-2">
@@ -116,12 +116,12 @@ export default function OwnerOrdersPage() {
                       <p>Total: {order.total_amount === null ? "Not set" : order.total_amount}</p>
                     </div>
                     {order.delivery_address ? (
-                      <p className="mt-2 text-[12px] text-[var(--text-muted)]">
+                      <p className="mt-2 break-words text-[12px] text-[var(--text-muted)]">
                         Address: {order.delivery_address}
                       </p>
                     ) : null}
                     {order.notes ? (
-                      <p className="mt-2 text-[12px] text-[var(--text-muted)]">
+                      <p className="mt-2 break-words text-[12px] text-[var(--text-muted)]">
                         Notes: {order.notes}
                       </p>
                     ) : null}

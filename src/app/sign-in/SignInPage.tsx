@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../_components/ToastProvider";
+import LoadingModal from "../_components/LoadingModal";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import SignInFooter from "./SignInFooter";
 
@@ -93,9 +94,6 @@ const SignInPage = () => {
             >
               AI Inbox
             </h1>
-            <p className="mt-3 max-w-[360px] text-[14px] leading-6 text-[#a1a1aa]">
-              Sign in to manage connected Facebook Pages, customer handoff, and order activity.
-            </p>
           </div>
 
           <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 sm:px-6 sm:py-6">
@@ -125,7 +123,7 @@ const SignInPage = () => {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="owner@business.com"
+                    placeholder="Email"
                     className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                     suppressHydrationWarning
                   />
@@ -184,6 +182,7 @@ const SignInPage = () => {
       </section>
 
       <SignInFooter />
+      <LoadingModal isOpen={isSubmitting} message="Signing in..." />
     </main>
   );
 };

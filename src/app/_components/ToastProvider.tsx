@@ -90,11 +90,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="pointer-events-none fixed bottom-5 right-5 z-[100] flex max-w-[calc(100vw-2.5rem)] flex-col items-end gap-3">
+      <div className="pointer-events-none fixed inset-x-3 bottom-4 z-[100] flex flex-col items-stretch gap-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:max-w-[calc(100vw-2.5rem)] sm:items-end">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto min-w-[280px] max-w-[360px] ${
+            className={`pointer-events-auto w-full max-w-[360px] ${
               toast.isLeaving ? "animate-[toastOut_220ms_ease-in_forwards]" : "animate-[toastIn_260ms_cubic-bezier(0.18,0.89,0.32,1.28)]"
             }`}
           >

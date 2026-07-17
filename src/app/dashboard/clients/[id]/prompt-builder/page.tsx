@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
+import LoadingModal from "@/app/_components/LoadingModal";
 import {
   COMPACT_BUSINESS_INFO_TEMPLATE,
   MAX_BUSINESS_INFO_LENGTH,
@@ -105,23 +106,23 @@ export default function PromptBuilderPage() {
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               AI Instructions
             </p>
-            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
               Keep the business facts short, current, and easy for the AI to follow.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}`}
-              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
             >
               Settings
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
             >
               Back to Pages
             </Link>
@@ -133,7 +134,7 @@ export default function PromptBuilderPage() {
             Loading AI builder...
           </div>
         ) : (
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-5">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
             <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
               Business Knowledge
             </label>
@@ -144,7 +145,7 @@ export default function PromptBuilderPage() {
               onChange={(event) => setPrompt(event.target.value)}
               maxLength={MAX_BUSINESS_INFO_LENGTH}
               placeholder={COMPACT_BUSINESS_INFO_TEMPLATE}
-              className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-4 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
             />
             <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
               <p>
@@ -161,7 +162,7 @@ export default function PromptBuilderPage() {
                 type="button"
                 onClick={() => void savePrompt()}
                 disabled={saving}
-                className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
               >
                 {saving ? "Saving..." : "Save Prompt"}
               </button>
@@ -169,6 +170,7 @@ export default function PromptBuilderPage() {
           </div>
         )}
       </div>
+      <LoadingModal isOpen={saving} message="Saving prompt..." />
     </DashboardShell>
   );
 }

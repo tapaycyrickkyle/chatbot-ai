@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
+import LoadingModal from "@/app/_components/LoadingModal";
 import OwnerShell from "../_components/OwnerShell";
 
 type Conversation = {
@@ -77,11 +78,6 @@ export default function OwnerConversationsPage() {
     void loadConversations();
   }, [loadConversations]);
 
-  const pausedCount = useMemo(
-    () => conversations.filter((conversation) => conversation.ai_paused).length,
-    [conversations]
-  );
-
   const updateAiStatus = async (recipientId: string, action: "pause" | "resume") => {
     setUpdatingRecipientId(recipientId);
 
@@ -131,33 +127,6 @@ export default function OwnerConversationsPage() {
       title="Conversations"
       description={clientName ? `${clientName} customer handoff controls.` : "Customer handoff controls."}
     >
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            Conversations
-          </p>
-          <p className="mt-2 text-[1.5rem] font-extrabold text-[var(--text-primary)]">
-            {conversations.length}
-          </p>
-        </div>
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            AI Paused
-          </p>
-          <p className="mt-2 text-[1.5rem] font-extrabold text-[#ffd37a]">
-            {pausedCount}
-          </p>
-        </div>
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            AI Active
-          </p>
-          <p className="mt-2 text-[1.5rem] font-extrabold text-[var(--accent-bright)]">
-            {Math.max(conversations.length - pausedCount, 0)}
-          </p>
-        </div>
-      </div>
-
       <section className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
         {loading ? (
           <div className="px-5 py-5 text-[14px] text-[var(--text-muted)]">
@@ -172,7 +141,7 @@ export default function OwnerConversationsPage() {
             {conversations.map((conversation) => (
               <article
                 key={conversation.id}
-                className="border-t border-[var(--border)] bg-background px-5 py-4 first:border-t-0"
+                className="border-t border-[var(--border)] bg-background px-4 py-4 first:border-t-0 sm:px-5"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1">
@@ -190,25 +159,25 @@ export default function OwnerConversationsPage() {
                         {conversation.ai_paused ? "AI Paused" : "AI Active"}
                       </span>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-[14px] leading-6 text-[var(--text-muted)]">
+                    <p className="mt-2 line-clamp-2 break-words text-[14px] leading-6 text-[var(--text-muted)]">
                       {conversation.last_customer_message || "No customer message preview available."}
                     </p>
                     <p className="mt-2 text-[12px] text-[var(--text-subtle)]">
                       Last activity: {formatTimestamp(conversation.last_message_at)}
                     </p>
                     {conversation.ai_paused ? (
-                      <p className="mt-1 text-[12px] text-[var(--text-subtle)]">
+                      <p className="mt-1 break-words text-[12px] text-[var(--text-subtle)]">
                         Paused by {conversation.paused_by || "owner"} at {formatTimestamp(conversation.paused_at)}
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full flex-wrap gap-2 lg:w-auto">
                     {conversation.ai_paused ? (
                       <button
                         type="button"
                         onClick={() => void updateAiStatus(conversation.recipient_id, "resume")}
                         disabled={updatingRecipientId === conversation.recipient_id}
-                        className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                       >
                         {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Resume AI"}
                       </button>
@@ -217,7 +186,7 @@ export default function OwnerConversationsPage() {
                         type="button"
                         onClick={() => void updateAiStatus(conversation.recipient_id, "pause")}
                         disabled={updatingRecipientId === conversation.recipient_id}
-                        className="inline-flex items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                       >
                         {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Pause AI"}
                       </button>
@@ -229,6 +198,7 @@ export default function OwnerConversationsPage() {
           </div>
         )}
       </section>
+      <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
     </OwnerShell>
   );
 }

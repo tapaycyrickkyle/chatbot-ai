@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
+import LoadingModal from "@/app/_components/LoadingModal";
 import DashboardShell from "../../_components/DashboardShell";
 
 type ClientSettings = {
@@ -110,7 +111,7 @@ export default function ClientSettingsPage() {
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               Page Settings
             </p>
-            <h1 className="mt-2 text-[1.8rem] font-extrabold text-[var(--text-primary)]">
+            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
@@ -119,7 +120,7 @@ export default function ClientSettingsPage() {
           </div>
           <Link
             href="/dashboard"
-            className="inline-flex w-fit items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+            className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] sm:w-fit"
           >
             Back to Pages
           </Link>
@@ -130,13 +131,13 @@ export default function ClientSettingsPage() {
             Loading page settings...
           </div>
         ) : (
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-5">
+          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Page Name
                 </p>
-                <p className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">
+                <p className="mt-2 break-words text-[15px] font-semibold text-[var(--text-primary)]">
                   {clientName || "Unknown page"}
                 </p>
               </div>
@@ -160,7 +161,7 @@ export default function ClientSettingsPage() {
               <div className="mt-4">
                 <Link
                   href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] sm:w-auto"
                 >
                   Open Conversations
                 </Link>
@@ -182,7 +183,7 @@ export default function ClientSettingsPage() {
                   type="button"
                   onClick={() => void cleanupStorage()}
                   disabled={cleaningStorage || loading}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                 >
                   {cleaningStorage ? "Cleaning..." : "Clean Old Logs & Sessions"}
                 </button>
@@ -191,6 +192,7 @@ export default function ClientSettingsPage() {
           </div>
         )}
       </div>
+      <LoadingModal isOpen={cleaningStorage} message="Cleaning old data..." />
     </DashboardShell>
   );
 }
