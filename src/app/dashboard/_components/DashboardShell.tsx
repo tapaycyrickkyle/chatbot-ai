@@ -92,7 +92,7 @@ const DashboardShell = ({
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className="fixed left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden"
+          className="fixed right-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
           aria-label="Open sidebar"
         >
           <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
@@ -109,8 +109,8 @@ const DashboardShell = ({
       ) : null}
 
       <aside
-        className={`panel-enter fixed inset-y-0 left-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:max-w-none xl:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"
+        className={`panel-enter fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:max-w-none xl:border-l-0 xl:border-r xl:translate-x-0 ${
+          isSidebarOpen ? "translate-x-0" : "translate-x-full xl:translate-x-0"
         } ${isDesktopSidebarExpanded ? "xl:w-[274px]" : "xl:w-[84px]"}`}
       >
         <div className={`${isDesktopSidebarExpanded ? "px-5 py-6" : "px-3 py-5 xl:px-3"} `}>
@@ -139,7 +139,7 @@ const DashboardShell = ({
             <button
               type="button"
               onClick={() => setIsSidebarOpen((current) => !current)}
-              className={`inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] ${
+              className={`inline-flex items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] ${
                 isDesktopSidebarExpanded ? "h-9 w-9" : "h-10 w-[calc(100%-14px)]"
               }`}
               aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
@@ -199,17 +199,17 @@ const DashboardShell = ({
           <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center justify-between gap-4">
+                <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
+                  AI Inbox Admin
+                </h1>
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen(true)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] xl:hidden"
+                  className="inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
                   aria-label="Open sidebar"
                 >
                   <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
                 </button>
-                <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
-                  AI Inbox Admin
-                </h1>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
