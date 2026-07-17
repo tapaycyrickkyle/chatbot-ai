@@ -8,12 +8,14 @@ import {
   faRightFromBracket,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
+import chatbotWebIcon from "../../chatbot-web-icon.png";
 
 type OwnerShellProps = {
   children: ReactNode;
@@ -32,6 +34,23 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
   const { showToast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const isSidebarExpanded = isSidebarOpen || isSidebarHovered;
+
+  useEffect(() => {
+    const syncViewport = () => {
+      if (window.innerWidth >= 640) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarHovered(false);
+      }
+    };
+
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   const logout = async () => {
     setIsLoggingOut(true);
@@ -74,19 +93,31 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[248px] flex-col border-l border-[var(--border)] bg-[var(--surface)] px-4 py-5 transition-transform duration-200 sm:left-0 sm:right-auto sm:z-20 sm:w-[248px] sm:border-l-0 sm:border-r sm:translate-x-0 ${
+        className={`fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 sm:left-0 sm:right-auto sm:z-20 sm:border-l-0 sm:border-r sm:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "translate-x-full sm:translate-x-0"
-        }`}
+        } ${isSidebarExpanded ? "sm:w-[274px]" : "sm:w-[84px]"}`}
+        onMouseEnter={() => setIsSidebarHovered(true)}
+        onMouseLeave={() => setIsSidebarHovered(false)}
       >
-        <div className="border-b border-[var(--border)] pb-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
-                Owner workspace
-              </p>
-              <h2 className="mt-1 text-[1.15rem] font-extrabold text-[var(--text-primary)]">
-                AI Inbox
-              </h2>
+        <div className={isSidebarExpanded ? "px-5 py-6" : "px-3 py-5"}>
+          <div className={`flex ${isSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
+            <div className={`flex ${isSidebarExpanded ? "items-center gap-3" : "flex-col items-center gap-3"}`}>
+              <Image
+                src={chatbotWebIcon}
+                alt="AI Inbox"
+                className={`${isSidebarExpanded ? "h-10 w-10" : "h-11 w-11"} rounded-md object-cover`}
+                priority
+              />
+              {isSidebarExpanded ? (
+              <div>
+                <h2 className="text-[1.25rem] font-extrabold leading-tight text-[var(--text-primary)]">
+                  AI Inbox
+                </h2>
+                <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+                  Owner workspace
+                </p>
+              </div>
+              ) : null}
             </div>
             <button
               type="button"
@@ -97,9 +128,14 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
               <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faXmark} />
             </button>
           </div>
+          {isSidebarExpanded ? (
+          <p className="mt-4 text-[13px] text-[var(--text-muted)]">
+            Review orders and control AI handoff.
+          </p>
+          ) : null}
         </div>
 
-        <nav className="mt-5">
+        <nav className="px-4">
           <ul className="space-y-2">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
@@ -110,14 +146,16 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
                     href={item.href}
                     title={item.label}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`flex h-11 items-center justify-start gap-3 rounded-md border px-3 text-[13px] font-semibold transition-colors ${
+                    className={`flex h-11 items-center rounded-md border text-[13px] font-semibold transition-colors ${
+                      isSidebarExpanded ? "justify-start gap-3 px-3" : "justify-center px-2.5"
+                    } ${
                       isActive
                         ? "border-transparent bg-[var(--surface-strong)] text-[var(--text-primary)] shadow-sm"
                         : "border-transparent bg-transparent text-[var(--text-muted)] hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={item.icon} />
-                    <span>{item.label}</span>
+                    {isSidebarExpanded ? <span>{item.label}</span> : null}
                   </Link>
                 </li>
               );
@@ -131,15 +169,21 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
             onClick={() => void logout()}
             disabled={isLoggingOut}
             title="Logout"
-            className="flex h-11 w-full items-center justify-start gap-3 rounded-md border border-transparent bg-transparent px-3 text-[13px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70"
+            className={`flex h-11 w-full items-center rounded-md border border-transparent bg-transparent text-[13px] font-semibold text-[var(--text-muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70 ${
+              isSidebarExpanded ? "justify-start gap-3 px-3" : "justify-center px-2.5"
+            }`}
           >
             <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faRightFromBracket} />
-            <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
+            {isSidebarExpanded ? (
+              <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
+            ) : null}
           </button>
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 sm:pl-[248px]">
+      <div className={`min-w-0 flex-1 transition-[padding] duration-200 ${
+        isSidebarExpanded ? "sm:pl-[274px]" : "sm:pl-[84px]"
+      }`}>
         <header className="border-b border-[var(--border)] bg-background px-3 py-4 sm:px-8 lg:px-10">
           <div className="mx-auto flex w-full max-w-6xl items-start justify-between gap-3">
             <div className="min-w-0">

@@ -36,20 +36,31 @@ const DashboardShell = ({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+  const [isDesktopSidebarHovered, setIsDesktopSidebarHovered] = useState(false);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
-  const isDesktopSidebarExpanded = isSidebarOpen;
+  const isDesktopSidebarExpanded = isDesktopViewport
+    ? isDesktopSidebarHovered
+    : isSidebarOpen;
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const storedSidebarPreference =
-        window.localStorage.getItem("dashboard-sidebar-open") !== "false";
+    const syncViewport = () => {
+      const isDesktop = window.innerWidth >= 1280;
+      setIsDesktopViewport(isDesktop);
 
-      setIsSidebarOpen(window.innerWidth >= 1280 && storedSidebarPreference);
-    }, 0);
+      if (isDesktop) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsDesktopSidebarHovered(false);
+      }
+    };
 
-    return () => window.clearTimeout(timeoutId);
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+
+    return () => window.removeEventListener("resize", syncViewport);
   }, []);
 
   useEffect(() => {
@@ -57,7 +68,7 @@ const DashboardShell = ({
   }, [searchValue]);
 
   const closeSidebarOnMobile = () => {
-    if (window.innerWidth < 1280) {
+    if (!isDesktopViewport) {
       setIsSidebarOpen(false);
     }
   };
@@ -99,7 +110,7 @@ const DashboardShell = ({
         </button>
       ) : null}
 
-      {isSidebarOpen ? (
+      {isSidebarOpen && !isDesktopViewport ? (
         <button
           type="button"
           onClick={() => setIsSidebarOpen(false)}
@@ -112,6 +123,8 @@ const DashboardShell = ({
         className={`panel-enter fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:max-w-none xl:border-l-0 xl:border-r xl:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "translate-x-full xl:translate-x-0"
         } ${isDesktopSidebarExpanded ? "xl:w-[274px]" : "xl:w-[84px]"}`}
+        onMouseEnter={() => setIsDesktopSidebarHovered(true)}
+        onMouseLeave={() => setIsDesktopSidebarHovered(false)}
       >
         <div className={`${isDesktopSidebarExpanded ? "px-5 py-6" : "px-3 py-5 xl:px-3"} `}>
           <div className={`flex ${isDesktopSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
@@ -139,7 +152,7 @@ const DashboardShell = ({
             <button
               type="button"
               onClick={() => setIsSidebarOpen((current) => !current)}
-              className={`inline-flex items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] ${
+              className={`inline-flex items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden ${
                 isDesktopSidebarExpanded ? "h-9 w-9" : "h-10 w-[calc(100%-14px)]"
               }`}
               aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
@@ -168,7 +181,7 @@ const DashboardShell = ({
                       isDesktopSidebarExpanded ? "justify-start gap-3 px-3.5 text-left" : "justify-center px-2.5"
                     } ${
                       isActive
-                        ? "border-[var(--border)] bg-[var(--surface-strong)] text-[var(--text-primary)] shadow-sm"
+                        ? "border-transparent bg-[var(--surface-strong)] text-[var(--text-primary)] shadow-sm"
                         : "border-transparent bg-transparent text-[var(--text-muted)] hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
                     }`}
                     onClick={closeSidebarOnMobile}

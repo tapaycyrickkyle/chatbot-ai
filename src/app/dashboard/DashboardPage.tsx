@@ -354,7 +354,7 @@ const DashboardPage = () => {
               >
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-strong)]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-strong)] min-[360px]:h-12 min-[360px]:w-12">
                       {client.picture_url ? (
                         <Image
                           src={client.picture_url}
@@ -388,8 +388,8 @@ const DashboardPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
-                    <div className="min-w-[120px]">
+                  <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
+                    <div className="min-w-0 sm:min-w-[120px]">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                         Connected
                       </p>
@@ -397,7 +397,7 @@ const DashboardPage = () => {
                         {formatClientTime(client.created_at)}
                       </p>
                     </div>
-                    <div className="min-w-[140px]">
+                    <div className="min-w-0 sm:min-w-[140px]">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                         Token
                       </p>
@@ -416,7 +416,7 @@ const DashboardPage = () => {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-[repeat(2,minmax(0,auto))] sm:flex sm:flex-wrap">
+                    <div className="grid w-full grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
                         className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
@@ -433,7 +433,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={() => openDisconnectModal(client)}
                         disabled={isDisconnectingClientId === client.id}
-                        className="inline-flex w-full items-center justify-center rounded-md border border-[#5a2626] bg-[#2b1717] px-4 py-2 text-[13px] font-semibold text-[#ffb4b4] transition-colors hover:bg-[#372020] disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
+                        className="inline-flex w-full items-center justify-center rounded-md border border-transparent bg-[#b42318] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
                       >
                         {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
                       </button>
@@ -500,7 +500,7 @@ const DashboardPage = () => {
                   type="button"
                   onClick={() => void disconnectClient()}
                   disabled={!canConfirmDisconnect || Boolean(isDisconnectingClientId)}
-                  className="rounded-md border border-[#5a2626] bg-[#7a2222] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#912929] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-transparent bg-[#b42318] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isDisconnectingClientId ? "Disconnecting..." : "Disconnect Page"}
                 </button>
