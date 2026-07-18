@@ -449,6 +449,37 @@ export async function resumeAiConversation(clientId: string, recipientId: string
   }
 }
 
+export async function reserveCommentPrivateReply(input: {
+  clientId: string;
+  pageId: string;
+  commentId: string;
+  postId?: string;
+  fromId?: string;
+  message?: string;
+  replyMessage: string;
+}) {
+  const supabase = getDb();
+  const { error } = await supabase.from("replied_comments").insert({
+    client_id: input.clientId,
+    page_id: input.pageId,
+    comment_id: input.commentId,
+    post_id: input.postId || null,
+    from_id: input.fromId || null,
+    message: input.message || null,
+    reply_message: input.replyMessage,
+  });
+
+  if (!error) {
+    return true;
+  }
+
+  if (error.code === "23505") {
+    return false;
+  }
+
+  throw new Error(error.message || "Failed to reserve comment private reply");
+}
+
 export async function getBusinessUserByEmail(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
 

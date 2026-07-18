@@ -7,6 +7,7 @@ import {
   getFaqsForClient,
   pauseAiConversation,
   recordCustomerConversationMessage,
+  reserveCommentPrivateReply,
 } from "@/lib/database";
 import { askDeepSeek } from "@/lib/deepseek";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -17,7 +18,12 @@ export const config = {
   },
 };
 
-const GRAPH_API_MESSAGES_URL = "https://graph.facebook.com/v20.0/me/messages";
+const GRAPH_API_BASE_URL = "https://graph.facebook.com/v20.0";
+const GRAPH_API_MESSAGES_URL = `${GRAPH_API_BASE_URL}/me/messages`;
+const COMMENT_PRIVATE_REPLY_MESSAGE =
+  process.env.COMMENT_PRIVATE_REPLY_MESSAGE?.trim() ||
+  process.env.COMMENT_AUTO_REPLY_MESSAGE?.trim() ||
+  "Hi! I sent you the details here. How can I help?";
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const MAX_QUICK_REPLIES = 13;
 const MAX_SEND_RETRIES = 5;
@@ -43,6 +49,7 @@ type WebhookBody = {
   object?: string;
   entry?: Array<{
     id: string;
+    changes?: PageWebhookChange[];
     messaging?: Array<{
       sender: { id: string };
       recipient?: { id?: string };
@@ -59,6 +66,29 @@ type WebhookBody = {
       };
     }>;
   }>;
+};
+
+type PageWebhookChange = {
+  field?: string;
+  value?: {
+    item?: string;
+    verb?: string;
+    comment_id?: string;
+    post_id?: string;
+    parent_id?: string;
+    message?: string;
+    from?: {
+      id?: string;
+      name?: string;
+    };
+  };
+};
+
+type PageFeedComment = {
+  commentId: string;
+  postId: string;
+  fromId: string;
+  message: string;
 };
 
 type MessengerRequestBody = {
@@ -181,6 +211,89 @@ async function safelyIsAiPaused(clientId: string, recipientId: string) {
   }
 }
 
+function getAddedPageComment(change: PageWebhookChange): PageFeedComment | null {
+  const value = change.value;
+
+  if (change.field !== "feed" || value?.item !== "comment" || value?.verb !== "add") {
+    return null;
+  }
+
+  if (!value.comment_id) {
+    return null;
+  }
+
+  return {
+    commentId: value.comment_id,
+    postId: value.post_id ?? "",
+    fromId: value.from?.id ?? "",
+    message: value.message ?? "",
+  };
+}
+
+async function safelyReplyToPageComment(input: {
+  clientId: string;
+  pageId: string;
+  pageAccessToken: string;
+  change: PageWebhookChange;
+}) {
+  const comment = getAddedPageComment(input.change);
+
+  if (!comment || comment.fromId === input.pageId) {
+    return;
+  }
+
+  try {
+    const shouldReply = await reserveCommentPrivateReply({
+      clientId: input.clientId,
+      pageId: input.pageId,
+      commentId: comment.commentId,
+      postId: comment.postId,
+      fromId: comment.fromId,
+      message: comment.message,
+      replyMessage: COMMENT_PRIVATE_REPLY_MESSAGE,
+    });
+
+    if (!shouldReply) {
+      return;
+    }
+
+    const url = `${GRAPH_API_BASE_URL}/${encodeURIComponent(comment.commentId)}/private_replies`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        message: COMMENT_PRIVATE_REPLY_MESSAGE,
+        access_token: input.pageAccessToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.error("Failed to send private reply to Page comment", {
+        clientId: input.clientId,
+        pageId: input.pageId,
+        commentId: comment.commentId,
+        status: response.status,
+        error: responseText,
+      });
+      return;
+    }
+
+    console.info("Sent private reply to Page comment", {
+      clientId: input.clientId,
+      pageId: input.pageId,
+      commentId: comment.commentId,
+    });
+  } catch (error) {
+    console.warn("Failed to handle Page comment private reply", {
+      clientId: input.clientId,
+      pageId: input.pageId,
+      commentId: comment.commentId,
+      error,
+    });
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -238,6 +351,15 @@ export default async function handler(
         }
 
         const pageAccessToken = client.page_access_token;
+
+        for (const change of entry.changes ?? []) {
+          await safelyReplyToPageComment({
+            clientId: client.id,
+            pageId,
+            pageAccessToken,
+            change,
+          });
+        }
 
         for (const event of entry.messaging ?? []) {
           const userId = getConversationRecipientId(event);

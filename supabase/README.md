@@ -13,6 +13,7 @@ Or run the SQL files individually in order:
 5. `05-business-users.sql`
 6. `06-orders.sql`
 7. `07-rls-lockdown.sql`
+8. `08-replied-comments.sql`
 
 ## Audit Notes
 
@@ -25,6 +26,7 @@ The app currently uses these tables:
 - `ai_conversations`: customer-level AI pause/resume state for owner handoff.
 - `business_users`: business-owner email allowlist mapped to one client.
 - `orders`: order records for the business-owner order page.
+- `replied_comments`: Page comment IDs already answered by the private-reply webhook.
 
 `clients.id` is an integer in the existing project database, so related tables use `integer` foreign keys.
 

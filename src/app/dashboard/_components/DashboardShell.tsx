@@ -37,13 +37,10 @@ const DashboardShell = ({
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(false);
-  const [isDesktopSidebarHovered, setIsDesktopSidebarHovered] = useState(false);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
-  const isDesktopSidebarExpanded = isDesktopViewport
-    ? isDesktopSidebarHovered
-    : isSidebarOpen;
+  const isDesktopSidebarExpanded = isDesktopViewport || isSidebarOpen;
 
   useEffect(() => {
     const syncViewport = () => {
@@ -52,8 +49,6 @@ const DashboardShell = ({
 
       if (isDesktop) {
         setIsSidebarOpen(false);
-      } else {
-        setIsDesktopSidebarHovered(false);
       }
     };
 
@@ -120,11 +115,9 @@ const DashboardShell = ({
       ) : null}
 
       <aside
-        className={`panel-enter fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:static xl:z-auto xl:max-w-none xl:border-l-0 xl:border-r xl:translate-x-0 ${
+        className={`panel-enter fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:left-0 xl:right-auto xl:z-20 xl:w-[274px] xl:max-w-none xl:border-l-0 xl:border-r xl:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "translate-x-full xl:translate-x-0"
-        } ${isDesktopSidebarExpanded ? "xl:w-[274px]" : "xl:w-[84px]"}`}
-        onMouseEnter={() => setIsDesktopSidebarHovered(true)}
-        onMouseLeave={() => setIsDesktopSidebarHovered(false)}
+        }`}
       >
         <div className={`${isDesktopSidebarExpanded ? "px-5 py-6" : "px-3 py-5 xl:px-3"} `}>
           <div className={`flex ${isDesktopSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
@@ -207,7 +200,7 @@ const DashboardShell = ({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col xl:pl-[274px]">
         {showTopBar ? (
           <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

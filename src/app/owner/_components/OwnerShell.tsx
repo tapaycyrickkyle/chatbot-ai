@@ -34,15 +34,16 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
   const { showToast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const isSidebarExpanded = isSidebarOpen || isSidebarHovered;
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+  const isSidebarExpanded = isDesktopViewport || isSidebarOpen;
 
   useEffect(() => {
     const syncViewport = () => {
-      if (window.innerWidth >= 640) {
+      const isDesktop = window.innerWidth >= 640;
+      setIsDesktopViewport(isDesktop);
+
+      if (isDesktop) {
         setIsSidebarOpen(false);
-      } else {
-        setIsSidebarHovered(false);
       }
     };
 
@@ -93,11 +94,9 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 sm:left-0 sm:right-auto sm:z-20 sm:border-l-0 sm:border-r sm:translate-x-0 ${
+        className={`fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 sm:left-0 sm:right-auto sm:z-20 sm:w-[274px] sm:border-l-0 sm:border-r sm:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "translate-x-full sm:translate-x-0"
-        } ${isSidebarExpanded ? "sm:w-[274px]" : "sm:w-[84px]"}`}
-        onMouseEnter={() => setIsSidebarHovered(true)}
-        onMouseLeave={() => setIsSidebarHovered(false)}
+        }`}
       >
         <div className={isSidebarExpanded ? "px-5 py-6" : "px-3 py-5"}>
           <div className={`flex ${isSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
@@ -181,9 +180,7 @@ export default function OwnerShell({ children, title, description }: OwnerShellP
         </div>
       </aside>
 
-      <div className={`min-w-0 flex-1 transition-[padding] duration-200 ${
-        isSidebarExpanded ? "sm:pl-[274px]" : "sm:pl-[84px]"
-      }`}>
+      <div className="min-w-0 flex-1 transition-[padding] duration-200 sm:pl-[274px]">
         <header className="border-b border-[var(--border)] bg-background px-3 py-4 sm:px-8 lg:px-10">
           <div className="mx-auto flex w-full max-w-6xl items-start justify-between gap-3">
             <div className="min-w-0">

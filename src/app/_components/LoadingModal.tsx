@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 type LoadingModalProps = {
   isOpen: boolean;
   message?: string;
@@ -9,11 +11,11 @@ export default function LoadingModal({
   isOpen,
   message = "Processing...",
 }: LoadingModalProps) {
-  if (!isOpen) {
+  if (typeof document === "undefined" || !isOpen) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div
       aria-live="polite"
       aria-modal="true"
@@ -26,6 +28,7 @@ export default function LoadingModal({
           {message}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
