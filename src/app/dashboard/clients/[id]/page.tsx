@@ -123,8 +123,6 @@ function appendLeadRow(fields) {
   }
 
   const row = COLUMNS.map(function(column) {
-    if (column === "Full Name") return data.fullName || fields["Full Name"] || "";
-    if (column === "Phone") return data.phone || fields["Phone"] || "";
     return fields[column] || "";
   });
 
