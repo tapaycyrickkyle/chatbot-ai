@@ -22,7 +22,11 @@ function normalizePhone(value: string) {
 function normalizeName(value: string) {
   return value
     .replace(PHONE_PATTERN, "")
-    .replace(/\b(?:phone|number|contact|mobile|cell|cp|tel)\b.*$/i, "")
+    .replace(
+      /\b(?:and\s+)?(?:my\s+)?(?:phone|number|contact|mobile|cell|cp|tel|email|budget|schedule|date|time|address)\b.*$/i,
+      ""
+    )
+    .replace(/\b(?:and|phone|number|contact|mobile|cell|cp|tel|email|budget)\s*$/i, "")
     .replace(/[^\p{L}\s.'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -41,6 +45,18 @@ function extractNameFromMessage(message: string) {
     if (candidate && looksLikeFullName(candidate)) {
       return candidate;
     }
+  }
+
+  const beforePhone = message.split(PHONE_PATTERN)[0] ?? "";
+  const fallbackName = normalizeName(
+    beforePhone.replace(
+      /\b(?:full\s+name|name|ako\s+si|pangalan\s+ko\s+ay|pangalan\s+ko|i\s+am|i'm|im|my\s+name\s+is|name\s+is)\b\s*[:\-]?/i,
+      ""
+    )
+  );
+
+  if (fallbackName && looksLikeFullName(fallbackName)) {
+    return fallbackName;
   }
 
   return "";

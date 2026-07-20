@@ -173,11 +173,17 @@ async function safelyCaptureLead(input: {
   const lead = extractLeadFromMessage(input.message, input.leadFields);
 
   if (!lead) {
+    console.info("Google Sheets lead capture skipped: lead fields not detected", {
+      pageId: input.pageId,
+      recipientId: input.recipientId,
+      requiredFields: ["Full Name", "Phone"],
+      preview: input.message.slice(0, 120),
+    });
     return;
   }
 
   try {
-    await sendLeadToGoogleSheet({
+    const sent = await sendLeadToGoogleSheet({
       fullName: lead.fullName,
       phone: lead.phone,
       pageId: input.pageId,
@@ -187,6 +193,14 @@ async function safelyCaptureLead(input: {
       capturedAt: new Date().toISOString(),
       fields: lead.fields,
     }, { webhookUrl: input.googleSheetsWebhookUrl });
+
+    if (sent) {
+      console.info("Google Sheets lead captured", {
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        fields: Object.keys(lead.fields),
+      });
+    }
   } catch (error) {
     console.warn("Failed to send lead to Google Sheet", error);
   }
