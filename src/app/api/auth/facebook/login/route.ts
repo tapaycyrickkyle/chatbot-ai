@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
   }
 
   const state = generateFacebookOAuthState();
-  const facebookLoginUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&scope=pages_messaging,pages_read_engagement,pages_manage_metadata,pages_show_list&response_type=code&state=${state}`;
+  const scope = ["pages_messaging", "pages_manage_metadata", "pages_show_list"].join(",");
+  const facebookLoginUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&scope=${scope}&response_type=code&state=${state}`;
   const response = NextResponse.redirect(facebookLoginUrl);
 
   response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, state, {
