@@ -118,11 +118,20 @@ function isOwnerMessageEcho(
   const appId = event.message.app_id ? String(event.message.app_id) : "";
   const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || "";
 
-  if (appId && facebookAppId && appId === facebookAppId) {
+  if (!appId) {
+    return true;
+  }
+
+  if (!facebookAppId) {
+    console.warn("Unable to classify Page message echo because FACEBOOK_APP_ID is missing", {
+      pageId,
+      recipientId: event.recipient.id,
+      appId,
+    });
     return false;
   }
 
-  return !appId;
+  return appId !== facebookAppId;
 }
 
 async function safelyPauseAiForOwnerReply(input: {
