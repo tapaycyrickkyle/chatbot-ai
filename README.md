@@ -40,6 +40,8 @@ The Messenger webhook can send captured leads to a free Google Apps Script Web A
 Dashboard -> Page Settings -> Lead Google Sheet
 ```
 
+Each Page can also define dynamic lead fields in that same settings area, one field per line.
+
 As an optional fallback for pages without their own saved URL, set this environment variable in Vercel:
 
 ```env
@@ -56,15 +58,23 @@ When a customer message includes a full name and phone number, the app posts:
   "pageName": "Business Page",
   "recipientId": "messenger-user-id",
   "message": "My name is Juan Dela Cruz, phone is 09171234567",
-  "capturedAt": "2026-07-20T00:00:00.000Z"
+  "capturedAt": "2026-07-20T00:00:00.000Z",
+  "fields": {
+    "Full Name": "Juan Dela Cruz",
+    "Phone": "09171234567",
+    "Email": "juan@example.com",
+    "Budget": "20000"
+  }
 }
 ```
 
-Recommended Google Sheet columns:
+Recommended base Google Sheet columns:
 
 ```text
 Captured At | Page Name | Page ID | Messenger User ID | Full Name | Phone | Message
 ```
+
+Your Apps Script can append any extra dynamic fields after those base columns.
 
 ## Getting Started
 

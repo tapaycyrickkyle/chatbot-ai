@@ -14,6 +14,7 @@ type ClientSettings = {
   bot_type: "ai";
   business_info: string;
   google_sheets_webhook_url: string;
+  lead_capture_fields: string;
 };
 
 export default function ClientSettingsPage() {
@@ -23,6 +24,7 @@ export default function ClientSettingsPage() {
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
+  const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
@@ -50,6 +52,7 @@ export default function ClientSettingsPage() {
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
         setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
+        setLeadCaptureFields(data.lead_capture_fields || "Full Name\nPhone");
       } catch (error) {
         console.error(error);
         showToast({
@@ -118,6 +121,7 @@ export default function ClientSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           google_sheets_webhook_url: googleSheetsWebhookUrl,
+          lead_capture_fields: leadCaptureFields,
         }),
       });
 
@@ -127,12 +131,12 @@ export default function ClientSettingsPage() {
         throw new Error(data?.error || "Failed to save Google Sheets URL");
       }
 
-      showToast({ tone: "success", message: "Google Sheets URL saved." });
+      showToast({ tone: "success", message: "Lead capture settings saved." });
     } catch (error) {
       console.error(error);
       showToast({
         tone: "error",
-        message: error instanceof Error ? error.message : "Failed to save Google Sheets URL.",
+        message: error instanceof Error ? error.message : "Failed to save lead capture settings.",
       });
     } finally {
       setSavingSheetsUrl(false);
@@ -208,6 +212,23 @@ export default function ClientSettingsPage() {
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
                 Leads captured from this Facebook Page will be sent to this sheet. Leave it empty to skip Google Sheets for this Page.
               </p>
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="lead-capture-fields"
+              >
+                Lead Fields
+              </label>
+              <textarea
+                id="lead-capture-fields"
+                rows={6}
+                value={leadCaptureFields}
+                onChange={(event) => setLeadCaptureFields(event.target.value)}
+                placeholder={"Full Name\nPhone\nEmail\nBudget\nPreferred Schedule"}
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Add one field per line. Full Name and Phone are still required before the lead is sent.
+              </p>
               <div className="mt-4">
                 <button
                   type="button"
@@ -215,7 +236,7 @@ export default function ClientSettingsPage() {
                   disabled={savingSheetsUrl || loading}
                   className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                 >
-                  {savingSheetsUrl ? "Saving..." : "Save Sheet URL"}
+                  {savingSheetsUrl ? "Saving..." : "Save Lead Settings"}
                 </button>
               </div>
             </div>

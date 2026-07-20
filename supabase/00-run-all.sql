@@ -14,6 +14,8 @@ create table if not exists public.clients (
   business_info text not null default '',
   ai_enabled boolean not null default true,
   google_sheets_webhook_url text not null default '',
+  lead_capture_fields text not null default 'Full Name
+Phone',
   constraint clients_page_id_key unique (page_id)
 );
 
@@ -25,7 +27,9 @@ alter table public.clients
   add column if not exists bot_type text not null default 'ai',
   add column if not exists business_info text not null default '',
   add column if not exists ai_enabled boolean not null default true,
-  add column if not exists google_sheets_webhook_url text not null default '';
+  add column if not exists google_sheets_webhook_url text not null default '',
+  add column if not exists lead_capture_fields text not null default 'Full Name
+Phone';
 
 update public.clients
 set
@@ -35,7 +39,9 @@ set
   bot_type = 'ai',
   business_info = coalesce(business_info, ''),
   ai_enabled = coalesce(ai_enabled, true),
-  google_sheets_webhook_url = coalesce(google_sheets_webhook_url, '');
+  google_sheets_webhook_url = coalesce(google_sheets_webhook_url, ''),
+  lead_capture_fields = coalesce(nullif(lead_capture_fields, ''), 'Full Name
+Phone');
 
 alter table public.clients
   alter column client_name set not null,
@@ -46,10 +52,13 @@ alter table public.clients
   alter column business_info set default '',
   alter column ai_enabled set default true,
   alter column google_sheets_webhook_url set default '',
+  alter column lead_capture_fields set default 'Full Name
+Phone',
   alter column bot_type set not null,
   alter column business_info set not null,
   alter column ai_enabled set not null,
-  alter column google_sheets_webhook_url set not null;
+  alter column google_sheets_webhook_url set not null,
+  alter column lead_capture_fields set not null;
 
 do $$
 begin

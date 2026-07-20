@@ -8,6 +8,7 @@ export type GoogleSheetsLeadInput = {
   recipientId: string;
   message: string;
   capturedAt: string;
+  fields: Record<string, string>;
 };
 
 function getSheetsWebhookUrl() {

@@ -10,7 +10,10 @@ const NAME_PATTERNS = [
 export type CapturedLead = {
   fullName: string;
   phone: string;
+  fields: Record<string, string>;
 };
+
+const DEFAULT_LEAD_FIELDS = ["Full Name", "Phone"];
 
 function normalizePhone(value: string) {
   return value.replace(/[^\d+]/g, "").trim();
@@ -43,7 +46,79 @@ function extractNameFromMessage(message: string) {
   return "";
 }
 
-export function extractLeadFromMessage(message: string): CapturedLead | null {
+export function parseLeadFields(value: string) {
+  const fields = value
+    .split(/\r?\n|,/)
+    .map((field) => field.trim())
+    .filter(Boolean);
+
+  return fields.length > 0 ? Array.from(new Set(fields)) : DEFAULT_LEAD_FIELDS;
+}
+
+function normalizeFieldKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function extractEmailFromMessage(message: string) {
+  return message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? "";
+}
+
+function extractSimpleField(message: string, labels: string[]) {
+  for (const label of labels) {
+    const pattern = new RegExp(
+      `\\b${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b\\s*[:\\-]?\\s*([^,\\n]{2,120})`,
+      "i"
+    );
+    const match = message.match(pattern);
+    const value = match?.[1]?.trim() ?? "";
+
+    if (value) {
+      return value.replace(PHONE_PATTERN, "").trim();
+    }
+  }
+
+  return "";
+}
+
+function extractFieldValue(field: string, message: string, fullName: string, phone: string) {
+  const key = normalizeFieldKey(field);
+
+  if (key.includes("name")) {
+    return fullName;
+  }
+
+  if (key.includes("phone") || key.includes("mobile") || key.includes("contact")) {
+    return phone;
+  }
+
+  if (key.includes("email")) {
+    return extractEmailFromMessage(message);
+  }
+
+  if (key.includes("address") || key.includes("location")) {
+    return extractSimpleField(message, ["address", "location", "delivery address"]);
+  }
+
+  if (key.includes("budget")) {
+    return extractSimpleField(message, ["budget", "price range"]);
+  }
+
+  if (key.includes("date") || key.includes("schedule")) {
+    return extractSimpleField(message, ["date", "schedule", "preferred date"]);
+  }
+
+  if (key.includes("time")) {
+    return extractSimpleField(message, ["time", "preferred time"]);
+  }
+
+  if (key.includes("message") || key.includes("inquiry") || key.includes("concern")) {
+    return message.trim();
+  }
+
+  return extractSimpleField(message, [field]);
+}
+
+export function extractLeadFromMessage(message: string, leadFields: string[] = DEFAULT_LEAD_FIELDS): CapturedLead | null {
   const phoneMatch = message.match(PHONE_PATTERN);
   const phone = phoneMatch?.[0] ? normalizePhone(phoneMatch[0]) : "";
   const fullName = extractNameFromMessage(message);
@@ -52,8 +127,16 @@ export function extractLeadFromMessage(message: string): CapturedLead | null {
     return null;
   }
 
+  const fields = Object.fromEntries(
+    leadFields.map((field) => [
+      field,
+      extractFieldValue(field, message, fullName, phone),
+    ])
+  );
+
   return {
     fullName,
     phone,
+    fields,
   };
 }

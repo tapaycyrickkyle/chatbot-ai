@@ -19,7 +19,7 @@ If you prefer running files individually, run them in this order:
 
 ## Tables Used
 
-- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, and business prompt knowledge.
+- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, and lead capture settings.
 - `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state for owner handoff.
 - `business_users`: business-owner email allowlist mapped to one client.

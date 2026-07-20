@@ -8,7 +8,7 @@ import {
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
 import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
-import { extractLeadFromMessage } from "@/lib/lead-capture";
+import { extractLeadFromMessage, parseLeadFields } from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -168,8 +168,9 @@ async function safelyCaptureLead(input: {
   recipientId: string;
   message: string;
   googleSheetsWebhookUrl: string;
+  leadFields: string[];
 }) {
-  const lead = extractLeadFromMessage(input.message);
+  const lead = extractLeadFromMessage(input.message, input.leadFields);
 
   if (!lead) {
     return;
@@ -184,6 +185,7 @@ async function safelyCaptureLead(input: {
       recipientId: input.recipientId,
       message: input.message,
       capturedAt: new Date().toISOString(),
+      fields: lead.fields,
     }, { webhookUrl: input.googleSheetsWebhookUrl });
   } catch (error) {
     console.warn("Failed to send lead to Google Sheet", error);
@@ -247,6 +249,7 @@ export default async function handler(
         }
 
         const pageAccessToken = client.page_access_token;
+        const leadFields = parseLeadFields(client.lead_capture_fields);
 
         for (const event of entry.messaging ?? []) {
           const userId = getConversationRecipientId(event);
@@ -295,6 +298,7 @@ export default async function handler(
               recipientId: userId,
               message: rawText,
               googleSheetsWebhookUrl: client.google_sheets_webhook_url,
+              leadFields,
             });
           }
 
@@ -325,7 +329,7 @@ export default async function handler(
                   userId,
                   preview: rawText.slice(0, 120),
                 });
-                const aiReply = await askAi(rawText, client.business_info || "");
+                const aiReply = await askAi(rawText, client.business_info || "", leadFields);
                 console.info("AI webhook generated reply", {
                   clientId: client.id,
                   pageId,

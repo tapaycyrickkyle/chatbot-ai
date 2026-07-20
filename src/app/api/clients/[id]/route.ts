@@ -4,6 +4,8 @@ import { assertSameOrigin, sanitizeIdentifier } from "@/lib/api-security";
 import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
+const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
+
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
@@ -13,13 +15,14 @@ function validateClientSettingsPayload(payload: unknown) {
     throw new Error("Invalid request body");
   }
 
-  const { bot_type, business_info, ai_enabled, google_sheets_webhook_url } =
+  const { bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields } =
     payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
     google_sheets_webhook_url: string;
+    lead_capture_fields: string;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -74,6 +77,18 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.google_sheets_webhook_url = trimmedUrl;
   }
 
+  if (lead_capture_fields !== undefined) {
+    if (typeof lead_capture_fields !== "string") {
+      throw new Error("Invalid lead capture fields");
+    }
+
+    if (lead_capture_fields.length > MAX_LEAD_CAPTURE_FIELDS_LENGTH) {
+      throw new Error("Lead capture fields are too long");
+    }
+
+    updates.lead_capture_fields = lead_capture_fields.trim();
+  }
+
   return updates;
 }
 
@@ -106,6 +121,7 @@ export async function GET(
       business_info: client.business_info,
       ai_enabled: client.ai_enabled,
       google_sheets_webhook_url: client.google_sheets_webhook_url,
+      lead_capture_fields: client.lead_capture_fields,
     });
   } catch (error) {
     console.error(error);
