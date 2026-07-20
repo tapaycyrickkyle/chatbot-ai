@@ -261,6 +261,15 @@ export default async function handler(
             });
           }
 
+          if (!client.ai_enabled) {
+            console.info("AI webhook skipped disabled page", {
+              clientId: client.id,
+              pageId,
+              userId,
+            });
+            continue;
+          }
+
           if (await safelyIsAiPaused(client.id, userId)) {
             console.info("AI webhook skipped paused conversation", {
               clientId: client.id,

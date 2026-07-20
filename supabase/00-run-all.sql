@@ -12,6 +12,7 @@ create table if not exists public.clients (
   created_at timestamptz not null default now(),
   bot_type text not null default 'ai',
   business_info text not null default '',
+  ai_enabled boolean not null default true,
   constraint clients_page_id_key unique (page_id)
 );
 
@@ -21,7 +22,8 @@ alter table public.clients
   add column if not exists page_access_token text,
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists bot_type text not null default 'ai',
-  add column if not exists business_info text not null default '';
+  add column if not exists business_info text not null default '',
+  add column if not exists ai_enabled boolean not null default true;
 
 update public.clients
 set
@@ -29,7 +31,8 @@ set
   page_id = coalesce(page_id, ''),
   page_access_token = coalesce(page_access_token, ''),
   bot_type = 'ai',
-  business_info = coalesce(business_info, '');
+  business_info = coalesce(business_info, ''),
+  ai_enabled = coalesce(ai_enabled, true);
 
 alter table public.clients
   alter column client_name set not null,
@@ -38,8 +41,10 @@ alter table public.clients
   alter column created_at set default now(),
   alter column bot_type set default 'ai',
   alter column business_info set default '',
+  alter column ai_enabled set default true,
   alter column bot_type set not null,
-  alter column business_info set not null;
+  alter column business_info set not null,
+  alter column ai_enabled set not null;
 
 do $$
 begin

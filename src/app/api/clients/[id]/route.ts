@@ -13,10 +13,11 @@ function validateClientSettingsPayload(payload: unknown) {
     throw new Error("Invalid request body");
   }
 
-  const { bot_type, business_info } = payload as Record<string, unknown>;
+  const { bot_type, business_info, ai_enabled } = payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
     business_info: string;
+    ai_enabled: boolean;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -37,6 +38,14 @@ function validateClientSettingsPayload(payload: unknown) {
     }
 
     updates.business_info = business_info.trim();
+  }
+
+  if (ai_enabled !== undefined) {
+    if (typeof ai_enabled !== "boolean") {
+      throw new Error("Invalid ai_enabled");
+    }
+
+    updates.ai_enabled = ai_enabled;
   }
 
   return updates;
@@ -69,6 +78,7 @@ export async function GET(
       page_id: client.page_id,
       bot_type: client.bot_type,
       business_info: client.business_info,
+      ai_enabled: client.ai_enabled,
     });
   } catch (error) {
     console.error(error);

@@ -17,6 +17,7 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
+  ai_enabled: boolean;
 };
 
 export default function PromptBuilderPage() {
@@ -25,8 +26,10 @@ export default function PromptBuilderPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [aiEnabled, setAiEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingAi, setUpdatingAi] = useState(false);
 
   useEffect(() => {
     if (!clientId) {
@@ -50,6 +53,7 @@ export default function PromptBuilderPage() {
 
         setClientName(data.client_name || "");
         setPrompt(data.business_info || "");
+        setAiEnabled(data.ai_enabled ?? true);
       } catch (error) {
         console.error(error);
         showToast({
@@ -96,6 +100,43 @@ export default function PromptBuilderPage() {
     }
   };
 
+  const toggleAiEnabled = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    const nextAiEnabled = !aiEnabled;
+    setUpdatingAi(true);
+
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_enabled: nextAiEnabled }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to update AI status");
+      }
+
+      setAiEnabled(nextAiEnabled);
+      showToast({
+        tone: "success",
+        message: nextAiEnabled ? "AI replies turned on." : "AI replies turned off.",
+      });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to update AI status.",
+      });
+    } finally {
+      setUpdatingAi(false);
+    }
+  };
+
   const remainingCharacters = MAX_BUSINESS_INFO_LENGTH - prompt.length;
 
   return (
@@ -134,43 +175,77 @@ export default function PromptBuilderPage() {
             Loading AI builder...
           </div>
         ) : (
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-            <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
-              Business Knowledge
-            </label>
-            <textarea
-              id="ai-prompt"
-              rows={18}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              maxLength={MAX_BUSINESS_INFO_LENGTH}
-              placeholder={COMPACT_BUSINESS_INFO_TEMPLATE}
-              className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
-            />
-            <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
-              <p>
-                {prompt.length} / {MAX_BUSINESS_INFO_LENGTH} characters used
-                {remainingCharacters >= 0 ? `, ${remainingCharacters} left.` : "."}
-              </p>
-              <p>
-                Use short labeled lines for products, pricing, payment, delivery, and policies.
-              </p>
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div>
+                <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                  AI Replies
+                </p>
+                <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                  {aiEnabled
+                    ? "AI is replying to new customer messages for this page."
+                    : "AI is off for this page and will not reply to customer messages."}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => void savePrompt()}
-                disabled={saving}
-                className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                onClick={() => void toggleAiEnabled()}
+                disabled={updatingAi}
+                className={`inline-flex w-full items-center justify-center rounded-md border px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto ${
+                  aiEnabled
+                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                    : "border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
+                }`}
               >
-                {saving ? "Saving..." : "Save Prompt"}
+                {updatingAi
+                  ? "Updating..."
+                  : aiEnabled
+                    ? "Turn Off AI"
+                    : "Turn On AI"}
               </button>
+            </div>
+
+            <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
+                Business Knowledge
+              </label>
+              <textarea
+                id="ai-prompt"
+                rows={18}
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                maxLength={MAX_BUSINESS_INFO_LENGTH}
+                placeholder={COMPACT_BUSINESS_INFO_TEMPLATE}
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
+              />
+              <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                <p>
+                  {prompt.length} / {MAX_BUSINESS_INFO_LENGTH} characters used
+                  {remainingCharacters >= 0 ? `, ${remainingCharacters} left.` : "."}
+                </p>
+                <p>
+                  Use short labeled lines for products, pricing, payment, delivery, and policies.
+                </p>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void savePrompt()}
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {saving ? "Saving..." : "Save Prompt"}
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
-      <LoadingModal isOpen={saving} message="Saving prompt..." />
+      <LoadingModal
+        isOpen={saving || updatingAi}
+        message={updatingAi ? "Updating AI status..." : "Saving prompt..."}
+      />
     </DashboardShell>
   );
 }

@@ -10,6 +10,7 @@ type ClientRow = {
   created_at: string;
   bot_type?: string | null;
   business_info?: string | null;
+  ai_enabled?: boolean | null;
 };
 
 type AiConversationRow = {
@@ -66,6 +67,7 @@ function normalizeClient(row: ClientRow) {
     created_at: row.created_at,
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
+    ai_enabled: row.ai_enabled ?? true,
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -125,7 +127,7 @@ export async function getClients() {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -176,7 +178,7 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -196,6 +198,7 @@ export async function updateClientSettings(
   updates: Partial<{
     bot_type: "ai";
     business_info: string;
+    ai_enabled: boolean;
   }>
 ) {
   const supabase = getDb();
