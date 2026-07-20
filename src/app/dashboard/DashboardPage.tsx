@@ -510,9 +510,9 @@ const DashboardPage = () => {
         </div>
       ) : null}
       {showModal ? (
-        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-5 sm:px-7 sm:py-6">
+        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center overflow-y-auto bg-black/70 px-4 py-4 backdrop-blur-sm sm:py-8">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)] sm:max-h-[calc(100vh-4rem)]">
+            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-5 sm:px-7 sm:py-6">
               <h3 className="text-[1.2rem] font-extrabold sm:text-[1.5rem]">
                 Connect a New Facebook Page
               </h3>
@@ -522,14 +522,19 @@ const DashboardPage = () => {
                 className="rounded-md border-none p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
                 aria-label="Close modal"
               >
-<FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
+                <FontAwesomeIcon aria-hidden="true" className="h-6 w-6" icon={faXmark} />
               </button>
             </div>
 
-            <div className="px-4 py-5 sm:px-7 sm:py-6">
+            <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
               <p className="max-w-[460px] text-[15px] leading-7 text-[var(--text-label)]">
                 Select the Facebook Page that should use this AI workspace.
               </p>
+              {pages.length > 0 ? (
+                <p className="mt-2 text-[13px] text-[var(--text-subtle)]">
+                  Showing {pages.length} available pages.
+                </p>
+              ) : null}
 
               <div className="mt-6 space-y-4">
                 {pages.length === 0 ? (
