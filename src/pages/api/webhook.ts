@@ -7,6 +7,8 @@ import {
   recordCustomerConversationMessage,
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
+import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
+import { extractLeadFromMessage } from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -160,6 +162,33 @@ async function safelyIsAiPaused(clientId: string, recipientId: string) {
   }
 }
 
+async function safelyCaptureLead(input: {
+  clientName: string;
+  pageId: string;
+  recipientId: string;
+  message: string;
+}) {
+  const lead = extractLeadFromMessage(input.message);
+
+  if (!lead) {
+    return;
+  }
+
+  try {
+    await sendLeadToGoogleSheet({
+      fullName: lead.fullName,
+      phone: lead.phone,
+      pageId: input.pageId,
+      pageName: input.clientName,
+      recipientId: input.recipientId,
+      message: input.message,
+      capturedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.warn("Failed to send lead to Google Sheet", error);
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -255,6 +284,12 @@ export default async function handler(
           if (rawText) {
             await safelyRecordCustomerMessage({
               clientId: client.id,
+              pageId,
+              recipientId: userId,
+              message: rawText,
+            });
+            await safelyCaptureLead({
+              clientName: client.client_name,
               pageId,
               recipientId: userId,
               message: rawText,

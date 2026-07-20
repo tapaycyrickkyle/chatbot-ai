@@ -32,6 +32,35 @@ AI_API_KEY="sk-your-deepseek-key"
 AI_MODEL="deepseek-chat"
 ```
 
+## Google Sheets Lead Capture
+
+The Messenger webhook can send captured leads to a free Google Apps Script Web App.
+Set this environment variable in Vercel:
+
+```env
+GOOGLE_SHEETS_WEBHOOK_URL="https://script.google.com/macros/s/your-deployment-id/exec"
+```
+
+When a customer message includes a full name and phone number, the app posts:
+
+```json
+{
+  "fullName": "Juan Dela Cruz",
+  "phone": "09171234567",
+  "pageId": "123456789",
+  "pageName": "Business Page",
+  "recipientId": "messenger-user-id",
+  "message": "My name is Juan Dela Cruz, phone is 09171234567",
+  "capturedAt": "2026-07-20T00:00:00.000Z"
+}
+```
+
+Recommended Google Sheet columns:
+
+```text
+Captured At | Page Name | Page ID | Messenger User ID | Full Name | Phone | Message
+```
+
 ## Getting Started
 
 First, run the development server:
