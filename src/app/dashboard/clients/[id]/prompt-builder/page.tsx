@@ -187,8 +187,8 @@ export default function PromptBuilderPage() {
                     : "AI is off for this page and will not reply to customer messages."}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-semibold text-[var(--text-muted)]">
+              <div className="flex items-center gap-2.5">
+                <span className="min-w-5 text-right text-[12px] font-semibold text-[var(--text-muted)]">
                   {aiEnabled ? "On" : "Off"}
                 </span>
                 <button
@@ -198,15 +198,15 @@ export default function PromptBuilderPage() {
                   aria-label={aiEnabled ? "Turn off AI replies" : "Turn on AI replies"}
                   onClick={() => void toggleAiEnabled()}
                   disabled={updatingAi}
-                  className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-70 ${
+                  className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/30 disabled:cursor-not-allowed disabled:opacity-70 ${
                     aiEnabled
                       ? "border-green-600 bg-green-500"
                       : "border-[var(--border)] bg-[var(--surface-strong)]"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      aiEnabled ? "translate-x-5" : "translate-x-0.5"
+                    className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      aiEnabled ? "translate-x-4" : "translate-x-0"
                     }`}
                   />
                 </button>
