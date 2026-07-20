@@ -32,21 +32,7 @@ function getLeadFieldList(value: string) {
 }
 
 function buildAppsScript(leadFields: string[]) {
-  const baseColumns = [
-    "Captured At",
-    "Page Name",
-    "Page ID",
-    "Messenger User ID",
-    "Full Name",
-    "Phone",
-    "Message",
-  ];
-  const extraFields = leadFields.filter(
-    (field) => !["Full Name", "Phone"].includes(field)
-  );
-  const columns = [...baseColumns, ...extraFields];
-
-  return `const COLUMNS = ${JSON.stringify(columns, null, 2)};
+  return `const COLUMNS = ${JSON.stringify(leadFields, null, 2)};
 
 function doPost(e) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -58,13 +44,8 @@ function doPost(e) {
   }
 
   const row = COLUMNS.map(function(column) {
-    if (column === "Captured At") return data.capturedAt || new Date().toISOString();
-    if (column === "Page Name") return data.pageName || "";
-    if (column === "Page ID") return data.pageId || "";
-    if (column === "Messenger User ID") return data.recipientId || "";
     if (column === "Full Name") return data.fullName || fields["Full Name"] || "";
     if (column === "Phone") return data.phone || fields["Phone"] || "";
-    if (column === "Message") return data.message || "";
     return fields[column] || "";
   });
 
@@ -89,16 +70,7 @@ export default function ClientSettingsPage() {
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
   const leadFields = getLeadFieldList(leadCaptureFields);
-  const sheetColumns = [
-    "Captured At",
-    "Page Name",
-    "Page ID",
-    "Messenger User ID",
-    "Full Name",
-    "Phone",
-    "Message",
-    ...leadFields.filter((field) => !["Full Name", "Phone"].includes(field)),
-  ];
+  const sheetColumns = leadFields;
   const generatedAppsScript = buildAppsScript(leadFields);
 
   useEffect(() => {
