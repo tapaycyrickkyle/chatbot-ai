@@ -51,8 +51,13 @@ export function parseLeadFields(value: string) {
     .split(/\r?\n|,/)
     .map((field) => field.trim())
     .filter(Boolean);
+  const uniqueFields = fields.length > 0 ? Array.from(new Set(fields)) : DEFAULT_LEAD_FIELDS;
 
-  return fields.length > 0 ? Array.from(new Set(fields)) : DEFAULT_LEAD_FIELDS;
+  return [
+    "Full Name",
+    "Phone",
+    ...uniqueFields.filter((field) => !["Full Name", "Phone"].includes(field)),
+  ];
 }
 
 function normalizeFieldKey(value: string) {

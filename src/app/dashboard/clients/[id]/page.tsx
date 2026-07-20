@@ -22,12 +22,13 @@ function getLeadFieldList(value: string) {
     .split(/\r?\n|,/)
     .map((field) => field.trim())
     .filter(Boolean);
+  const uniqueFields = Array.from(new Set(fields));
 
-  return fields.length > 0 ? Array.from(new Set(fields)) : ["Full Name", "Phone"];
-}
-
-function toScriptString(value: string) {
-  return JSON.stringify(value);
+  return [
+    "Full Name",
+    "Phone",
+    ...uniqueFields.filter((field) => !["Full Name", "Phone"].includes(field)),
+  ];
 }
 
 function buildAppsScript(leadFields: string[]) {
@@ -44,19 +45,6 @@ function buildAppsScript(leadFields: string[]) {
     (field) => !["Full Name", "Phone"].includes(field)
   );
   const columns = [...baseColumns, ...extraFields];
-  const dynamicValues = extraFields
-    .map((field) => `    fields[${toScriptString(field)}] || ""`)
-    .join(",\n");
-  const rowValues = [
-    '    data.capturedAt || new Date().toISOString()',
-    '    data.pageName || ""',
-    '    data.pageId || ""',
-    '    data.recipientId || ""',
-    '    data.fullName || fields["Full Name"] || ""',
-    '    data.phone || fields["Phone"] || ""',
-    '    data.message || ""',
-    dynamicValues,
-  ].filter(Boolean);
 
   return `const COLUMNS = ${JSON.stringify(columns, null, 2)};
 
@@ -69,9 +57,18 @@ function doPost(e) {
     sheet.appendRow(COLUMNS);
   }
 
-  sheet.appendRow([
-${rowValues.join(",\n")}
-  ]);
+  const row = COLUMNS.map(function(column) {
+    if (column === "Captured At") return data.capturedAt || new Date().toISOString();
+    if (column === "Page Name") return data.pageName || "";
+    if (column === "Page ID") return data.pageId || "";
+    if (column === "Messenger User ID") return data.recipientId || "";
+    if (column === "Full Name") return data.fullName || fields["Full Name"] || "";
+    if (column === "Phone") return data.phone || fields["Phone"] || "";
+    if (column === "Message") return data.message || "";
+    return fields[column] || "";
+  });
+
+  sheet.appendRow(row);
 
   return ContentService
     .createTextOutput(JSON.stringify({ success: true }))
@@ -87,6 +84,7 @@ export default function ClientSettingsPage() {
   const [pageId, setPageId] = useState("");
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
   const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
+  const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
@@ -237,6 +235,47 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const updateLeadField = (index: number, value: string) => {
+    const nextFields = [...leadFields];
+    nextFields[index] = value;
+    setLeadCaptureFields(nextFields.join("\n"));
+  };
+
+  const removeLeadField = (index: number) => {
+    const field = leadFields[index];
+
+    if (field === "Full Name" || field === "Phone") {
+      showToast({
+        tone: "error",
+        message: "Full Name and Phone are required fields.",
+      });
+      return;
+    }
+
+    const nextFields = leadFields.filter((_, fieldIndex) => fieldIndex !== index);
+    setLeadCaptureFields(nextFields.join("\n"));
+  };
+
+  const addLeadField = () => {
+    const nextField = newLeadField.trim();
+
+    if (!nextField) {
+      return;
+    }
+
+    if (
+      leadFields.some(
+        (field) => field.toLowerCase() === nextField.toLowerCase()
+      )
+    ) {
+      showToast({ tone: "error", message: "That lead field already exists." });
+      return;
+    }
+
+    setLeadCaptureFields([...leadFields, nextField].join("\n"));
+    setNewLeadField("");
+  };
+
   return (
     <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -308,20 +347,63 @@ export default function ClientSettingsPage() {
               </p>
               <label
                 className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="lead-capture-fields"
+                htmlFor="new-lead-field"
               >
                 Lead Fields
               </label>
-              <textarea
-                id="lead-capture-fields"
-                rows={6}
-                value={leadCaptureFields}
-                onChange={(event) => setLeadCaptureFields(event.target.value)}
-                placeholder={"Full Name\nPhone\nEmail\nBudget\nPreferred Schedule"}
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
+              <div className="mt-2 flex flex-col gap-2">
+                {leadFields.map((field, index) => {
+                  const isRequiredField = field === "Full Name" || field === "Phone";
+
+                  return (
+                    <div
+                      key={`${field}-${index}`}
+                      className="flex flex-col gap-2 min-[480px]:flex-row"
+                    >
+                      <input
+                        type="text"
+                        value={field}
+                        onChange={(event) => updateLeadField(index, event.target.value)}
+                        disabled={isRequiredField}
+                        className="min-w-0 flex-1 rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-80"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLeadField(index)}
+                        disabled={isRequiredField}
+                        className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex flex-col gap-2 min-[480px]:flex-row">
+                <input
+                  id="new-lead-field"
+                  type="text"
+                  value={newLeadField}
+                  onChange={(event) => setNewLeadField(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addLeadField();
+                    }
+                  }}
+                  placeholder="Email, Budget, Preferred Schedule..."
+                  className="min-w-0 flex-1 rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                />
+                <button
+                  type="button"
+                  onClick={addLeadField}
+                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                >
+                  Add Field
+                </button>
+              </div>
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Add one field per line. Full Name and Phone are still required before the lead is sent.
+                Full Name and Phone are required before the lead is sent.
               </p>
               <div className="mt-4">
                 <button
