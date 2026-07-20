@@ -7,7 +7,11 @@ import {
   recordCustomerConversationMessage,
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
-import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
+import {
+  advanceGoogleSheetLeadFlow,
+  sendLeadToGoogleSheet,
+  type GoogleSheetsLeadFlowResponse,
+} from "@/lib/google-sheets";
 import { extractLeadFromMessage, parseLeadFields } from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -206,6 +210,38 @@ async function safelyCaptureLead(input: {
   }
 }
 
+function shouldStartLeadFlow(message: string) {
+  return /\b(order|buy|book|booking|schedule|sched|appointment|viewing|quote|estimate|interested|available|avail|reserve|contact|call|inquire|inquiry|talk to|agent|specialist)\b/i.test(
+    message
+  );
+}
+
+async function safelyAdvanceLeadFlow(input: {
+  clientName: string;
+  pageId: string;
+  recipientId: string;
+  message: string;
+  googleSheetsWebhookUrl: string;
+  leadFields: string[];
+}): Promise<GoogleSheetsLeadFlowResponse | null> {
+  try {
+    return await advanceGoogleSheetLeadFlow(
+      {
+        pageName: input.clientName,
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        message: input.message,
+        leadFields: input.leadFields,
+        startLeadFlow: shouldStartLeadFlow(input.message),
+      },
+      { webhookUrl: input.googleSheetsWebhookUrl }
+    );
+  } catch (error) {
+    console.warn("Failed to advance Google Sheets lead flow", error);
+    return null;
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -306,6 +342,32 @@ export default async function handler(
               recipientId: userId,
               message: rawText,
             });
+
+            const leadFlow = await safelyAdvanceLeadFlow({
+              clientName: client.client_name,
+              pageId,
+              recipientId: userId,
+              message: rawText,
+              googleSheetsWebhookUrl: client.google_sheets_webhook_url,
+              leadFields,
+            });
+
+            if (leadFlow?.reply) {
+              await safelyHandleFlowSend(
+                () =>
+                  safeSendMessage(
+                    userId,
+                    leadFlow.reply || "",
+                    pageAccessToken,
+                    0,
+                    pageId,
+                    client.id
+                  ).then(() => undefined),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+              continue;
+            }
+
             await safelyCaptureLead({
               clientName: client.client_name,
               pageId,
