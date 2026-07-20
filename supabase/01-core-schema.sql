@@ -11,6 +11,7 @@ create table if not exists public.clients (
   bot_type text not null default 'ai',
   business_info text not null default '',
   ai_enabled boolean not null default true,
+  google_sheets_webhook_url text not null default '',
   constraint clients_page_id_key unique (page_id)
 );
 
@@ -21,7 +22,8 @@ alter table public.clients
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists bot_type text not null default 'ai',
   add column if not exists business_info text not null default '',
-  add column if not exists ai_enabled boolean not null default true;
+  add column if not exists ai_enabled boolean not null default true,
+  add column if not exists google_sheets_webhook_url text not null default '';
 
 update public.clients
 set
@@ -30,7 +32,8 @@ set
   page_access_token = coalesce(page_access_token, ''),
   bot_type = 'ai',
   business_info = coalesce(business_info, ''),
-  ai_enabled = coalesce(ai_enabled, true);
+  ai_enabled = coalesce(ai_enabled, true),
+  google_sheets_webhook_url = coalesce(google_sheets_webhook_url, '');
 
 alter table public.clients
   alter column client_name set not null,
@@ -40,9 +43,11 @@ alter table public.clients
   alter column bot_type set default 'ai',
   alter column business_info set default '',
   alter column ai_enabled set default true,
+  alter column google_sheets_webhook_url set default '',
   alter column bot_type set not null,
   alter column business_info set not null,
-  alter column ai_enabled set not null;
+  alter column ai_enabled set not null,
+  alter column google_sheets_webhook_url set not null;
 
 do $$
 begin

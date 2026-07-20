@@ -11,6 +11,7 @@ type ClientRow = {
   bot_type?: string | null;
   business_info?: string | null;
   ai_enabled?: boolean | null;
+  google_sheets_webhook_url?: string | null;
 };
 
 type AiConversationRow = {
@@ -68,6 +69,7 @@ function normalizeClient(row: ClientRow) {
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     ai_enabled: row.ai_enabled ?? true,
+    google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -127,7 +129,7 @@ export async function getClients() {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -178,7 +180,7 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled")
+    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -199,6 +201,7 @@ export async function updateClientSettings(
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
+    google_sheets_webhook_url: string;
   }>
 ) {
   const supabase = getDb();

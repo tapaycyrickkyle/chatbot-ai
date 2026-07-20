@@ -13,11 +13,13 @@ function validateClientSettingsPayload(payload: unknown) {
     throw new Error("Invalid request body");
   }
 
-  const { bot_type, business_info, ai_enabled } = payload as Record<string, unknown>;
+  const { bot_type, business_info, ai_enabled, google_sheets_webhook_url } =
+    payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
+    google_sheets_webhook_url: string;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -46,6 +48,30 @@ function validateClientSettingsPayload(payload: unknown) {
     }
 
     updates.ai_enabled = ai_enabled;
+  }
+
+  if (google_sheets_webhook_url !== undefined) {
+    if (typeof google_sheets_webhook_url !== "string") {
+      throw new Error("Invalid Google Sheets webhook URL");
+    }
+
+    const trimmedUrl = google_sheets_webhook_url.trim();
+
+    if (trimmedUrl) {
+      let parsedUrl: URL;
+
+      try {
+        parsedUrl = new URL(trimmedUrl);
+      } catch {
+        throw new Error("Invalid Google Sheets webhook URL");
+      }
+
+      if (parsedUrl.protocol !== "https:") {
+        throw new Error("Google Sheets webhook URL must use HTTPS");
+      }
+    }
+
+    updates.google_sheets_webhook_url = trimmedUrl;
   }
 
   return updates;
@@ -79,6 +105,7 @@ export async function GET(
       bot_type: client.bot_type,
       business_info: client.business_info,
       ai_enabled: client.ai_enabled,
+      google_sheets_webhook_url: client.google_sheets_webhook_url,
     });
   } catch (error) {
     console.error(error);

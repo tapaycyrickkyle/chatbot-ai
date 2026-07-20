@@ -14,11 +14,14 @@ function getSheetsWebhookUrl() {
   return process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim() || "";
 }
 
-export async function sendLeadToGoogleSheet(input: GoogleSheetsLeadInput) {
-  const webhookUrl = getSheetsWebhookUrl();
+export async function sendLeadToGoogleSheet(
+  input: GoogleSheetsLeadInput,
+  options: { webhookUrl?: string } = {}
+) {
+  const webhookUrl = options.webhookUrl?.trim() || getSheetsWebhookUrl();
 
   if (!webhookUrl) {
-    console.info("Google Sheets lead capture skipped: missing GOOGLE_SHEETS_WEBHOOK_URL");
+    console.info("Google Sheets lead capture skipped: no webhook URL configured");
     return false;
   }
 

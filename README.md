@@ -34,8 +34,13 @@ AI_MODEL="deepseek-chat"
 
 ## Google Sheets Lead Capture
 
-The Messenger webhook can send captured leads to a free Google Apps Script Web App.
-Set this environment variable in Vercel:
+The Messenger webhook can send captured leads to a free Google Apps Script Web App. Each connected Facebook Page can have its own URL in:
+
+```text
+Dashboard -> Page Settings -> Lead Google Sheet
+```
+
+As an optional fallback for pages without their own saved URL, set this environment variable in Vercel:
 
 ```env
 GOOGLE_SHEETS_WEBHOOK_URL="https://script.google.com/macros/s/your-deployment-id/exec"

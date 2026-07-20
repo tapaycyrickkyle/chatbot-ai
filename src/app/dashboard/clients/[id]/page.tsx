@@ -13,6 +13,7 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
+  google_sheets_webhook_url: string;
 };
 
 export default function ClientSettingsPage() {
@@ -21,8 +22,10 @@ export default function ClientSettingsPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
+  const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
+  const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
 
   useEffect(() => {
     if (!clientId) {
@@ -46,6 +49,7 @@ export default function ClientSettingsPage() {
 
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
+        setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
       } catch (error) {
         console.error(error);
         showToast({
@@ -101,6 +105,40 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const saveGoogleSheetsWebhookUrl = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    setSavingSheetsUrl(true);
+
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          google_sheets_webhook_url: googleSheetsWebhookUrl,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save Google Sheets URL");
+      }
+
+      showToast({ tone: "success", message: "Google Sheets URL saved." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to save Google Sheets URL.",
+      });
+    } finally {
+      setSavingSheetsUrl(false);
+    }
+  };
+
   return (
     <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -151,6 +189,39 @@ export default function ClientSettingsPage() {
 
             <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Lead Google Sheet
+              </p>
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="google-sheets-webhook-url"
+              >
+                Google Apps Script Web App URL
+              </label>
+              <input
+                id="google-sheets-webhook-url"
+                type="url"
+                value={googleSheetsWebhookUrl}
+                onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Leads captured from this Facebook Page will be sent to this sheet. Leave it empty to skip Google Sheets for this Page.
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => void saveGoogleSheetsWebhookUrl()}
+                  disabled={savingSheetsUrl || loading}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {savingSheetsUrl ? "Saving..." : "Save Sheet URL"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 AI Conversation Control
               </p>
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
@@ -190,7 +261,10 @@ export default function ClientSettingsPage() {
           </div>
         )}
       </div>
-      <LoadingModal isOpen={cleaningStorage} message="Cleaning old data..." />
+      <LoadingModal
+        isOpen={cleaningStorage || savingSheetsUrl}
+        message={savingSheetsUrl ? "Saving Google Sheets URL..." : "Cleaning old data..."}
+      />
     </DashboardShell>
   );
 }

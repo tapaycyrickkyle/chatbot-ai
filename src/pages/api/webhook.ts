@@ -167,6 +167,7 @@ async function safelyCaptureLead(input: {
   pageId: string;
   recipientId: string;
   message: string;
+  googleSheetsWebhookUrl: string;
 }) {
   const lead = extractLeadFromMessage(input.message);
 
@@ -183,7 +184,7 @@ async function safelyCaptureLead(input: {
       recipientId: input.recipientId,
       message: input.message,
       capturedAt: new Date().toISOString(),
-    });
+    }, { webhookUrl: input.googleSheetsWebhookUrl });
   } catch (error) {
     console.warn("Failed to send lead to Google Sheet", error);
   }
@@ -293,6 +294,7 @@ export default async function handler(
               pageId,
               recipientId: userId,
               message: rawText,
+              googleSheetsWebhookUrl: client.google_sheets_webhook_url,
             });
           }
 
