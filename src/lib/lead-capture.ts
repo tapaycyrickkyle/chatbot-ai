@@ -139,6 +139,68 @@ function extractFieldValue(field: string, message: string, fullName: string, pho
   return extractSimpleField(message, [field]);
 }
 
+function getFieldAliases(field: string) {
+  const key = normalizeFieldKey(field);
+  const aliases = [field];
+
+  if (key.includes("name")) {
+    aliases.push("Name");
+  }
+
+  if (key.includes("phone") || key.includes("mobile") || key.includes("contact")) {
+    aliases.push("Phone", "Phone Number", "Contact Number", "Mobile Number");
+  }
+
+  return Array.from(new Set(aliases));
+}
+
+function extractFormattedField(message: string, field: string) {
+  for (const alias of getFieldAliases(field)) {
+    const pattern = new RegExp(
+      `^\\s*${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*(.+?)\\s*$`,
+      "im"
+    );
+    const value = message.match(pattern)?.[1]?.trim() ?? "";
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+export function createLeadInformationPrompt(leadFields: string[]) {
+  const lines = leadFields.map((field) => `${field}:`).join("\n");
+
+  return `Please send your information in this format:\n\nInformation\n${lines}`;
+}
+
+export function extractFormattedLeadFromMessage(
+  message: string,
+  leadFields: string[] = DEFAULT_LEAD_FIELDS
+): CapturedLead | null {
+  if (!/\binformation\b/i.test(message)) {
+    return null;
+  }
+
+  const fields = Object.fromEntries(
+    leadFields.map((field) => [field, extractFormattedField(message, field)])
+  );
+  const fullName = fields["Full Name"] || fields.Name || "";
+  const phone = fields.Phone || fields["Phone Number"] || "";
+
+  if (!fullName || !phone) {
+    return null;
+  }
+
+  return {
+    fullName,
+    phone,
+    fields,
+  };
+}
+
 export function extractLeadFromMessage(message: string, leadFields: string[] = DEFAULT_LEAD_FIELDS): CapturedLead | null {
   const phoneMatch = message.match(PHONE_PATTERN);
   const phone = phoneMatch?.[0] ? normalizePhone(phoneMatch[0]) : "";

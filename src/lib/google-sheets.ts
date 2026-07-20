@@ -11,20 +11,6 @@ export type GoogleSheetsLeadInput = {
   fields: Record<string, string>;
 };
 
-export type GoogleSheetsLeadFlowInput = {
-  pageName: string;
-  pageId: string;
-  recipientId: string;
-  message: string;
-  leadFields: string[];
-  startLeadFlow: boolean;
-};
-
-export type GoogleSheetsLeadFlowResponse = {
-  status?: "idle" | "asking" | "complete";
-  reply?: string;
-};
-
 function getSheetsWebhookUrl() {
   return process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim() || "";
 }
@@ -56,35 +42,4 @@ export async function sendLeadToGoogleSheet(
   }
 
   return true;
-}
-
-export async function advanceGoogleSheetLeadFlow(
-  input: GoogleSheetsLeadFlowInput,
-  options: { webhookUrl?: string } = {}
-) {
-  const webhookUrl = options.webhookUrl?.trim() || getSheetsWebhookUrl();
-
-  if (!webhookUrl) {
-    return null;
-  }
-
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      action: "lead_flow",
-      ...input,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Google Sheets lead flow failed: ${response.status} ${response.statusText} ${body}`.trim()
-    );
-  }
-
-  return (await response.json().catch(() => null)) as GoogleSheetsLeadFlowResponse | null;
 }

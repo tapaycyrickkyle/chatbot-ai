@@ -36,83 +36,9 @@ function buildAppsScript(leadFields: string[]) {
 
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
-
-  if (data.action === "lead_flow") {
-    return handleLeadFlow(data);
-  }
-
   appendLeadRow(data.fields || {});
 
   return jsonResponse({ success: true });
-}
-
-function handleLeadFlow(data) {
-  const recipientId = data.recipientId || "";
-  const message = String(data.message || "").trim();
-
-  if (!recipientId) {
-    return jsonResponse({ status: "idle" });
-  }
-
-  const properties = PropertiesService.getScriptProperties();
-  const key = "lead_flow_" + recipientId;
-  const savedState = properties.getProperty(key);
-  let state = savedState ? JSON.parse(savedState) : null;
-
-  if (!state && !data.startLeadFlow) {
-    return jsonResponse({ status: "idle" });
-  }
-
-  if (!state) {
-    state = { fields: {}, nextIndex: 0 };
-    properties.setProperty(key, JSON.stringify(state));
-    return jsonResponse({
-      status: "asking",
-      reply: questionForField(COLUMNS[0])
-    });
-  }
-
-  const currentField = COLUMNS[state.nextIndex] || firstMissingField(state.fields);
-
-  if (currentField && message) {
-    state.fields[currentField] = message;
-  }
-
-  const nextField = firstMissingField(state.fields);
-
-  if (!nextField) {
-    appendLeadRow(state.fields);
-    properties.deleteProperty(key);
-    return jsonResponse({
-      status: "complete",
-      reply: "Thanks, I got your details. Our team will follow up shortly."
-    });
-  }
-
-  state.nextIndex = COLUMNS.indexOf(nextField);
-  properties.setProperty(key, JSON.stringify(state));
-
-  return jsonResponse({
-    status: "asking",
-    reply: questionForField(nextField)
-  });
-}
-
-function firstMissingField(fields) {
-  for (var i = 0; i < COLUMNS.length; i += 1) {
-    if (!fields[COLUMNS[i]]) {
-      return COLUMNS[i];
-    }
-  }
-
-  return "";
-}
-
-function questionForField(field) {
-  if (field === "Full Name") return "May I have your full name?";
-  if (field === "Phone") return "What phone number can we contact you at?";
-  if (field === "Email") return "What email should we use?";
-  return "What is your " + field + "?";
 }
 
 function appendLeadRow(fields) {
@@ -493,7 +419,7 @@ export default function ClientSettingsPage() {
                   Columns: {sheetColumns.join(" | ")}
                 </p>
                 <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                  After changing lead fields, copy this script and redeploy the Google Apps Script Web App.
+                  After changing lead fields, copy this script and deploy a new Google Apps Script Web App version.
                 </p>
                 <pre className="mt-3 max-h-[360px] overflow-auto rounded border border-[var(--border)] bg-background px-3 py-3 text-[12px] leading-5 text-[var(--text-primary)]">
                   <code>{generatedAppsScript}</code>

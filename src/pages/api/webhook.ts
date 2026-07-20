@@ -7,12 +7,12 @@ import {
   recordCustomerConversationMessage,
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
+import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
 import {
-  advanceGoogleSheetLeadFlow,
-  sendLeadToGoogleSheet,
-  type GoogleSheetsLeadFlowResponse,
-} from "@/lib/google-sheets";
-import { extractLeadFromMessage, parseLeadFields } from "@/lib/lead-capture";
+  createLeadInformationPrompt,
+  extractFormattedLeadFromMessage,
+  parseLeadFields,
+} from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -174,16 +174,16 @@ async function safelyCaptureLead(input: {
   googleSheetsWebhookUrl: string;
   leadFields: string[];
 }) {
-  const lead = extractLeadFromMessage(input.message, input.leadFields);
+  const lead = extractFormattedLeadFromMessage(input.message, input.leadFields);
 
   if (!lead) {
-    console.info("Google Sheets lead capture skipped: lead fields not detected", {
+    console.info("Google Sheets lead capture skipped: formatted lead not detected", {
       pageId: input.pageId,
       recipientId: input.recipientId,
-      requiredFields: ["Full Name", "Phone"],
+      requiredFields: input.leadFields,
       preview: input.message.slice(0, 120),
     });
-    return;
+    return false;
   }
 
   try {
@@ -204,42 +204,19 @@ async function safelyCaptureLead(input: {
         recipientId: input.recipientId,
         fields: Object.keys(lead.fields),
       });
+      return true;
     }
   } catch (error) {
     console.warn("Failed to send lead to Google Sheet", error);
   }
+
+  return false;
 }
 
 function shouldStartLeadFlow(message: string) {
   return /\b(order|buy|book|booking|schedule|sched|appointment|viewing|quote|estimate|interested|available|avail|reserve|contact|call|inquire|inquiry|talk to|agent|specialist)\b/i.test(
     message
   );
-}
-
-async function safelyAdvanceLeadFlow(input: {
-  clientName: string;
-  pageId: string;
-  recipientId: string;
-  message: string;
-  googleSheetsWebhookUrl: string;
-  leadFields: string[];
-}): Promise<GoogleSheetsLeadFlowResponse | null> {
-  try {
-    return await advanceGoogleSheetLeadFlow(
-      {
-        pageName: input.clientName,
-        pageId: input.pageId,
-        recipientId: input.recipientId,
-        message: input.message,
-        leadFields: input.leadFields,
-        startLeadFlow: shouldStartLeadFlow(input.message),
-      },
-      { webhookUrl: input.googleSheetsWebhookUrl }
-    );
-  } catch (error) {
-    console.warn("Failed to advance Google Sheets lead flow", error);
-    return null;
-  }
 }
 
 export default async function handler(
@@ -343,7 +320,7 @@ export default async function handler(
               message: rawText,
             });
 
-            const leadFlow = await safelyAdvanceLeadFlow({
+            const capturedLead = await safelyCaptureLead({
               clientName: client.client_name,
               pageId,
               recipientId: userId,
@@ -352,12 +329,12 @@ export default async function handler(
               leadFields,
             });
 
-            if (leadFlow?.reply) {
+            if (capturedLead) {
               await safelyHandleFlowSend(
                 () =>
                   safeSendMessage(
                     userId,
-                    leadFlow.reply || "",
+                    "Thanks, I got your details. Our team will follow up shortly.",
                     pageAccessToken,
                     0,
                     pageId,
@@ -368,14 +345,21 @@ export default async function handler(
               continue;
             }
 
-            await safelyCaptureLead({
-              clientName: client.client_name,
-              pageId,
-              recipientId: userId,
-              message: rawText,
-              googleSheetsWebhookUrl: client.google_sheets_webhook_url,
-              leadFields,
-            });
+            if (shouldStartLeadFlow(rawText)) {
+              await safelyHandleFlowSend(
+                () =>
+                  safeSendMessage(
+                    userId,
+                    createLeadInformationPrompt(leadFields),
+                    pageAccessToken,
+                    0,
+                    pageId,
+                    client.id
+                  ).then(() => undefined),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+              continue;
+            }
           }
 
           if (!client.ai_enabled) {
