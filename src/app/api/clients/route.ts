@@ -3,7 +3,6 @@ import {
   addClient,
   deleteClientById,
   deleteClientByPageId,
-  deleteFaqsForClient,
   getClientById,
   getClients,
 } from "@/lib/database";
@@ -24,7 +23,7 @@ async function subscribePageToWebhook(pageId: string, pageAccessToken: string) {
       },
       body: JSON.stringify({
         access_token: pageAccessToken,
-        subscribed_fields: ["messages", "messaging_postbacks"],
+        subscribed_fields: ["messages", "messaging_postbacks", "message_echoes"],
       }),
     }
   );
@@ -273,7 +272,6 @@ export async function DELETE(req: NextRequest) {
       console.error("Facebook unsubscribe request failed", error);
     }
 
-    await deleteFaqsForClient(clientId);
     await deleteClientById(clientId);
 
     return NextResponse.json({ success: true, clientId });

@@ -1,12 +1,11 @@
 import "server-only";
 
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
   "Our AI assistant is temporarily unavailable. Please try again later.";
 const AI_FALLBACK_REPLY =
   "Great question! Let me connect you with our specialist - one moment please.";
 
-type DeepSeekChatCompletionResponse = {
+type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
       content?: string;
@@ -50,7 +49,33 @@ function getErrorSummary(error: unknown) {
   };
 }
 
-export async function askDeepSeek(userMessage: string, businessContext: string) {
+function getAiConfig() {
+  const apiKey = process.env.AI_API_KEY?.trim() || "";
+  const apiUrl = process.env.AI_API_URL?.trim() || "";
+  const model = process.env.AI_MODEL?.trim() || "";
+
+  return {
+    apiKey,
+    apiUrl,
+    model,
+  };
+}
+
+function createAiHeaders(apiKey: string, apiUrl: string) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  if (apiUrl.includes("openrouter.ai")) {
+    headers["HTTP-Referer"] = process.env.AI_SITE_URL || "http://localhost:3000";
+    headers["X-Title"] = process.env.AI_APP_NAME || "AI Inbox";
+  }
+
+  return headers;
+}
+
+export async function askAi(userMessage: string, businessContext: string) {
   const detectedLanguage = detectReplyLanguage(userMessage);
   const systemPrompt = `You are a strong sales agent for a business. You are confident, empathetic, persuasive, and practical. You speak naturally and can mix English and Tagalog (Taglish).
 
@@ -79,22 +104,17 @@ RULES:
 
 BUSINESS INFORMATION:
 ${businessContext}`;
-
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  const model = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+  const { apiKey, apiUrl, model } = getAiConfig();
 
   try {
-    if (!apiKey) {
-      console.error("DeepSeek request failed: missing DEEPSEEK_API_KEY");
+    if (!apiUrl || !apiKey || !model) {
+      console.error("AI request failed: missing AI_API_URL, AI_API_KEY, or AI_MODEL");
       return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
     }
 
-    const response = await fetch(DEEPSEEK_API_URL, {
+    const response = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: createAiHeaders(apiKey, apiUrl),
       body: JSON.stringify({
         model,
         temperature: 0.7,
@@ -110,7 +130,9 @@ ${businessContext}`;
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      console.error("DeepSeek request failed", {
+      console.error("AI request failed", {
+        providerUrl: apiUrl,
+        model,
         status: response.status,
         statusText: response.statusText,
         body: errorText,
@@ -118,12 +140,12 @@ ${businessContext}`;
       return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
     }
 
-    const data = (await response.json()) as DeepSeekChatCompletionResponse;
+    const data = (await response.json()) as ChatCompletionResponse;
     const reply = data.choices?.[0]?.message?.content?.trim();
 
     return reply || AI_FALLBACK_REPLY;
   } catch (error) {
-    console.error("DeepSeek request failed", getErrorSummary(error));
+    console.error("AI request failed", getErrorSummary(error));
     return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
   }
 }

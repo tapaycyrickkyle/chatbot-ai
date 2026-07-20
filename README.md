@@ -1,5 +1,37 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## AI Provider
+
+The chatbot uses an OpenAI-compatible chat completions API. Configure it with environment variables:
+
+```env
+AI_API_URL="provider chat completions URL"
+AI_API_KEY="provider API key"
+AI_MODEL="provider model name"
+AI_SITE_URL="http://localhost:3000"
+AI_APP_NAME="AI Inbox"
+```
+
+OpenRouter example:
+
+```env
+AI_API_URL="https://openrouter.ai/api/v1/chat/completions"
+AI_API_KEY="sk-or-v1-your-openrouter-key"
+AI_MODEL="google/gemma-4-26b-a4b-it:free"
+AI_SITE_URL="http://localhost:3000"
+AI_APP_NAME="AI Inbox"
+```
+
+To switch models, change `AI_MODEL`. To switch providers, change `AI_API_URL` and `AI_API_KEY`.
+
+DeepSeek example:
+
+```env
+AI_API_URL="https://api.deepseek.com/chat/completions"
+AI_API_KEY="sk-your-deepseek-key"
+AI_MODEL="deepseek-chat"
+```
+
 ## Getting Started
 
 First, run the development server:

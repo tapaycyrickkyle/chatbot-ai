@@ -3,13 +3,10 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const RATE_LIMIT_LOG_RETENTION_DAYS = 7;
-const REPLY_SESSION_RETENTION_HOURS = 24;
 
 type CleanupResult = {
   deletedRateLimitLogs: number;
-  deletedReplySessions: number;
   logRetentionDays: number;
-  sessionRetentionHours: number;
   warnings: string[];
 };
 
@@ -81,24 +78,18 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
   const rateLimitCutoffIso = new Date(
     now - RATE_LIMIT_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
-  const replySessionCutoffIso = new Date(
-    now - REPLY_SESSION_RETENTION_HOURS * 60 * 60 * 1000
-  ).toISOString();
-
-  const [rateLimitLogsResult, replySessionsResult] = await Promise.all([
-    cleanupRowsOlderThan("rate_limit_logs", "created_at", rateLimitCutoffIso),
-    cleanupRowsOlderThan("bot_flow_reply_sessions", "updated_at", replySessionCutoffIso),
-  ]);
-  const warnings = [
-    rateLimitLogsResult.warning,
-    replySessionsResult.warning,
-  ].filter((warning): warning is string => Boolean(warning));
+  const rateLimitLogsResult = await cleanupRowsOlderThan(
+    "rate_limit_logs",
+    "created_at",
+    rateLimitCutoffIso
+  );
+  const warnings = [rateLimitLogsResult.warning].filter(
+    (warning): warning is string => Boolean(warning)
+  );
 
   return {
     deletedRateLimitLogs: rateLimitLogsResult.deletedRows,
-    deletedReplySessions: replySessionsResult.deletedRows,
     logRetentionDays: RATE_LIMIT_LOG_RETENTION_DAYS,
-    sessionRetentionHours: REPLY_SESSION_RETENTION_HOURS,
     warnings,
   };
 }

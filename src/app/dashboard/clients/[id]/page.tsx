@@ -69,12 +69,10 @@ export default function ClientSettingsPage() {
       });
 
       const data = (await response.json().catch(() => null)) as
-        | {
+          | {
             error?: string;
             deletedRateLimitLogs?: number;
-            deletedReplySessions?: number;
             logRetentionDays?: number;
-            sessionRetentionHours?: number;
             warnings?: string[];
           }
         | null;
@@ -89,8 +87,8 @@ export default function ClientSettingsPage() {
         tone: warnings.length > 0 ? "error" : "success",
         message:
           warnings.length > 0
-            ? `Cleanup finished with ${warnings.length} skipped table${warnings.length === 1 ? "" : "s"}. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows and ${data?.deletedReplySessions ?? 0} old reply sessions.`
-            : `Cleanup finished. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows and ${data?.deletedReplySessions ?? 0} old reply sessions.`,
+            ? `Cleanup finished with ${warnings.length} skipped table${warnings.length === 1 ? "" : "s"}. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows.`
+            : `Cleanup finished. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows.`,
       });
     } catch (error) {
       console.error(error);

@@ -1,34 +1,35 @@
 # Supabase Schema
 
-For a new setup, you can run the single combined file:
+For the current Messenger-only AI chatbot, run this single file in Supabase SQL Editor:
 
 1. `00-run-all.sql`
 
-Or run the SQL files individually in order:
+That file creates/updates the current app tables, applies the RLS lockdown, and removes legacy tables from old FAQ/flow and Facebook comment private-reply features.
+
+If you prefer running files individually, run them in this order:
 
 1. `01-core-schema.sql`
-2. `02-legacy-flow-support.sql`
+2. `02-remove-legacy-flow.sql`
 3. `03-logging-maintenance.sql`
 4. `04-ai-conversations.sql`
 5. `05-business-users.sql`
 6. `06-orders.sql`
 7. `07-rls-lockdown.sql`
-8. `08-replied-comments.sql`
+8. `08-remove-comment-private-replies.sql`
 
-## Audit Notes
-
-The app currently uses these tables:
+## Tables Used
 
 - `clients`: connected Facebook Pages, page tokens, Full AI mode, and business prompt knowledge.
-- `faqs`: legacy flow-builder cards. The UI is Full AI only now, but some legacy/debug APIs still read this table.
-- `bot_flow_reply_sessions`: legacy flow reply-capture sessions. Cleanup/debug code still references it.
-- `rate_limit_logs`: webhook send failures, usage snapshots, and cleanup logs.
+- `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state for owner handoff.
 - `business_users`: business-owner email allowlist mapped to one client.
 - `orders`: order records for the business-owner order page.
-- `replied_comments`: Page comment IDs already answered by the private-reply webhook.
 
-`clients.id` is an integer in the existing project database, so related tables use `integer` foreign keys.
+## No Longer Used
+
+- `faqs`: removed because the website is Full AI only.
+- `bot_flow_reply_sessions`: removed with the legacy FAQ/flow system.
+- `replied_comments`: removed because the app no longer auto-sends private replies to people who comment on Facebook Page posts.
 
 ## Security Model
 

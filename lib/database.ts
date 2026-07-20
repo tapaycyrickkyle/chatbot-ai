@@ -12,14 +12,6 @@ type ClientRow = {
   business_info?: string | null;
 };
 
-type FaqRow = {
-  id: string;
-  client_id: string;
-  keywords: string[] | null;
-  answer: string;
-  image_attachment_id: string | null;
-};
-
 type AiConversationRow = {
   id: string;
   client_id: string;
@@ -75,16 +67,6 @@ function normalizeClient(row: ClientRow) {
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
-  };
-}
-
-function normalizeFaq(row: FaqRow) {
-  return {
-    id: String(row.id),
-    client_id: String(row.client_id),
-    keywords: Array.isArray(row.keywords) ? row.keywords : [],
-    answer: row.answer,
-    image_attachment_id: row.image_attachment_id ?? "",
   };
 }
 
@@ -224,126 +206,6 @@ export async function updateClientSettings(
   }
 }
 
-export async function deleteFaqsForClient(clientId: string) {
-  const supabase = getDb();
-  const { error } = await supabase.from("faqs").delete().eq("client_id", clientId);
-
-  if (error) {
-    throw new Error(error.message || "Failed to delete FAQs");
-  }
-}
-
-export async function getFaqsForClient(clientId: string) {
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("faqs")
-    .select("id, client_id, keywords, answer, image_attachment_id")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw new Error(error.message || "Failed to load FAQs");
-  }
-
-  return (data ?? []).map((row) => {
-    const faq = normalizeFaq(row as FaqRow);
-
-    return {
-      id: faq.id,
-      keywords: faq.keywords,
-      answer: faq.answer,
-      image_attachment_id: faq.image_attachment_id,
-    };
-  });
-}
-
-export async function getFaqById(faqId: string) {
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("faqs")
-    .select("id, client_id, keywords, answer, image_attachment_id")
-    .eq("id", faqId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message || "Failed to load FAQ");
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return normalizeFaq(data as FaqRow);
-}
-
-export async function addFaq(
-  clientId: string,
-  keywords: string[],
-  answer: string,
-  image_attachment_id?: string
-) {
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("faqs")
-    .insert({
-      client_id: clientId,
-      keywords,
-      answer,
-      image_attachment_id: image_attachment_id || null,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw new Error(error.message || "Failed to add FAQ");
-  }
-
-  return data.id;
-}
-
-export async function updateFaq(
-  faqId: string,
-  data: Partial<{
-    keywords: string[];
-    answer: string;
-    image_attachment_id: string;
-  }>
-) {
-  const updates: {
-    keywords?: string[];
-    answer?: string;
-    image_attachment_id?: string | null;
-  } = {};
-
-  if (data.keywords) {
-    updates.keywords = data.keywords;
-  }
-
-  if (data.answer) {
-    updates.answer = data.answer;
-  }
-
-  if (data.image_attachment_id !== undefined) {
-    updates.image_attachment_id = data.image_attachment_id || null;
-  }
-
-  const supabase = getDb();
-  const { error } = await supabase.from("faqs").update(updates).eq("id", faqId);
-
-  if (error) {
-    throw new Error(error.message || "Failed to update FAQ");
-  }
-}
-
-export async function deleteFaq(faqId: string) {
-  const supabase = getDb();
-  const { error } = await supabase.from("faqs").delete().eq("id", faqId);
-
-  if (error) {
-    throw new Error(error.message || "Failed to delete FAQ");
-  }
-}
-
 export async function getAiConversationsForClient(clientId: string) {
   const supabase = getDb();
   const { data, error } = await supabase
@@ -447,37 +309,6 @@ export async function resumeAiConversation(clientId: string, recipientId: string
   if (error) {
     throw new Error(error.message || "Failed to resume AI conversation");
   }
-}
-
-export async function reserveCommentPrivateReply(input: {
-  clientId: string;
-  pageId: string;
-  commentId: string;
-  postId?: string;
-  fromId?: string;
-  message?: string;
-  replyMessage: string;
-}) {
-  const supabase = getDb();
-  const { error } = await supabase.from("replied_comments").insert({
-    client_id: input.clientId,
-    page_id: input.pageId,
-    comment_id: input.commentId,
-    post_id: input.postId || null,
-    from_id: input.fromId || null,
-    message: input.message || null,
-    reply_message: input.replyMessage,
-  });
-
-  if (!error) {
-    return true;
-  }
-
-  if (error.code === "23505") {
-    return false;
-  }
-
-  throw new Error(error.message || "Failed to reserve comment private reply");
 }
 
 export async function getBusinessUserByEmail(email: string) {
