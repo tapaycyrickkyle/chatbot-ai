@@ -17,6 +17,68 @@ type ClientSettings = {
   lead_capture_fields: string;
 };
 
+function getLeadFieldList(value: string) {
+  const fields = value
+    .split(/\r?\n|,/)
+    .map((field) => field.trim())
+    .filter(Boolean);
+
+  return fields.length > 0 ? Array.from(new Set(fields)) : ["Full Name", "Phone"];
+}
+
+function toScriptString(value: string) {
+  return JSON.stringify(value);
+}
+
+function buildAppsScript(leadFields: string[]) {
+  const baseColumns = [
+    "Captured At",
+    "Page Name",
+    "Page ID",
+    "Messenger User ID",
+    "Full Name",
+    "Phone",
+    "Message",
+  ];
+  const extraFields = leadFields.filter(
+    (field) => !["Full Name", "Phone"].includes(field)
+  );
+  const columns = [...baseColumns, ...extraFields];
+  const dynamicValues = extraFields
+    .map((field) => `    fields[${toScriptString(field)}] || ""`)
+    .join(",\n");
+  const rowValues = [
+    '    data.capturedAt || new Date().toISOString()',
+    '    data.pageName || ""',
+    '    data.pageId || ""',
+    '    data.recipientId || ""',
+    '    data.fullName || fields["Full Name"] || ""',
+    '    data.phone || fields["Phone"] || ""',
+    '    data.message || ""',
+    dynamicValues,
+  ].filter(Boolean);
+
+  return `const COLUMNS = ${JSON.stringify(columns, null, 2)};
+
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const data = JSON.parse(e.postData.contents);
+  const fields = data.fields || {};
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(COLUMNS);
+  }
+
+  sheet.appendRow([
+${rowValues.join(",\n")}
+  ]);
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ success: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+}
+
 export default function ClientSettingsPage() {
   const params = useParams<{ id: string }>();
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id ?? "";
@@ -28,6 +90,18 @@ export default function ClientSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
+  const leadFields = getLeadFieldList(leadCaptureFields);
+  const sheetColumns = [
+    "Captured At",
+    "Page Name",
+    "Page ID",
+    "Messenger User ID",
+    "Full Name",
+    "Phone",
+    "Message",
+    ...leadFields.filter((field) => !["Full Name", "Phone"].includes(field)),
+  ];
+  const generatedAppsScript = buildAppsScript(leadFields);
 
   useEffect(() => {
     if (!clientId) {
@@ -143,6 +217,26 @@ export default function ClientSettingsPage() {
     }
   };
 
+  const copyAppsScript = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedAppsScript);
+      showToast({ tone: "success", message: "Apps Script copied." });
+    } catch (error) {
+      console.error(error);
+      showToast({ tone: "error", message: "Unable to copy Apps Script." });
+    }
+  };
+
+  const copySheetColumns = async () => {
+    try {
+      await navigator.clipboard.writeText(sheetColumns.join("\t"));
+      showToast({ tone: "success", message: "Sheet columns copied." });
+    } catch (error) {
+      console.error(error);
+      showToast({ tone: "error", message: "Unable to copy Sheet columns." });
+    }
+  };
+
   return (
     <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -238,6 +332,36 @@ export default function ClientSettingsPage() {
                 >
                   {savingSheetsUrl ? "Saving..." : "Save Lead Settings"}
                 </button>
+              </div>
+
+              <div className="mt-6 rounded border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                    Generated Google Apps Script
+                  </p>
+                  <div className="flex flex-col gap-2 min-[420px]:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => void copySheetColumns()}
+                      className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                    >
+                      Copy Columns
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyAppsScript()}
+                      className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                    >
+                      Copy Script
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-3 break-words text-[12px] leading-6 text-[var(--text-muted)]">
+                  Columns: {sheetColumns.join(" | ")}
+                </p>
+                <pre className="mt-3 max-h-[360px] overflow-auto rounded border border-[var(--border)] bg-background px-3 py-3 text-[12px] leading-5 text-[var(--text-primary)]">
+                  <code>{generatedAppsScript}</code>
+                </pre>
               </div>
             </div>
 
