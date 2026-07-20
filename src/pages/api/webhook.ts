@@ -110,8 +110,13 @@ function isOwnerMessageEcho(
   }
 
   const appId = event.message.app_id ? String(event.message.app_id) : "";
+  const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || "";
 
-  return !appId || appId !== process.env.FACEBOOK_APP_ID;
+  if (appId && facebookAppId && appId === facebookAppId) {
+    return false;
+  }
+
+  return !appId;
 }
 
 async function safelyPauseAiForOwnerReply(input: {
@@ -223,6 +228,16 @@ export default async function handler(
               clientId: client.id,
               pageId,
               recipientId: userId,
+            });
+            continue;
+          }
+
+          if (event.message?.is_echo) {
+            console.info("AI webhook ignored Page message echo", {
+              clientId: client.id,
+              pageId,
+              userId,
+              appId: event.message.app_id ? String(event.message.app_id) : "",
             });
             continue;
           }
