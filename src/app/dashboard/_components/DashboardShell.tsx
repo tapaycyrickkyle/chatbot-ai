@@ -17,11 +17,12 @@ import chatbotWebIcon from "../../chatbot-web-icon.png";
 
 const navigationItems = [
   { label: "Pages", href: "/dashboard", icon: "clients" as const },
+  { label: "Owner Accounts", href: "/dashboard/owners", icon: "owners" as const },
 ];
 
 type DashboardShellProps = {
   children: ReactNode;
-  activeNav?: "Pages";
+  activeNav?: "Pages" | "Owner Accounts";
   searchPlaceholder?: string;
   showTopBar?: boolean;
 };

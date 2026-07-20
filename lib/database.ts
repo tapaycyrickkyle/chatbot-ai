@@ -341,6 +341,55 @@ export async function getBusinessUserByEmail(email: string) {
   return data ? normalizeBusinessUser(data as BusinessUserRow) : null;
 }
 
+export async function getBusinessUsers() {
+  const supabase = getDb();
+  const { data, error } = await supabase
+    .from("business_users")
+    .select("id, client_id, email, role, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || "Failed to load business users");
+  }
+
+  return (data ?? []).map((row) => normalizeBusinessUser(row as BusinessUserRow));
+}
+
+export async function upsertBusinessUser(input: {
+  clientId: string;
+  email: string;
+}) {
+  const email = input.email.trim().toLowerCase();
+  const supabase = getDb();
+  const { data, error } = await supabase
+    .from("business_users")
+    .upsert(
+      {
+        client_id: input.clientId,
+        email,
+        role: "owner",
+      },
+      { onConflict: "email" }
+    )
+    .select("id, client_id, email, role, created_at")
+    .single();
+
+  if (error) {
+    throw new Error(error.message || "Failed to save business user");
+  }
+
+  return normalizeBusinessUser(data as BusinessUserRow);
+}
+
+export async function deleteBusinessUser(ownerId: string) {
+  const supabase = getDb();
+  const { error } = await supabase.from("business_users").delete().eq("id", ownerId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to delete business user");
+  }
+}
+
 export async function getOrdersForClient(clientId: string) {
   const supabase = getDb();
   const { data, error } = await supabase
