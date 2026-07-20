@@ -8,6 +8,7 @@ import {
 } from "@/lib/database";
 import { assertSameOrigin, sanitizeIdentifier, validateClientPayload } from "@/lib/api-security";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
+import { getFacebookAccountPages } from "@/lib/facebook-pages";
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -134,18 +135,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing Facebook session" }, { status: 400 });
       }
 
-      const pagesResponse = await fetch("https://graph.facebook.com/v20.0/me/accounts", {
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
+      const pages = await getFacebookAccountPages(userToken, {
+        includeAccessToken: true,
       });
-      const pagesData = await pagesResponse.json();
-      const matchedPage = Array.isArray(pagesData.data)
-        ? pagesData.data.find(
-            (page: { id?: string; access_token?: string }) =>
-              page.id === body.facebook_page_id
-          )
-        : null;
+      const matchedPage = pages.find((page) => page.id === body.facebook_page_id);
 
       if (!matchedPage?.access_token) {
         return NextResponse.json({ error: "Unable to resolve page token" }, { status: 400 });

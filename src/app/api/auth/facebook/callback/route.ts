@@ -5,6 +5,7 @@ import {
   isValidFacebookOAuthState,
   verifyAdminAccessToken,
 } from "@/lib/admin-auth";
+import { getFacebookAccountPages } from "@/lib/facebook-pages";
 
 function clearTransientCookies(response: NextResponse) {
   response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, "", {
@@ -108,31 +109,22 @@ export async function GET(req: NextRequest) {
       return response;
     }
 
-    const pagesResponse = await fetch("https://graph.facebook.com/v20.0/me/accounts", {
-      headers: {
-        Authorization: `Bearer ${longLived.data.access_token}`,
-      },
-    });
-    const pagesData = (await pagesResponse.json()) as {
-      data?: Array<{ id?: string; name?: string }>;
-      error?: unknown;
-    };
+    let safePages: Array<{ id: string; name: string }>;
 
-    if (!pagesResponse.ok) {
-      console.error("Facebook pages fetch failed", pagesData);
+    try {
+      const pages = await getFacebookAccountPages(longLived.data.access_token);
+      safePages = pages.map((page) => ({
+        id: page.id,
+        name: page.name,
+      }));
+    } catch (error) {
+      console.error("Facebook pages fetch failed", error);
       const response = NextResponse.redirect(
         new URL("/dashboard?error=pages_failed", req.url)
       );
       clearTransientCookies(response);
       return response;
     }
-
-    const safePages = Array.isArray(pagesData.data)
-      ? pagesData.data.map((page) => ({
-          id: page.id ?? "",
-          name: page.name ?? "",
-        }))
-      : [];
 
     const response = NextResponse.redirect(
       new URL("/dashboard?fb_connected=true", req.url)
