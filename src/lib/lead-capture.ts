@@ -180,13 +180,15 @@ export function extractFormattedLeadFromMessage(
   message: string,
   leadFields: string[] = DEFAULT_LEAD_FIELDS
 ): CapturedLead | null {
-  if (!/\binformation\b/i.test(message)) {
-    return null;
-  }
-
   const fields = Object.fromEntries(
     leadFields.map((field) => [field, extractFormattedField(message, field)])
   );
+  const hasFormattedField = Object.values(fields).some(Boolean);
+
+  if (!hasFormattedField) {
+    return null;
+  }
+
   const fullName = fields["Full Name"] || fields.Name || "";
   const phone = fields.Phone || fields["Phone Number"] || "";
 
