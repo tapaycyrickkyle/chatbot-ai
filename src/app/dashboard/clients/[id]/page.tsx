@@ -57,10 +57,22 @@ function appendLeadRow(sheet, fields) {
   }
 
   const row = COLUMNS.map(function(column) {
-    return fields[column] || "";
+    return formatSheetValue(column, fields[column] || "");
   });
 
   sheet.appendRow(row);
+}
+
+function formatSheetValue(column, value) {
+  if (!value) {
+    return "";
+  }
+
+  if (/phone|mobile|contact/i.test(column)) {
+    return "'" + String(value);
+  }
+
+  return value;
 }
 
 function jsonResponse(payload) {
