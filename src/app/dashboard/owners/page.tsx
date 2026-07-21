@@ -37,6 +37,7 @@ export default function OwnerAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingOwnerId, setDeletingOwnerId] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const loadOwners = useCallback(async () => {
     try {
@@ -90,6 +91,7 @@ export default function OwnerAccountsPage() {
       showToast({ tone: "success", message: "Owner account saved." });
       setEmail("");
       setPassword("");
+      setIsCreateModalOpen(false);
       await loadOwners();
     } catch (error) {
       console.error(error);
@@ -100,6 +102,14 @@ export default function OwnerAccountsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const closeCreateModal = () => {
+    if (saving) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
   };
 
   const deleteOwner = async (ownerId: string) => {
@@ -133,77 +143,134 @@ export default function OwnerAccountsPage() {
   return (
     <DashboardShell activeNav="Owner Accounts" searchPlaceholder="Search owners..." showTopBar={false}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <div>
-          <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
-            Owner Accounts
-          </p>
-          <h1 className="mt-2 text-[1.55rem] font-extrabold text-[var(--text-primary)] sm:text-[1.9rem]">
-            Business owner access
-          </h1>
-          <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--text-muted)]">
-            Create owner logins and assign each owner to one connected Facebook Page.
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
+              Owner Accounts
+            </p>
+            <h1 className="mt-2 text-[1.55rem] font-extrabold text-[var(--text-primary)] sm:text-[1.9rem]">
+              Business owner access
+            </h1>
+            <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--text-muted)]">
+              Create owner logins and assign each owner to one connected Facebook Page.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
+          >
+            Create Owner
+          </button>
         </div>
 
-        <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
-            <div>
-              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-email">
-                Owner Email
-              </label>
-              <input
-                id="owner-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="owner@example.com"
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-password">
-                Temporary Password
-              </label>
-              <input
-                id="owner-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 6 characters"
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-client">
-                Assigned Page
-              </label>
-              <select
-                id="owner-client"
-                value={clientId}
-                onChange={(event) => setClientId(event.target.value)}
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              >
-                {clients.length === 0 ? <option value="">No connected pages</option> : null}
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.client_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={() => void createOwner()}
-              disabled={saving || !email.trim() || !clientId}
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 lg:w-auto"
+        {isCreateModalOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center overflow-y-auto bg-black/70 px-4 py-4 backdrop-blur-sm sm:py-8"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeCreateModal();
+              }
+            }}
+          >
+            <div
+              aria-labelledby="create-owner-title"
+              aria-modal="true"
+              className="flex max-h-[calc(100vh-2rem)] w-full max-w-[560px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)] sm:max-h-[calc(100vh-4rem)]"
+              role="dialog"
             >
-              {saving ? "Saving..." : "Create Owner"}
-            </button>
+              <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
+                <div>
+                  <h2 id="create-owner-title" className="text-[16px] font-bold text-[var(--text-primary)]">
+                    Create Owner
+                  </h2>
+                  <p className="mt-1 text-[13px] leading-5 text-[var(--text-muted)]">
+                    Assign one owner login to a connected page.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close create owner modal"
+                  onClick={closeCreateModal}
+                  disabled={saving}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[18px] leading-none text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+                <div className="grid gap-4">
+                  <div>
+                    <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-email">
+                      Owner Email
+                    </label>
+                    <input
+                      id="owner-email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="owner@example.com"
+                      className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-password">
+                      Temporary Password
+                    </label>
+                    <input
+                      id="owner-password"
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="At least 6 characters"
+                      className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-client">
+                      Assigned Page
+                    </label>
+                    <select
+                      id="owner-client"
+                      value={clientId}
+                      onChange={(event) => setClientId(event.target.value)}
+                      className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                    >
+                      {clients.length === 0 ? <option value="">No connected pages</option> : null}
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="mt-3 text-[12px] leading-6 text-[var(--text-muted)]">
+                  If the Supabase Auth user already exists, leave password empty to only update the page assignment.
+                </p>
+              </div>
+              <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] px-4 py-4 sm:flex-row sm:justify-end sm:px-5">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-5 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createOwner()}
+                  disabled={saving || !email.trim() || !clientId}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {saving ? "Saving..." : "Create Owner"}
+                </button>
+              </div>
+            </div>
           </div>
-          <p className="mt-3 text-[12px] leading-6 text-[var(--text-muted)]">
-            If the Supabase Auth user already exists, leave password empty to only update the page assignment.
-          </p>
-        </div>
+        ) : null}
 
         <div className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-4 py-4 sm:px-5">
