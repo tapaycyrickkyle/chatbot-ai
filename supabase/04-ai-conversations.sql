@@ -16,6 +16,7 @@ create table if not exists public.ai_conversations (
   ai_paused boolean not null default false,
   paused_at timestamptz,
   paused_by text,
+  ai_pause_expires_at timestamptz,
   resumed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -57,6 +58,9 @@ alter table public.ai_conversations
 
 alter table public.ai_conversations
   add column if not exists paused_by text;
+
+alter table public.ai_conversations
+  add column if not exists ai_pause_expires_at timestamptz;
 
 alter table public.ai_conversations
   add column if not exists resumed_at timestamptz;

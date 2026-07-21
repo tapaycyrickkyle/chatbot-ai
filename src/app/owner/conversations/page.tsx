@@ -18,10 +18,20 @@ type Conversation = {
 type ConversationsResponse = {
   client?: {
     client_name: string;
+    manual_ai_pause_minutes?: number;
   };
   conversations?: Conversation[];
   error?: string;
 };
+
+const STOP_AI_DURATION_OPTIONS = [
+  { value: 5, label: "5 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 240, label: "4 hours" },
+  { value: 1440, label: "24 hours" },
+];
 
 function formatTimestamp(value: string) {
   if (!value) {
@@ -47,8 +57,10 @@ export default function OwnerConversationsPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(5);
   const [loading, setLoading] = useState(true);
   const [updatingRecipientId, setUpdatingRecipientId] = useState<string | null>(null);
+  const [savingPauseDuration, setSavingPauseDuration] = useState(false);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -62,6 +74,7 @@ export default function OwnerConversationsPage() {
       }
 
       setClientName(data.client?.client_name || "");
+      setManualAiPauseMinutes(data.client?.manual_ai_pause_minutes || 5);
       setConversations(Array.isArray(data.conversations) ? data.conversations : []);
     } catch (error) {
       console.error(error);
@@ -122,11 +135,76 @@ export default function OwnerConversationsPage() {
     }
   };
 
+  const updateManualAiPauseMinutes = async (minutes: number) => {
+    const previousMinutes = manualAiPauseMinutes;
+
+    setManualAiPauseMinutes(minutes);
+    setSavingPauseDuration(true);
+
+    try {
+      const response = await fetch("/api/owner/conversations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_pause_duration",
+          manualAiPauseMinutes: minutes,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; manualAiPauseMinutes?: number }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save stop AI duration");
+      }
+
+      setManualAiPauseMinutes(data?.manualAiPauseMinutes || minutes);
+      showToast({
+        tone: "success",
+        message: "Stop AI duration saved.",
+      });
+    } catch (error) {
+      console.error(error);
+      setManualAiPauseMinutes(previousMinutes);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to save stop AI duration.",
+      });
+    } finally {
+      setSavingPauseDuration(false);
+    }
+  };
+
   return (
     <OwnerShell
       title="Conversations"
       description={clientName ? `${clientName} customer handoff controls.` : "Customer handoff controls."}
     >
+      <section className="mb-4 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Stop AI
+            </p>
+            <p className="mt-2 text-[14px] leading-6 text-[var(--text-primary)]">
+              When you manually reply in Messenger, AI will stop for this long.
+            </p>
+          </div>
+          <select
+            value={manualAiPauseMinutes}
+            onChange={(event) => void updateManualAiPauseMinutes(Number(event.target.value))}
+            disabled={savingPauseDuration}
+            className="w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-70 sm:w-44"
+          >
+            {STOP_AI_DURATION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
         {loading ? (
           <div className="px-5 py-5 text-[14px] text-[var(--text-muted)]">
@@ -198,7 +276,10 @@ export default function OwnerConversationsPage() {
           </div>
         )}
       </section>
-      <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
+      <LoadingModal
+        isOpen={Boolean(updatingRecipientId) || savingPauseDuration}
+        message={savingPauseDuration ? "Saving stop AI duration..." : "Updating AI status..."}
+      />
     </OwnerShell>
   );
 }

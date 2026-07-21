@@ -20,6 +20,7 @@ type ClientRow = {
   welcome_message?: string | null;
   welcome_link_url?: string | null;
   welcome_image_urls?: string | null;
+  manual_ai_pause_minutes?: number | null;
 };
 
 type AiConversationRow = {
@@ -37,6 +38,7 @@ type AiConversationRow = {
   ai_paused: boolean | null;
   paused_at: string | null;
   paused_by: string | null;
+  ai_pause_expires_at?: string | null;
   resumed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -69,11 +71,11 @@ type OrderRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls, manual_ai_pause_minutes";
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
 const AI_CONVERSATION_COLUMNS =
-  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, welcome_sequence_sent, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
+  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, welcome_sequence_sent, last_message_at, ai_paused, paused_at, paused_by, ai_pause_expires_at, resumed_at, created_at, updated_at";
 const LEGACY_AI_CONVERSATION_COLUMNS =
   "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 
@@ -123,6 +125,20 @@ function isMissingWelcomeSequenceError(error: { message?: string } | null) {
   );
 }
 
+function isMissingManualAiPauseMinutesError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("manual_ai_pause_minutes") &&
+      error.message.includes("does not exist")
+  );
+}
+
+function isMissingAiPauseExpiresAtError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("ai_pause_expires_at") &&
+      error.message.includes("does not exist")
+  );
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -142,6 +158,7 @@ function normalizeClient(row: ClientRow) {
     welcome_message: row.welcome_message ?? "",
     welcome_link_url: row.welcome_link_url ?? "",
     welcome_image_urls: row.welcome_image_urls ?? "",
+    manual_ai_pause_minutes: row.manual_ai_pause_minutes ?? 5,
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -173,6 +190,7 @@ function normalizeAiConversation(row: AiConversationRow) {
     ai_paused: Boolean(row.ai_paused),
     paused_at: row.paused_at ?? "",
     paused_by: row.paused_by ?? "",
+    ai_pause_expires_at: row.ai_pause_expires_at ?? "",
     resumed_at: row.resumed_at ?? "",
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -222,7 +240,8 @@ export async function getClients() {
   const { data, error } =
     isMissingGoogleSheetsTabNameError(response.error) ||
     isMissingNewClientAiFieldsError(response.error) ||
-    isMissingWelcomeSequenceError(response.error)
+    isMissingWelcomeSequenceError(response.error) ||
+    isMissingManualAiPauseMinutesError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -283,7 +302,8 @@ export async function getClientById(clientId: string) {
   const { data, error } =
     isMissingGoogleSheetsTabNameError(response.error) ||
     isMissingNewClientAiFieldsError(response.error) ||
-    isMissingWelcomeSequenceError(response.error)
+    isMissingWelcomeSequenceError(response.error) ||
+    isMissingManualAiPauseMinutesError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -317,6 +337,7 @@ export async function updateClientSettings(
     welcome_message: string;
     welcome_link_url: string;
     welcome_image_urls: string;
+    manual_ai_pause_minutes: number;
   }>
 ) {
   const supabase = getDb();
@@ -337,7 +358,8 @@ export async function getAiConversationsForClient(clientId: string) {
   const { data, error } =
     isMissingLastAiReplyError(response.error) ||
     isMissingConversationMemoryError(response.error) ||
-    isMissingWelcomeSequenceError(response.error)
+    isMissingWelcomeSequenceError(response.error) ||
+    isMissingAiPauseExpiresAtError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -363,7 +385,8 @@ export async function getAiConversation(clientId: string, recipientId: string) {
   const { data, error } =
     isMissingLastAiReplyError(response.error) ||
     isMissingConversationMemoryError(response.error) ||
-    isMissingWelcomeSequenceError(response.error)
+    isMissingWelcomeSequenceError(response.error) ||
+    isMissingAiPauseExpiresAtError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -509,21 +532,38 @@ export async function pauseAiConversation(input: {
   pageId: string;
   recipientId: string;
   pausedBy: "owner" | "admin";
+  pauseExpiresAt?: string | null;
 }) {
   const now = new Date().toISOString();
   const supabase = getDb();
-  const { error } = await supabase.from("ai_conversations").upsert(
-    {
-      client_id: input.clientId,
-      page_id: input.pageId,
-      recipient_id: input.recipientId,
-      ai_paused: true,
-      paused_at: now,
-      paused_by: input.pausedBy,
-      updated_at: now,
-    },
+  const updates = {
+    client_id: input.clientId,
+    page_id: input.pageId,
+    recipient_id: input.recipientId,
+    ai_paused: true,
+    paused_at: now,
+    paused_by: input.pausedBy,
+    ai_pause_expires_at: input.pauseExpiresAt ?? null,
+    updated_at: now,
+  };
+  const response = await supabase.from("ai_conversations").upsert(
+    updates,
     { onConflict: "client_id,recipient_id" }
   );
+  const { error } = isMissingAiPauseExpiresAtError(response.error)
+    ? await supabase.from("ai_conversations").upsert(
+        {
+          client_id: input.clientId,
+          page_id: input.pageId,
+          recipient_id: input.recipientId,
+          ai_paused: true,
+          paused_at: now,
+          paused_by: input.pausedBy,
+          updated_at: now,
+        },
+        { onConflict: "client_id,recipient_id" }
+      )
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to pause AI conversation");
@@ -533,16 +573,29 @@ export async function pauseAiConversation(input: {
 export async function resumeAiConversation(clientId: string, recipientId: string) {
   const now = new Date().toISOString();
   const supabase = getDb();
-  const { error } = await supabase
+  const response = await supabase
     .from("ai_conversations")
     .update({
       ai_paused: false,
       paused_by: null,
+      ai_pause_expires_at: null,
       resumed_at: now,
       updated_at: now,
     })
     .eq("client_id", clientId)
     .eq("recipient_id", recipientId);
+  const { error } = isMissingAiPauseExpiresAtError(response.error)
+    ? await supabase
+        .from("ai_conversations")
+        .update({
+          ai_paused: false,
+          paused_by: null,
+          resumed_at: now,
+          updated_at: now,
+        })
+        .eq("client_id", clientId)
+        .eq("recipient_id", recipientId)
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to resume AI conversation");

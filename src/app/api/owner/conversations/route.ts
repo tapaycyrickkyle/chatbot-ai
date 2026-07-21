@@ -8,7 +8,25 @@ import {
   getAiConversationsForClient,
   pauseAiConversation,
   resumeAiConversation,
+  updateClientSettings,
 } from "@/lib/database";
+
+const MIN_MANUAL_AI_PAUSE_MINUTES = 1;
+const MAX_MANUAL_AI_PAUSE_MINUTES = 1440;
+
+function parseManualAiPauseMinutes(value: unknown) {
+  const minutes = typeof value === "number" ? value : Number(value);
+
+  if (
+    !Number.isInteger(minutes) ||
+    minutes < MIN_MANUAL_AI_PAUSE_MINUTES ||
+    minutes > MAX_MANUAL_AI_PAUSE_MINUTES
+  ) {
+    throw new Error("Invalid stop AI duration");
+  }
+
+  return minutes;
+}
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,6 +49,7 @@ export async function GET(req: NextRequest) {
         id: owner.clientId,
         client_name: owner.clientName,
         page_id: owner.pageId,
+        manual_ai_pause_minutes: owner.manualAiPauseMinutes,
       },
       conversations,
     });
@@ -59,13 +78,23 @@ export async function PATCH(req: NextRequest) {
     assertSameOrigin(req);
 
     const body = (await req.json().catch(() => null)) as
-      | { recipientId?: unknown; action?: unknown }
+      | { recipientId?: unknown; action?: unknown; manualAiPauseMinutes?: unknown }
       | null;
     const recipientId =
       typeof body?.recipientId === "string"
         ? sanitizeIdentifier(body.recipientId, "recipient ID")
         : "";
     const action = typeof body?.action === "string" ? body.action : "";
+
+    if (action === "set_pause_duration") {
+      const manualAiPauseMinutes = parseManualAiPauseMinutes(body?.manualAiPauseMinutes);
+
+      await updateClientSettings(owner.clientId, {
+        manual_ai_pause_minutes: manualAiPauseMinutes,
+      });
+
+      return NextResponse.json({ success: true, manualAiPauseMinutes });
+    }
 
     if (!recipientId) {
       return NextResponse.json({ error: "Missing recipient ID" }, { status: 400 });

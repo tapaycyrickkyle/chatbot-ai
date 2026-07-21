@@ -7,6 +7,7 @@ import {
   recordAiConversationReply,
   recordCustomerConversationMessage,
   recordWelcomeSequenceSent,
+  resumeAiConversation,
 } from "@/lib/database";
 import { askAi, classifyLeadCaptureIntent, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
@@ -39,6 +40,7 @@ const HIGH_USAGE_THRESHOLD = 80;
 const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
+const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
 
 type WebhookBody = {
   object?: string;
@@ -138,17 +140,45 @@ async function safelyPauseAiForOwnerReply(input: {
   clientId: string;
   pageId: string;
   recipientId: string;
+  pauseMinutes: number;
 }) {
   try {
+    const pauseExpiresAt = new Date(
+      Date.now() + input.pauseMinutes * 60 * 1000
+    ).toISOString();
+
     await pauseAiConversation({
       clientId: input.clientId,
       pageId: input.pageId,
       recipientId: input.recipientId,
       pausedBy: "owner",
+      pauseExpiresAt,
     });
   } catch (error) {
     console.warn("Failed to pause AI after owner reply", error);
   }
+}
+
+async function safelyResumeExpiredPause(clientId: string, recipientId: string) {
+  try {
+    await resumeAiConversation(clientId, recipientId);
+  } catch (error) {
+    console.warn("Failed to resume expired AI pause", error);
+  }
+}
+
+function isPauseStillActive(conversation: Awaited<ReturnType<typeof getAiConversation>>) {
+  if (!conversation?.ai_paused) {
+    return false;
+  }
+
+  if (!conversation.ai_pause_expires_at) {
+    return true;
+  }
+
+  const expiresAt = new Date(conversation.ai_pause_expires_at).getTime();
+
+  return Number.isNaN(expiresAt) || expiresAt > Date.now();
 }
 
 async function safelyRecordCustomerMessage(input: {
@@ -592,6 +622,7 @@ export default async function handler(
               clientId: client.id,
               pageId,
               recipientId: userId,
+              pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
             });
             continue;
           }
@@ -691,13 +722,17 @@ export default async function handler(
             continue;
           }
 
-          if (existingConversation?.ai_paused) {
+          if (isPauseStillActive(existingConversation)) {
             console.info("AI webhook skipped paused conversation", {
               clientId: client.id,
               pageId,
               userId,
             });
             continue;
+          }
+
+          if (existingConversation?.ai_paused) {
+            await safelyResumeExpiredPause(client.id, userId);
           }
 
           if (

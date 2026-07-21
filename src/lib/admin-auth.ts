@@ -97,6 +97,7 @@ export async function verifyBusinessOwnerAccessToken(accessToken: string | undef
     clientId: businessUser.client_id,
     clientName: client.client_name,
     pageId: client.page_id,
+    manualAiPauseMinutes: client.manual_ai_pause_minutes,
   };
 }
 
