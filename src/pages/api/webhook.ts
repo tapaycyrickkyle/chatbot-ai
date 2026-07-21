@@ -125,22 +125,12 @@ function isOwnerMessageEcho(
   }
 
   const appId = event.message.app_id ? String(event.message.app_id) : "";
-  const facebookAppId = process.env.FACEBOOK_APP_ID?.trim() || "";
 
   if (!appId) {
     return true;
   }
 
-  if (!facebookAppId) {
-    console.warn("Unable to classify Page message echo because FACEBOOK_APP_ID is missing", {
-      pageId,
-      recipientId: event.recipient.id,
-      appId,
-    });
-    return false;
-  }
-
-  return appId !== facebookAppId;
+  return false;
 }
 
 async function safelyPauseAiForOwnerReply(input: {
