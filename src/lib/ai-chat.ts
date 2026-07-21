@@ -226,13 +226,11 @@ ${userMessage}`;
 export async function askAi(
   userMessage: string,
   businessContext: string,
-  leadFields: string[] = ["Full Name", "Phone"],
+  _leadFields: string[] = ["Full Name", "Phone"],
   conversationContext: ConversationContext = {}
 ) {
+  void _leadFields;
   const detectedLanguage = detectReplyLanguage(userMessage);
-  const leadInformationFormat = leadFields
-    .map((field) => `${field}:`)
-    .join("\n");
   const memorySummary = conversationContext.conversationSummary?.trim().slice(0, MAX_MEMORY_CHARS);
   const customerState = conversationContext.customerState ?? {};
   const customerStateText =
@@ -248,14 +246,12 @@ Core rules:
 - If the answer is missing, reply exactly: "Great question! Let me connect you with our specialist - one moment please."
 - Be helpful first, then gently guide the customer to the next step.
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
-- Ask only one question unless requesting lead details.
+- Ask only one question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
 - Match the latest customer language: English for English; English-heavy Taglish for Tagalog/Taglish. Never reply in full Tagalog.
 - For English-heavy Taglish, use mostly English with natural words like po, opo, sige, and salamat.
-  - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
-  - Only ask for the complete details when the customer clearly wants to proceed, reserve, book, schedule, place an order now, request a human callback/contact, or asks the team to process a quote:
-${leadInformationFormat}
-- Copy the format above exactly on separate lines. Never write the required fields inline in a sentence.
+- Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
+- Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
 - If complete lead details are already provided, say: "Thank you, I got your details. Our team will follow up shortly."
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 
