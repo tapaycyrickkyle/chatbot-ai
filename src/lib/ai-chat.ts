@@ -109,6 +109,31 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
   }
 }
 
+function normalizeForFactCheck(value = "") {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function mentionsUnsupportedContactChannel(reply: string, businessContext: string) {
+  const normalizedReply = normalizeForFactCheck(reply);
+  const normalizedBusinessContext = normalizeForFactCheck(businessContext);
+  const channels = [
+    "viber",
+    "whatsapp",
+    "telegram",
+    "email",
+    "gmail",
+    "phone",
+    "call",
+    "sms",
+    "text",
+  ];
+
+  return channels.some(
+    (channel) =>
+      normalizedReply.includes(channel) && !normalizedBusinessContext.includes(channel)
+  );
+}
+
 function getErrorSummary(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -283,7 +308,9 @@ export async function askAi(
   const systemPrompt = `You are a human-like sales and customer support assistant.
 
 Core rules:
-- Use only the business facts below. Never invent prices, products, availability, promos, or policies.
+- Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
+- Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
+- If a detail is not in the business facts, use the missing-info reply. Do not guess and do not create an alternative process.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
 - Detected latest customer language/style: ${latestLanguageStyle}. Use this latest detected language/style for this reply only.
 - Do not keep using a previous customer's language if the latest message switches languages.
@@ -386,6 +413,13 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
 
     const data = (await response.json()) as ChatCompletionResponse;
     const reply = data.choices?.[0]?.message?.content?.trim();
+
+    if (reply && mentionsUnsupportedContactChannel(reply, businessContext)) {
+      console.warn("AI reply blocked because it mentioned an unsupported contact channel", {
+        preview: reply.slice(0, 160),
+      });
+      return missingInfoReply;
+    }
 
     return reply || missingInfoReply;
   } catch (error) {
