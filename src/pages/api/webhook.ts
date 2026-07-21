@@ -248,10 +248,43 @@ async function safelyCaptureLead(input: {
   return false;
 }
 
-function shouldStartLeadFlow(message: string) {
-  return /\b(order|buy|book|booking|schedule|sched|appointment|meeting|meet|viewing|quote|estimate|reserve|contact|call|talk to|agent|specialist)\b/i.test(
-    message
-  );
+function shouldAskForLeadFormat(
+  message: string,
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+) {
+  const hasDirectLeadIntent =
+    /\b(order|buy|book|booking|schedule|sched|appointment|meeting|meet|viewing|quote|estimate|compute|computation|monthly|amort|amortization|reserve|contact|call|talk to|agent|specialist)\b/i.test(
+      message
+    );
+
+  if (hasDirectLeadIntent) {
+    return true;
+  }
+
+  const isAskingForFormat =
+    /\b(format|info|information|details|what.*need|what.*send|how.*send)\b/i.test(message);
+
+  if (isAskingForFormat) {
+    return true;
+  }
+
+  const isShortFinancingAnswer =
+    /\b(bank|in-house|inhouse|pag-ibig|pagibig|spot cash|cash)\b/i.test(message) ||
+    /\b\d+\s*(?:mo|mos|month|months|yr|yrs|year|years)\b/i.test(message) ||
+    /\b(?:dp|down payment|loan term|financing)\b/i.test(message);
+  const previousAiReply = conversation?.last_ai_reply?.toLowerCase() ?? "";
+  const conversationSummary = conversation?.conversation_summary?.toLowerCase() ?? "";
+  const previousContext = `${previousAiReply} ${conversationSummary}`;
+  const wasDiscussingComputation =
+    /\b(compute|computation|estimate|monthly|amort|amortization|dp|loan|financing|bank|in-house|pag-ibig|spot cash)\b/i.test(
+      previousContext
+    );
+
+  return isShortFinancingAnswer && wasDiscussingComputation;
+}
+
+function createLeadFormatReply(leadFields: string[]) {
+  return createLeadInformationPrompt(leadFields);
 }
 
 export default async function handler(
@@ -409,8 +442,8 @@ export default async function handler(
               continue;
             }
 
-            if (shouldStartLeadFlow(rawText)) {
-              const reply = createLeadInformationPrompt(leadFields);
+            if (shouldAskForLeadFormat(rawText, existingConversation)) {
+              const reply = createLeadFormatReply(leadFields);
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,

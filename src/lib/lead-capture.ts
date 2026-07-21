@@ -173,7 +173,7 @@ function extractFormattedField(message: string, field: string) {
 export function createLeadInformationPrompt(leadFields: string[]) {
   const lines = leadFields.map((field) => `${field}:`).join("\n");
 
-  return `Please send your information in this format:\n\n${lines}`;
+  return `Please send your details in this format:\n\n${lines}`;
 }
 
 export function extractFormattedLeadFromMessage(
