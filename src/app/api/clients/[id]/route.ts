@@ -16,9 +16,34 @@ const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
 const MAX_WELCOME_ATTACHMENTS = 11;
 const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MESSENGER_WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes"];
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+async function subscribePageToMessengerWebhook(pageId: string, pageAccessToken: string) {
+  const response = await fetch(
+    `https://graph.facebook.com/v20.0/${encodeURIComponent(pageId)}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        access_token: pageAccessToken,
+        subscribed_fields: MESSENGER_WEBHOOK_FIELDS,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+
+    throw new Error(data?.error?.message || "Failed to repair Messenger webhook subscription");
+  }
 }
 
 function validateClientSettingsPayload(payload: unknown) {
@@ -320,6 +345,60 @@ export async function PUT(
 
     await updateClientSettings(clientId, updates);
     return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    const message = error instanceof Error ? error.message : "Internal server error";
+    const status =
+      message === "Cross-origin request blocked" ||
+      message === "Missing host header"
+        ? 403
+        : message === "Internal server error"
+          ? 500
+          : 400;
+
+    return NextResponse.json(
+      { error: status === 500 ? "Internal server error" : message },
+      { status }
+    );
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const session = await verifyAdminAccessToken(
+    req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value
+  );
+
+  if (!session) {
+    return unauthorizedResponse();
+  }
+
+  try {
+    assertSameOrigin(req);
+
+    const { id } = await context.params;
+    const clientId = sanitizeIdentifier(id, "client ID");
+    const client = await getClientById(clientId);
+
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    const body = (await req.json().catch(() => null)) as { action?: unknown } | null;
+    const action = typeof body?.action === "string" ? body.action : "";
+
+    if (action !== "repair_messenger_webhook") {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    await subscribePageToMessengerWebhook(client.page_id, client.page_access_token);
+
+    return NextResponse.json({
+      success: true,
+      subscribed_fields: MESSENGER_WEBHOOK_FIELDS,
+    });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Internal server error";

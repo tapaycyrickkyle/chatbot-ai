@@ -101,6 +101,7 @@ export default function ClientSettingsPage() {
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
+  const [repairingMessengerWebhook, setRepairingMessengerWebhook] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
   const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
   const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
@@ -266,6 +267,39 @@ export default function ClientSettingsPage() {
       });
     } finally {
       setSavingWelcomeSequence(false);
+    }
+  };
+
+  const repairMessengerWebhook = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    setRepairingMessengerWebhook(true);
+
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "repair_messenger_webhook" }),
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to repair Messenger webhook");
+      }
+
+      showToast({ tone: "success", message: "Messenger webhook subscription repaired." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to repair Messenger webhook.",
+      });
+    } finally {
+      setRepairingMessengerWebhook(false);
     }
   };
 
@@ -673,14 +707,25 @@ export default function ClientSettingsPage() {
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
                 Pause or resume AI replies when a human owner takes over a conversation.
               </p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
                   className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] sm:w-auto"
                 >
                   Open Conversations
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => void repairMessengerWebhook()}
+                  disabled={repairingMessengerWebhook || loading}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {repairingMessengerWebhook ? "Repairing..." : "Repair Messenger Webhook"}
+                </button>
               </div>
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Use this if manual owner replies are not appearing in Vercel logs. It re-subscribes this Page to messages, postbacks, and message echoes.
+              </p>
             </div>
 
             <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
@@ -708,9 +753,11 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || savingSheetsUrl || savingWelcomeSequence || uploadingWelcomeImage}
+        isOpen={cleaningStorage || repairingMessengerWebhook || savingSheetsUrl || savingWelcomeSequence || uploadingWelcomeImage}
         message={
-          uploadingWelcomeImage
+          repairingMessengerWebhook
+            ? "Repairing Messenger webhook..."
+            : uploadingWelcomeImage
             ? "Uploading image to Messenger..."
             : savingWelcomeSequence
             ? "Saving first reply sequence..."
