@@ -41,7 +41,6 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
-const DEFAULT_IGNORED_PAGE_ECHO_APP_IDS = ["1567190244970637"];
 const OWNER_TAKEOVER_TRIGGER = "/ ";
 const HUMAN_REPLY_MIN_DELAY_MS = 4500;
 const HUMAN_REPLY_MAX_DELAY_MS = 12000;
@@ -129,29 +128,6 @@ function getConversationRecipientId(
   return event.sender.id;
 }
 
-function isOwnerMessageEcho(
-  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
-  pageId: string
-) {
-  if (!event.message?.is_echo || event.sender.id !== pageId || !event.recipient?.id) {
-    return false;
-  }
-
-  const appId = event.message.app_id ? String(event.message.app_id) : "";
-  const ignoredAppIds = getIgnoredPageEchoAppIds();
-  const humanAppIds = getHumanPageEchoAppIds();
-
-  if (appId && ignoredAppIds.has(appId)) {
-    return false;
-  }
-
-  if (appId) {
-    return humanAppIds.has(appId);
-  }
-
-  return true;
-}
-
 function isOwnerTakeoverTriggerEcho(
   event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
   pageId: string
@@ -162,36 +138,6 @@ function isOwnerTakeoverTriggerEcho(
       event.recipient?.id &&
       event.message.text?.startsWith(OWNER_TAKEOVER_TRIGGER)
   );
-}
-
-function getIgnoredPageEchoAppIds() {
-  const configuredIds = [
-    process.env.FACEBOOK_APP_ID,
-    process.env.BOTCAKE_APP_ID,
-    process.env.BOTCAKE_APP_IDS,
-    process.env.IGNORED_PAGE_ECHO_APP_IDS,
-  ]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return new Set([...DEFAULT_IGNORED_PAGE_ECHO_APP_IDS, ...configuredIds]);
-}
-
-function getHumanPageEchoAppIds() {
-  const configuredIds = [
-    process.env.HUMAN_REPLY_APP_ID,
-    process.env.HUMAN_REPLY_APP_IDS,
-  ]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return new Set(configuredIds);
 }
 
 function summarizePageEcho(
@@ -695,7 +641,7 @@ export default async function handler(
             });
           }
 
-          if (isOwnerTakeoverTriggerEcho(event, pageId) || isOwnerMessageEcho(event, pageId)) {
+          if (isOwnerTakeoverTriggerEcho(event, pageId)) {
             await safelyPauseAiForOwnerReply({
               clientId: client.id,
               pageId,
@@ -707,14 +653,14 @@ export default async function handler(
               pageId,
               userId,
               appId: event.message?.app_id ? String(event.message.app_id) : "",
-              triggeredByPrefix: isOwnerTakeoverTriggerEcho(event, pageId),
+              trigger: OWNER_TAKEOVER_TRIGGER.trim(),
               pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
             });
             continue;
           }
 
           if (event.message?.is_echo) {
-            console.info("AI webhook ignored Page message echo automation or unknown app", {
+            console.info("AI webhook ignored Page message echo without takeover trigger", {
               clientId: client.id,
               pageId,
               userId,
