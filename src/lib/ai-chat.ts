@@ -1,6 +1,10 @@
 import "server-only";
 
-import { detectCustomerLanguageStyle, getMissingInfoReply } from "@/lib/language-style";
+import {
+  detectCustomerLanguageStyle,
+  getMissingInfoReply,
+  type CustomerLanguageStyle,
+} from "@/lib/language-style";
 
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
   "Our AI assistant is temporarily unavailable. Please try again later.";
@@ -12,6 +16,8 @@ type ChatCompletionResponse = {
     };
   }>;
 };
+
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
 export type LeadCaptureIntent =
   | "INFO_ONLY"
@@ -47,6 +53,14 @@ const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "PROVIDED_LEAD_DETAILS",
   "UNCLEAR",
 ]);
+const ARGUMENTATIVE_TONE_PATTERN =
+  /\b(?:talagang gusto mo|obviously|clearly you|you keep asking|paulit-ulit|pinipilit)\b/i;
+const ENGLISH_REPLY_NON_ENGLISH_PATTERN =
+  /\b(?:po|opo|natin|namin|kami|kayo|ikaw|ako|mo|talaga|talagang|gusto|nasa|mayroon|meron|wala|lokasyon|unsa|pila|naa|ug|diri|imong|imoha|among)\b/i;
+const CEBUANO_REPLY_TAGALOG_PATTERN =
+  /\b(?:talagang|mayroon|meron|nakatayo|kami|natin|iyong|lokasyon|mas maraming|sa loob mismo|tungkol diyan)\b/i;
+const TAGALOG_REPLY_CEBUANO_PATTERN =
+  /\b(?:unsa|pila|naa|ug|diri|adto|ari|palihug|imong|imoha|among|koy|tabangan)\b/i;
 
 function isLeadCollectionText(value = "") {
   const normalizedValue = value.toLowerCase();
@@ -107,6 +121,40 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
     default:
       return "Write the next assistant reply in the same language or language mix as the latest customer message.";
   }
+}
+
+function getStrictLanguageInstruction(languageStyle: CustomerLanguageStyle) {
+  switch (languageStyle) {
+    case "english":
+      return "The customer's latest message is English. Reply in English only. Remove all Tagalog, Taglish, Bisaya/Cebuano, and words like po/opo.";
+    case "cebuano":
+      return "The customer's latest message is Bisaya/Cebuano. Reply in natural Bisaya/Cebuano only. Do not use Tagalog phrases.";
+    case "tagalog":
+      return "The customer's latest message is Tagalog. Reply in natural Tagalog only. Do not use Bisaya/Cebuano phrases.";
+    case "taglish":
+      return "The customer's latest message is Taglish. Reply in natural Taglish only. Do not switch to full Bisaya/Cebuano.";
+    default:
+      return "Reply using only the language or language mix of the customer's latest message.";
+  }
+}
+
+function hasWrongReplyLanguage(reply: string, languageStyle: CustomerLanguageStyle) {
+  switch (languageStyle) {
+    case "english":
+      return ENGLISH_REPLY_NON_ENGLISH_PATTERN.test(reply);
+    case "cebuano":
+      return CEBUANO_REPLY_TAGALOG_PATTERN.test(reply);
+    case "tagalog":
+      return TAGALOG_REPLY_CEBUANO_PATTERN.test(reply);
+    case "taglish":
+      return TAGALOG_REPLY_CEBUANO_PATTERN.test(reply);
+    default:
+      return false;
+  }
+}
+
+function needsReplyRewrite(reply: string, languageStyle: CustomerLanguageStyle) {
+  return ARGUMENTATIVE_TONE_PATTERN.test(reply) || hasWrongReplyLanguage(reply, languageStyle);
 }
 
 function normalizeForFactCheck(value = "") {
@@ -182,6 +230,44 @@ function createAiHeaders(apiKey: string, apiUrl: string) {
   }
 
   return headers;
+}
+
+async function requestChatCompletion(input: {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  messages: ChatMessage[];
+  temperature: number;
+  maxTokens: number;
+}) {
+  const response = await fetch(input.apiUrl, {
+    method: "POST",
+    headers: createAiHeaders(input.apiKey, input.apiUrl),
+    body: JSON.stringify({
+      model: input.model,
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages: input.messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+
+    console.error("AI request failed", {
+      providerUrl: input.apiUrl,
+      model: input.model,
+      status: response.status,
+      statusText: response.statusText,
+      body: errorText,
+    });
+
+    return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
+  }
+
+  const data = (await response.json()) as ChatCompletionResponse;
+
+  return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
 function parseLeadIntent(value: string): LeadCaptureIntent {
@@ -321,6 +407,7 @@ Core rules:
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
 - Ask only one question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
+- Never sound annoyed, confrontational, sarcastic, or like the customer is looking for a fight. Do not say phrases like "talagang gusto mo", "you keep asking", "obviously", or similar.
 - If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
 - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
 - Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
@@ -344,7 +431,7 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
       return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
     }
 
-    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    const messages: ChatMessage[] = [
       {
         role: "system",
         content: systemPrompt,
@@ -388,31 +475,48 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
     });
     messages.push({ role: "user", content: userMessage });
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: createAiHeaders(apiKey, apiUrl),
-      body: JSON.stringify({
-        model,
-        temperature: 0.55,
-        max_tokens: getMaxOutputTokens(),
-        messages,
-      }),
+    let reply = await requestChatCompletion({
+      apiKey,
+      apiUrl,
+      model,
+      messages,
+      temperature: 0.35,
+      maxTokens: getMaxOutputTokens(),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      console.error("AI request failed", {
-        providerUrl: apiUrl,
-        model,
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
+    if (
+      reply &&
+      reply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE &&
+      needsReplyRewrite(reply, latestLanguageStyle)
+    ) {
+      console.warn("AI reply rewritten for language/tone mismatch", {
+        latestLanguageStyle,
+        preview: reply.slice(0, 160),
       });
-      return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
-    }
 
-    const data = (await response.json()) as ChatCompletionResponse;
-    const reply = data.choices?.[0]?.message?.content?.trim();
+      reply = await requestChatCompletion({
+        apiKey,
+        apiUrl,
+        model,
+        messages: [
+          ...messages,
+          {
+            role: "assistant",
+            content: reply,
+          },
+          {
+            role: "system",
+            content: `${getStrictLanguageInstruction(latestLanguageStyle)} Also sound friendly and direct. Do not say "talagang gusto mo" or imply the customer is arguing, repeating themselves, or being difficult.`,
+          },
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+        temperature: 0.2,
+        maxTokens: getMaxOutputTokens(),
+      });
+    }
 
     if (reply && mentionsUnsupportedContactChannel(reply, businessContext)) {
       console.warn("AI reply blocked because it mentioned an unsupported contact channel", {
