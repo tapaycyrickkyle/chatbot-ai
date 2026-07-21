@@ -456,26 +456,6 @@ async function sendWelcomeSequence(input: {
   const linkUrl = input.client.welcome_link_url.trim();
   const imageAttachmentIds = getWelcomeImageAttachmentIds(input.client.welcome_image_urls);
 
-  if (message) {
-    await safelyHandleFlowSend(
-      () =>
-        safeSendMessage(
-          input.recipientId,
-          message,
-          input.pageAccessToken,
-          0,
-          input.pageId,
-          input.client.id
-        ).then(() => undefined),
-      {
-        clientId: input.client.id,
-        pageId: input.pageId,
-        recipientId: input.recipientId,
-        messageType: "text",
-      }
-    );
-  }
-
   if (linkUrl) {
     await safelyHandleFlowSend(
       () =>
@@ -512,6 +492,26 @@ async function sendWelcomeSequence(input: {
         pageId: input.pageId,
         recipientId: input.recipientId,
         messageType: "image",
+      }
+    );
+  }
+
+  if (message) {
+    await safelyHandleFlowSend(
+      () =>
+        safeSendMessage(
+          input.recipientId,
+          message,
+          input.pageAccessToken,
+          0,
+          input.pageId,
+          input.client.id
+        ).then(() => undefined),
+      {
+        clientId: input.client.id,
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        messageType: "text",
       }
     );
   }
