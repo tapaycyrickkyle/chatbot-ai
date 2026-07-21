@@ -119,7 +119,7 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
     case "taglish":
       return "Write the next assistant reply in natural Taglish, matching the latest customer message. Do not use Bisaya/Cebuano.";
     default:
-      return "Write the next assistant reply in the same language or language mix as the latest customer message.";
+      return "If the latest customer message is short, ambiguous, or mostly English/Latin text, write the next assistant reply in English only unless the message contains clear Tagalog or Bisaya/Cebuano words.";
   }
 }
 
@@ -134,7 +134,7 @@ function getStrictLanguageInstruction(languageStyle: CustomerLanguageStyle) {
     case "taglish":
       return "The customer's latest message is Taglish. Reply in natural Taglish only. Do not switch to full Bisaya/Cebuano.";
     default:
-      return "Reply using only the language or language mix of the customer's latest message.";
+      return "Reply in English only unless the latest customer message contains clear Tagalog or Bisaya/Cebuano words.";
   }
 }
 
@@ -149,7 +149,7 @@ function hasWrongReplyLanguage(reply: string, languageStyle: CustomerLanguageSty
     case "taglish":
       return TAGALOG_REPLY_CEBUANO_PATTERN.test(reply);
     default:
-      return false;
+      return ENGLISH_REPLY_NON_ENGLISH_PATTERN.test(reply);
   }
 }
 

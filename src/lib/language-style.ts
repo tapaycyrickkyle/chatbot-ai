@@ -14,14 +14,20 @@ const WEAK_CEBUANO_PATTERN =
 const TAGALOG_PATTERN =
   /\b(?:magkano|ano|saan|meron|mayroon|wala|ito|iyan|yun|ako|ikaw|kami|tayo|nila|pwede|pede|paki|salamat|gusto|bumili|kuha|bayad|po|opo|ba|naman|lang|talaga)\b/i;
 const ENGLISH_PATTERN =
-  /\b(?:the|and|is|are|can|do|does|how|what|when|where|price|available|order|buy|shipping|delivery|details|info|please|thanks)\b/i;
+  /\b(?:the|and|is|are|am|i|me|my|you|your|we|us|can|do|does|did|how|what|when|where|why|now|understand|got|okay|ok|yes|no|sure|really|price|available|order|buy|shipping|delivery|details|info|please|thanks|thank|hello|hi)\b/i;
+const ENGLISH_CONFIRMATION_PATTERN =
+  /^(?:yes|no|ok|okay|sure|now i understand|i understand|understood|got it|i get it|thanks|thank you|hello|hi)[.!?\s]*$/i;
 
 export function detectCustomerLanguageStyle(message = ""): CustomerLanguageStyle {
-  const normalizedMessage = message.toLowerCase();
+  const normalizedMessage = message.toLowerCase().trim();
   const hasStrongCebuano = STRONG_CEBUANO_PATTERN.test(normalizedMessage);
   const hasWeakCebuano = WEAK_CEBUANO_PATTERN.test(normalizedMessage);
   const hasTagalog = TAGALOG_PATTERN.test(normalizedMessage);
   const hasEnglish = ENGLISH_PATTERN.test(normalizedMessage);
+
+  if (ENGLISH_CONFIRMATION_PATTERN.test(normalizedMessage)) {
+    return "english";
+  }
 
   if (hasEnglish && !hasStrongCebuano && !hasTagalog) {
     return "english";
