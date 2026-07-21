@@ -103,7 +103,12 @@ export default function ClientSettingsPage() {
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
   const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
+  const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
   const leadFields = getLeadFieldList(leadCaptureFields);
+  const welcomeAttachmentIds = welcomeImageUrls
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
   const sheetColumns = leadFields;
   const generatedAppsScript = buildAppsScript(leadFields, googleSheetsTabName.trim() || "Sheet1");
 
@@ -261,6 +266,48 @@ export default function ClientSettingsPage() {
       });
     } finally {
       setSavingWelcomeSequence(false);
+    }
+  };
+
+  const uploadWelcomeImage = async (file: File | undefined) => {
+    if (!clientId || !file) {
+      return;
+    }
+
+    setUploadingWelcomeImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("clientId", clientId);
+      formData.append("file", file);
+
+      const response = await fetch("/api/facebook/attachments", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { attachmentId?: string; error?: string }
+        | null;
+
+      if (!response.ok || !data?.attachmentId) {
+        throw new Error(data?.error || "Failed to upload image to Messenger");
+      }
+
+      const nextAttachmentIds = [
+        ...welcomeImageUrls.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
+        data.attachmentId,
+      ].slice(0, 5);
+
+      setWelcomeImageUrls(nextAttachmentIds.join("\n"));
+      showToast({ tone: "success", message: "Image uploaded to Messenger." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to upload image.",
+      });
+    } finally {
+      setUploadingWelcomeImage(false);
     }
   };
 
@@ -437,19 +484,31 @@ export default function ClientSettingsPage() {
                 className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
                 htmlFor="welcome-image-urls"
               >
-                Image URLs
+                Messenger Image Attachments
               </label>
+              <input
+                id="welcome-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  void uploadWelcomeImage(file);
+                }}
+                disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 5}
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70"
+              />
               <textarea
                 id="welcome-image-urls"
                 value={welcomeImageUrls}
                 onChange={(event) => setWelcomeImageUrls(event.target.value)}
                 rows={4}
-                maxLength={6000}
-                placeholder={"https://example.com/image-1.jpg\nhttps://example.com/image-2.jpg"}
+                maxLength={2000}
+                placeholder={"123456789012345\n987654321098765"}
                 className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
               />
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Use HTTPS image URLs, one per line, up to 5 images.
+                Upload images here to create reusable Messenger attachment IDs. The image file is stored by Facebook, not Supabase. {welcomeAttachmentIds.length} / 5 used.
               </p>
 
               <div className="mt-4">
@@ -649,9 +708,11 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || savingSheetsUrl || savingWelcomeSequence}
+        isOpen={cleaningStorage || savingSheetsUrl || savingWelcomeSequence || uploadingWelcomeImage}
         message={
-          savingWelcomeSequence
+          uploadingWelcomeImage
+            ? "Uploading image to Messenger..."
+            : savingWelcomeSequence
             ? "Saving first reply sequence..."
             : savingSheetsUrl
               ? "Saving Google Sheets URL..."

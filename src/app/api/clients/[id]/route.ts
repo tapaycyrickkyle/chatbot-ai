@@ -11,10 +11,11 @@ import { getClientById, updateClientSettings } from "@/lib/database";
 const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
 const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
-const MAX_WELCOME_URL_LENGTH = 2000;
-const MAX_WELCOME_IMAGE_URLS_LENGTH = 6000;
-const MAX_WELCOME_IMAGE_URLS = 5;
+const MAX_WELCOME_LINK_URL_LENGTH = 2000;
+const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
+const MAX_WELCOME_ATTACHMENTS = 5;
 const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
+const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -187,7 +188,7 @@ function validateClientSettingsPayload(payload: unknown) {
 
     const trimmedUrl = welcome_link_url.trim();
 
-    if (trimmedUrl.length > MAX_WELCOME_URL_LENGTH) {
+    if (trimmedUrl.length > MAX_WELCOME_LINK_URL_LENGTH) {
       throw new Error("Welcome link URL is too long");
     }
 
@@ -210,41 +211,29 @@ function validateClientSettingsPayload(payload: unknown) {
 
   if (welcome_image_urls !== undefined) {
     if (typeof welcome_image_urls !== "string") {
-      throw new Error("Invalid welcome image URLs");
+      throw new Error("Invalid welcome image attachment IDs");
     }
 
-    if (welcome_image_urls.length > MAX_WELCOME_IMAGE_URLS_LENGTH) {
-      throw new Error("Welcome image URLs are too long");
+    if (welcome_image_urls.length > MAX_WELCOME_ATTACHMENT_IDS_LENGTH) {
+      throw new Error("Welcome image attachments are too long");
     }
 
-    const imageUrls = welcome_image_urls
+    const attachmentIds = welcome_image_urls
       .split(/\r?\n/)
-      .map((url) => url.trim())
+      .map((attachmentId) => attachmentId.trim())
       .filter(Boolean);
 
-    if (imageUrls.length > MAX_WELCOME_IMAGE_URLS) {
-      throw new Error(`Use ${MAX_WELCOME_IMAGE_URLS} welcome image URLs or fewer`);
+    if (attachmentIds.length > MAX_WELCOME_ATTACHMENTS) {
+      throw new Error(`Use ${MAX_WELCOME_ATTACHMENTS} welcome image attachments or fewer`);
     }
 
-    for (const imageUrl of imageUrls) {
-      if (imageUrl.length > MAX_WELCOME_URL_LENGTH) {
-        throw new Error("Welcome image URL is too long");
-      }
-
-      let parsedUrl: URL;
-
-      try {
-        parsedUrl = new URL(imageUrl);
-      } catch {
-        throw new Error("Invalid welcome image URL");
-      }
-
-      if (parsedUrl.protocol !== "https:") {
-        throw new Error("Welcome image URLs must use HTTPS");
+    for (const attachmentId of attachmentIds) {
+      if (!MESSENGER_ATTACHMENT_ID_PATTERN.test(attachmentId)) {
+        throw new Error("Invalid welcome image attachment ID");
       }
     }
 
-    updates.welcome_image_urls = imageUrls.join("\n");
+    updates.welcome_image_urls = attachmentIds.join("\n");
   }
 
   return updates;

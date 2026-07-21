@@ -419,10 +419,10 @@ function createLeadFormatReply(
   });
 }
 
-function getWelcomeImageUrls(value: string) {
+function getWelcomeImageAttachmentIds(value: string) {
   return value
     .split(/\r?\n/)
-    .map((url) => url.trim())
+    .map((attachmentId) => attachmentId.trim())
     .filter(Boolean)
     .slice(0, 5);
 }
@@ -431,7 +431,7 @@ function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>
   return Boolean(
     client.welcome_message.trim() ||
       client.welcome_link_url.trim() ||
-      getWelcomeImageUrls(client.welcome_image_urls).length > 0
+      getWelcomeImageAttachmentIds(client.welcome_image_urls).length > 0
   );
 }
 
@@ -454,7 +454,7 @@ async function sendWelcomeSequence(input: {
 }) {
   const message = input.client.welcome_message.trim();
   const linkUrl = input.client.welcome_link_url.trim();
-  const imageUrls = getWelcomeImageUrls(input.client.welcome_image_urls);
+  const imageAttachmentIds = getWelcomeImageAttachmentIds(input.client.welcome_image_urls);
 
   if (message) {
     await safelyHandleFlowSend(
@@ -496,12 +496,12 @@ async function sendWelcomeSequence(input: {
     );
   }
 
-  for (const imageUrl of imageUrls) {
+  for (const attachmentId of imageAttachmentIds) {
     await safelyHandleFlowSend(
       () =>
         safeSendImage(
           input.recipientId,
-          imageUrl,
+          attachmentId,
           input.pageAccessToken,
           0,
           input.pageId,
@@ -994,7 +994,7 @@ async function safeSendMessage(
 
 async function safeSendImage(
   recipientId: string,
-  imageUrl: string,
+  attachmentId: string,
   pageToken: string,
   retryCount = 0,
   pageId = "unknown",
@@ -1009,7 +1009,7 @@ async function safeSendImage(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify(createImageMessageBody(recipientId, imageUrl)),
+      body: JSON.stringify(createImageMessageBody(recipientId, attachmentId)),
     });
     clearTimeout(timeoutId);
 
@@ -1049,7 +1049,7 @@ async function safeSendImage(
           errorCode,
           errorSubcode: errorPayload?.error?.error_subcode,
           errorMessage: "Rate limit retry exhausted",
-          payload: createImageMessageBody(recipientId, imageUrl),
+          payload: createImageMessageBody(recipientId, attachmentId),
         });
         return false;
       }
@@ -1057,7 +1057,7 @@ async function safeSendImage(
       const delay = withJitter(Math.pow(2, retryCount) * 1000);
       console.warn(`Image send rate limited. Retry ${retryCount + 1} in ${delay}ms`);
       await sleep(delay);
-      return safeSendImage(recipientId, imageUrl, pageToken, retryCount + 1, pageId, clientId);
+      return safeSendImage(recipientId, attachmentId, pageToken, retryCount + 1, pageId, clientId);
     }
 
     if (!res.ok) {
@@ -1072,7 +1072,7 @@ async function safeSendImage(
         errorCode,
         errorSubcode: errorPayload?.error?.error_subcode,
         errorMessage: typeof errorData === "string" ? errorData : JSON.stringify(errorData),
-        payload: createImageMessageBody(recipientId, imageUrl),
+        payload: createImageMessageBody(recipientId, attachmentId),
       });
       return false;
     }
@@ -1088,7 +1088,7 @@ async function safeSendImage(
       messageType: "image",
       statusCode: 0,
       errorMessage: err instanceof Error ? err.message : "Unknown network error",
-      payload: createImageMessageBody(recipientId, imageUrl),
+      payload: createImageMessageBody(recipientId, attachmentId),
     });
     return false;
   }
@@ -1246,15 +1246,14 @@ function createTextMessageBody(recipientId: string, text: string): MessengerRequ
   };
 }
 
-function createImageMessageBody(recipientId: string, imageUrl: string): MessengerRequestBody {
+function createImageMessageBody(recipientId: string, attachmentId: string): MessengerRequestBody {
   return {
     recipient: { id: recipientId },
     message: {
       attachment: {
         type: "image",
         payload: {
-          url: imageUrl,
-          is_reusable: true,
+          attachment_id: attachmentId,
         },
       },
     },
