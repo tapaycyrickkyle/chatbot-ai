@@ -41,6 +41,9 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
+const HUMAN_REPLY_MIN_DELAY_MS = 4500;
+const HUMAN_REPLY_MAX_DELAY_MS = 12000;
+const HUMAN_REPLY_MS_PER_CHAR = 35;
 
 type WebhookBody = {
   object?: string;
@@ -65,6 +68,11 @@ type WebhookBody = {
 type MessengerRequestBody = {
   recipient: { id: string };
   message: unknown;
+};
+
+type MessengerSenderActionBody = {
+  recipient: { id: string };
+  sender_action: "typing_on" | "typing_off" | "mark_seen";
 };
 
 type UsageMetrics = {
@@ -689,11 +697,10 @@ export default async function handler(
 
               await safelyHandleFlowSend(
                 () =>
-                  safeSendMessage(
+                  safeSendHumanTextReply(
                     userId,
                     reply,
                     pageAccessToken,
-                    0,
                     pageId,
                     client.id
                   ).then(() => undefined),
@@ -808,11 +815,10 @@ export default async function handler(
 
               await safelyHandleFlowSend(
                 () =>
-                  safeSendMessage(
+                  safeSendHumanTextReply(
                     userId,
                     deterministicReply,
                     pageAccessToken,
-                    0,
                     pageId,
                     client.id
                   ).then(() => undefined),
@@ -868,7 +874,7 @@ export default async function handler(
                   userId,
                   preview: aiReply.slice(0, 120),
                 });
-                await safeSendMessage(userId, aiReply, pageAccessToken, 0, pageId, client.id);
+                await safeSendHumanTextReply(userId, aiReply, pageAccessToken, pageId, client.id);
                 await safelyRecordAiReply({
                   clientId: client.id,
                   pageId,
@@ -1024,6 +1030,46 @@ async function safeSendMessage(
       payload: createTextMessageBody(recipientId, text),
     });
     return false;
+  }
+}
+
+async function safeSendHumanTextReply(
+  recipientId: string,
+  text: string,
+  pageToken: string,
+  pageId = "unknown",
+  clientId = "unknown"
+) {
+  await safeSendSenderAction(recipientId, "typing_on", pageToken);
+  await sleep(getHumanReplyDelayMs(text));
+  await safeSendSenderAction(recipientId, "typing_off", pageToken);
+
+  return safeSendMessage(recipientId, text, pageToken, 0, pageId, clientId);
+}
+
+async function safeSendSenderAction(
+  recipientId: string,
+  senderAction: MessengerSenderActionBody["sender_action"],
+  pageToken: string
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    await fetch(`${GRAPH_API_MESSAGES_URL}?access_token=${pageToken}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify(createSenderActionBody(recipientId, senderAction)),
+    });
+  } catch (error) {
+    console.warn("Messenger sender action failed", {
+      recipientId,
+      senderAction,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -1281,6 +1327,16 @@ function createTextMessageBody(recipientId: string, text: string): MessengerRequ
   };
 }
 
+function createSenderActionBody(
+  recipientId: string,
+  senderAction: MessengerSenderActionBody["sender_action"]
+): MessengerSenderActionBody {
+  return {
+    recipient: { id: recipientId },
+    sender_action: senderAction,
+  };
+}
+
 function createImageMessageBody(recipientId: string, attachmentId: string): MessengerRequestBody {
   return {
     recipient: { id: recipientId },
@@ -1347,6 +1403,16 @@ function isValidWebhookSignature(
 
 function sleep(durationMs: number) {
   return new Promise((resolve) => setTimeout(resolve, durationMs));
+}
+
+function getHumanReplyDelayMs(text: string) {
+  const typedDelay = text.length * HUMAN_REPLY_MS_PER_CHAR;
+  const baseDelay = Math.min(
+    HUMAN_REPLY_MAX_DELAY_MS,
+    Math.max(HUMAN_REPLY_MIN_DELAY_MS, typedDelay)
+  );
+
+  return withJitter(baseDelay);
 }
 
 function withJitter(durationMs: number) {
