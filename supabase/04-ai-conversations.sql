@@ -7,6 +7,7 @@ create table if not exists public.ai_conversations (
   page_id text not null,
   recipient_id text not null,
   last_customer_message text,
+  last_ai_reply text,
   last_message_at timestamptz,
   ai_paused boolean not null default false,
   paused_at timestamptz,
@@ -28,6 +29,9 @@ alter table public.ai_conversations
 
 alter table public.ai_conversations
   add column if not exists last_customer_message text;
+
+alter table public.ai_conversations
+  add column if not exists last_ai_reply text;
 
 alter table public.ai_conversations
   add column if not exists ai_paused boolean not null default false;

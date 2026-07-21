@@ -4,6 +4,7 @@ import {
   getAiConversation,
   getClients,
   pauseAiConversation,
+  recordAiConversationReply,
   recordCustomerConversationMessage,
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
@@ -165,14 +166,25 @@ async function safelyRecordCustomerMessage(input: {
   }
 }
 
-async function safelyIsAiPaused(clientId: string, recipientId: string) {
+async function safelyGetAiConversation(clientId: string, recipientId: string) {
   try {
-    const conversation = await getAiConversation(clientId, recipientId);
-
-    return Boolean(conversation?.ai_paused);
+    return await getAiConversation(clientId, recipientId);
   } catch (error) {
-    console.warn("Failed to load AI conversation pause state", error);
-    return false;
+    console.warn("Failed to load AI conversation state", error);
+    return null;
+  }
+}
+
+async function safelyRecordAiReply(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  reply: string;
+}) {
+  try {
+    await recordAiConversationReply(input);
+  } catch (error) {
+    console.warn("Failed to record AI reply", error);
   }
 }
 
@@ -326,6 +338,8 @@ export default async function handler(
             ...summarizeWebhookEvent(event),
           });
 
+          const existingConversation = await safelyGetAiConversation(client.id, userId);
+
           if (rawText) {
             await safelyRecordCustomerMessage({
               clientId: client.id,
@@ -386,7 +400,7 @@ export default async function handler(
             continue;
           }
 
-          if (await safelyIsAiPaused(client.id, userId)) {
+          if (existingConversation?.ai_paused) {
             console.info("AI webhook skipped paused conversation", {
               clientId: client.id,
               pageId,
@@ -404,7 +418,10 @@ export default async function handler(
                   userId,
                   preview: rawText.slice(0, 120),
                 });
-                const aiReply = await askAi(rawText, client.business_info || "", leadFields);
+                const aiReply = await askAi(rawText, client.business_info || "", leadFields, {
+                  previousCustomerMessage: existingConversation?.last_customer_message,
+                  previousAiReply: existingConversation?.last_ai_reply,
+                });
                 console.info("AI webhook generated reply", {
                   clientId: client.id,
                   pageId,
@@ -412,6 +429,12 @@ export default async function handler(
                   preview: aiReply.slice(0, 120),
                 });
                 await safeSendMessage(userId, aiReply, pageAccessToken, 0, pageId, client.id);
+                await safelyRecordAiReply({
+                  clientId: client.id,
+                  pageId,
+                  recipientId: userId,
+                  reply: aiReply,
+                });
               },
               { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
             );

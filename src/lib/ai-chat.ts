@@ -13,6 +13,11 @@ type ChatCompletionResponse = {
   }>;
 };
 
+type ConversationContext = {
+  previousCustomerMessage?: string;
+  previousAiReply?: string;
+};
+
 function detectReplyLanguage(userMessage: string) {
   const normalizedMessage = userMessage.toLowerCase();
   const hasTagalogCue =
@@ -78,7 +83,8 @@ function createAiHeaders(apiKey: string, apiUrl: string) {
 export async function askAi(
   userMessage: string,
   businessContext: string,
-  leadFields: string[] = ["Full Name", "Phone"]
+  leadFields: string[] = ["Full Name", "Phone"],
+  conversationContext: ConversationContext = {}
 ) {
   const detectedLanguage = detectReplyLanguage(userMessage);
   const leadInformationFormat = `Information\n${leadFields
@@ -120,6 +126,9 @@ ${leadInformationFormat}
 - Use simple words. Avoid long explanations, markdown, bullets, and numbered lists in customer replies.
 - Ask only one question at a time unless requesting the full Information block.
 - Always end with a question or a clear next step - never a dead end.
+- Use the previous conversation turn when the latest customer message is short, such as "yes", "no", "1 BR", "how much", or "I want to know more".
+- Do not restart the conversation, re-introduce the business, or repeat the same question if the customer already answered it.
+- Treat short confirmations like "yes" as an answer to your previous question.
 
 BUSINESS INFORMATION:
 ${businessContext}`;
@@ -131,19 +140,36 @@ ${businessContext}`;
       return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
     }
 
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\nLATEST CUSTOMER LANGUAGE: ${detectedLanguage}`,
+      },
+    ];
+
+    if (conversationContext.previousCustomerMessage) {
+      messages.push({
+        role: "user",
+        content: conversationContext.previousCustomerMessage,
+      });
+    }
+
+    if (conversationContext.previousAiReply) {
+      messages.push({
+        role: "assistant",
+        content: conversationContext.previousAiReply,
+      });
+    }
+
+    messages.push({ role: "user", content: userMessage });
+
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: createAiHeaders(apiKey, apiUrl),
       body: JSON.stringify({
         model,
         temperature: 0.7,
-        messages: [
-          {
-            role: "system",
-            content: `${systemPrompt}\n\nLATEST CUSTOMER LANGUAGE: ${detectedLanguage}`,
-          },
-          { role: "user", content: userMessage },
-        ],
+        messages,
       }),
     });
 

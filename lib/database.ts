@@ -22,6 +22,7 @@ type AiConversationRow = {
   page_id: string;
   recipient_id: string;
   last_customer_message: string | null;
+  last_ai_reply?: string | null;
   last_message_at: string | null;
   ai_paused: boolean | null;
   paused_at: string | null;
@@ -61,6 +62,10 @@ const CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields";
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
+const AI_CONVERSATION_COLUMNS =
+  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
+const LEGACY_AI_CONVERSATION_COLUMNS =
+  "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 
 function buildPagePictureUrl(pageId: string) {
   return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
@@ -69,6 +74,13 @@ function buildPagePictureUrl(pageId: string) {
 function isMissingGoogleSheetsTabNameError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("google_sheets_tab_name") &&
+      error.message.includes("does not exist")
+  );
+}
+
+function isMissingLastAiReplyError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("last_ai_reply") &&
       error.message.includes("does not exist")
   );
 }
@@ -97,6 +109,7 @@ function normalizeAiConversation(row: AiConversationRow) {
     page_id: row.page_id,
     recipient_id: row.recipient_id,
     last_customer_message: row.last_customer_message ?? "",
+    last_ai_reply: row.last_ai_reply ?? "",
     last_message_at: row.last_message_at ?? row.updated_at,
     ai_paused: Boolean(row.ai_paused),
     paused_at: row.paused_at ?? "",
@@ -245,13 +258,18 @@ export async function updateClientSettings(
 
 export async function getAiConversationsForClient(clientId: string) {
   const supabase = getDb();
-  const { data, error } = await supabase
+  const response = await supabase
     .from("ai_conversations")
-    .select(
-      "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at"
-    )
+    .select(AI_CONVERSATION_COLUMNS)
     .eq("client_id", clientId)
     .order("last_message_at", { ascending: false, nullsFirst: false });
+  const { data, error } = isMissingLastAiReplyError(response.error)
+    ? await supabase
+        .from("ai_conversations")
+        .select(LEGACY_AI_CONVERSATION_COLUMNS)
+        .eq("client_id", clientId)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to load conversations");
@@ -262,14 +280,20 @@ export async function getAiConversationsForClient(clientId: string) {
 
 export async function getAiConversation(clientId: string, recipientId: string) {
   const supabase = getDb();
-  const { data, error } = await supabase
+  const response = await supabase
     .from("ai_conversations")
-    .select(
-      "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at"
-    )
+    .select(AI_CONVERSATION_COLUMNS)
     .eq("client_id", clientId)
     .eq("recipient_id", recipientId)
     .maybeSingle();
+  const { data, error } = isMissingLastAiReplyError(response.error)
+    ? await supabase
+        .from("ai_conversations")
+        .select(LEGACY_AI_CONVERSATION_COLUMNS)
+        .eq("client_id", clientId)
+        .eq("recipient_id", recipientId)
+        .maybeSingle()
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to load conversation");
@@ -300,6 +324,43 @@ export async function recordCustomerConversationMessage(input: {
 
   if (error) {
     throw new Error(error.message || "Failed to record conversation");
+  }
+}
+
+export async function recordAiConversationReply(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  reply: string;
+}) {
+  const now = new Date().toISOString();
+  const supabase = getDb();
+  const response = await supabase.from("ai_conversations").upsert(
+    {
+      client_id: input.clientId,
+      page_id: input.pageId,
+      recipient_id: input.recipientId,
+      last_ai_reply: input.reply,
+      last_message_at: now,
+      updated_at: now,
+    },
+    { onConflict: "client_id,recipient_id" }
+  );
+  const { error } = isMissingLastAiReplyError(response.error)
+    ? await supabase.from("ai_conversations").upsert(
+        {
+          client_id: input.clientId,
+          page_id: input.pageId,
+          recipient_id: input.recipientId,
+          last_message_at: now,
+          updated_at: now,
+        },
+        { onConflict: "client_id,recipient_id" }
+      )
+    : response;
+
+  if (error) {
+    throw new Error(error.message || "Failed to record AI reply");
   }
 }
 
