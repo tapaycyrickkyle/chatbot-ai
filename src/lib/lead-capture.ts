@@ -170,10 +170,68 @@ function extractFormattedField(message: string, field: string) {
   return "";
 }
 
-export function createLeadInformationPrompt(leadFields: string[]) {
-  const lines = leadFields.map((field) => `${field}:`).join("\n");
+type LeadPromptReason =
+  | "order"
+  | "booking"
+  | "human_contact"
+  | "quote"
+  | "reservation"
+  | "generic";
 
-  return `Please send your details in this format:\n\n${lines}`;
+function detectLeadPromptLanguage(message = "") {
+  const normalizedMessage = message.toLowerCase();
+  const hasFilipinoCue =
+    /\b(po|opo|sige|pwede|pede|ako|magpa|pa\s*(?:reserve|book|contact|call)|gusto|bumili|kailangan|salamat)\b/i.test(
+      normalizedMessage
+    );
+
+  return hasFilipinoCue ? "taglish" : "english";
+}
+
+function getLeadPromptIntro(reason: LeadPromptReason, message = "") {
+  const language = detectLeadPromptLanguage(message);
+
+  if (language === "taglish") {
+    switch (reason) {
+      case "order":
+        return "Got it po. To help prepare your order, please send your details below:";
+      case "booking":
+        return "Sige po, we can help arrange that. Please send your details below so our team can confirm the schedule:";
+      case "human_contact":
+        return "Sure po, I can ask our team to contact you. Please send your details below:";
+      case "quote":
+        return "Sige po, I can forward this for a proper quote. Please send your details below:";
+      case "reservation":
+        return "Sige po, I can help forward your reservation request. Please send your details below:";
+      default:
+        return "Sure po, I can forward this to our team. Please send your details below:";
+    }
+  }
+
+  switch (reason) {
+    case "order":
+      return "Got it. To help prepare your order, please send your details below:";
+    case "booking":
+      return "Sure, we can help arrange that. Please send your details below so our team can confirm the schedule:";
+    case "human_contact":
+      return "Sure, I can ask our team to contact you. Please send your details below:";
+    case "quote":
+      return "Sure, I can forward this for a proper quote. Please send your details below:";
+    case "reservation":
+      return "Sure, I can help forward your reservation request. Please send your details below:";
+    default:
+      return "Sure, I can forward this to our team. Please send your details below:";
+  }
+}
+
+export function createLeadInformationPrompt(
+  leadFields: string[],
+  options: { reason?: LeadPromptReason; customerMessage?: string } = {}
+) {
+  const lines = leadFields.map((field) => `${field}:`).join("\n");
+  const intro = getLeadPromptIntro(options.reason ?? "generic", options.customerMessage);
+
+  return `${intro}\n\n${lines}`;
 }
 
 export function extractFormattedLeadFromMessage(

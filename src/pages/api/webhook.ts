@@ -7,7 +7,7 @@ import {
   recordAiConversationReply,
   recordCustomerConversationMessage,
 } from "@/lib/database";
-import { askAi } from "@/lib/ai-chat";
+import { askAi, classifyLeadCaptureIntent, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
   appendRecentConversationMessages,
   getDeterministicReply,
@@ -248,43 +248,143 @@ async function safelyCaptureLead(input: {
   return false;
 }
 
-function shouldAskForLeadFormat(
+type LeadPromptReason =
+  | "order"
+  | "booking"
+  | "human_contact"
+  | "quote"
+  | "reservation"
+  | "generic";
+
+function wasLeadFormatRecentlyRequested(
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+) {
+  const lastReply = conversation?.last_ai_reply?.toLowerCase() ?? "";
+  const recentAssistantReplies =
+    conversation?.recent_messages
+      ?.filter((message) => message.role === "assistant")
+      .map((message) => message.content.toLowerCase())
+      .join(" ") ?? "";
+  const recentText = `${lastReply} ${recentAssistantReplies}`;
+
+  return (
+    recentText.includes("full name:") &&
+    (recentText.includes("phone:") || recentText.includes("contact number:"))
+  );
+}
+
+function getFallbackLeadIntent(message: string): LeadCaptureIntent {
+  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
+  const asksForInfoOnly =
+    /\b(details?|info|information|price|how much|hm|available|availability|requirements?|photos?|pictures?|location|sample computation|computation|monthly|amortization|dp|down payment)\b/i.test(
+      normalizedMessage
+    ) ||
+    /\bhow\s+(?:to|do i|can i)\s+(?:order|buy|book|reserve|schedule|get|avail)/i.test(
+      normalizedMessage
+    );
+
+  if (asksForInfoOnly) {
+    return "INFO_ONLY";
+  }
+
+  const providesLeadDetails =
+    /\b(?:name|full name|phone|contact|mobile|number)\s*[:\-]/i.test(normalizedMessage) &&
+    /(?:\+?\d[\d\s().-]{7,}\d)/.test(normalizedMessage);
+
+  if (providesLeadDetails) {
+    return "PROVIDED_LEAD_DETAILS";
+  }
+
+  const wantsHumanContact =
+    /\b(?:call me|contact me|message me|pm me|dm me|talk to|speak to|agent|specialist|human|staff|representative|someone\s+(?:call|contact|assist)|pa\s*(?:call|contact)|tawag(?:an)?|kausap)\b/i.test(
+      normalizedMessage
+    );
+
+  if (wantsHumanContact) {
+    return "WANTS_HUMAN_CONTACT";
+  }
+
+  const readyToBuyOrBook =
+    /\b(?:i want to|i'd like to|ill|i'll|let me|can i|please)\s+(?:order|buy|purchase|reserve|book|schedule|avail|proceed)\b/i.test(
+      normalizedMessage
+    ) ||
+    /\b(?:order now|place order|checkout|buy now|reserve now|book now|schedule viewing|book viewing|set appointment|make appointment|proceed with|go ahead|sign me up)\b/i.test(
+      normalizedMessage
+    ) ||
+    /\b(?:pa\s*reserve|pa\s*book|magpa\s*book|magpa\s*reserve|gusto\s+ko\s+(?:bumili|mag\s*order|magpa\s*reserve|magpa\s*book))\b/i.test(
+      normalizedMessage
+    );
+
+  if (readyToBuyOrBook) {
+    return "READY_TO_BUY_OR_BOOK";
+  }
+
+  return "UNCLEAR";
+}
+
+async function getLeadCaptureIntent(
   message: string,
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
 ) {
-  const hasDirectLeadIntent =
-    /\b(order|buy|book|booking|schedule|sched|appointment|meeting|meet|viewing|quote|estimate|compute|computation|monthly|amort|amortization|reserve|contact|call|talk to|agent|specialist)\b/i.test(
-      message
-    );
+  const aiIntent = await classifyLeadCaptureIntent(message, {
+    previousAiReply: conversation?.last_ai_reply,
+    conversationSummary: conversation?.conversation_summary,
+    recentMessages: conversation?.recent_messages,
+  });
 
-  if (hasDirectLeadIntent) {
-    return true;
+  if (aiIntent !== "UNCLEAR") {
+    return aiIntent;
   }
 
-  const isAskingForFormat =
-    /\b(format|info|information|details|what.*need|what.*send|how.*send)\b/i.test(message);
-
-  if (isAskingForFormat) {
-    return true;
-  }
-
-  const isShortFinancingAnswer =
-    /\b(bank|in-house|inhouse|pag-ibig|pagibig|spot cash|cash)\b/i.test(message) ||
-    /\b\d+\s*(?:mo|mos|month|months|yr|yrs|year|years)\b/i.test(message) ||
-    /\b(?:dp|down payment|loan term|financing)\b/i.test(message);
-  const previousAiReply = conversation?.last_ai_reply?.toLowerCase() ?? "";
-  const conversationSummary = conversation?.conversation_summary?.toLowerCase() ?? "";
-  const previousContext = `${previousAiReply} ${conversationSummary}`;
-  const wasDiscussingComputation =
-    /\b(compute|computation|estimate|monthly|amort|amortization|dp|loan|financing|bank|in-house|pag-ibig|spot cash)\b/i.test(
-      previousContext
-    );
-
-  return isShortFinancingAnswer && wasDiscussingComputation;
+  return getFallbackLeadIntent(message);
 }
 
-function createLeadFormatReply(leadFields: string[]) {
-  return createLeadInformationPrompt(leadFields);
+function shouldAskForLeadFormat(
+  intent: LeadCaptureIntent,
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+) {
+  if (wasLeadFormatRecentlyRequested(conversation)) {
+    return false;
+  }
+
+  return intent === "READY_TO_BUY_OR_BOOK" || intent === "WANTS_HUMAN_CONTACT";
+}
+
+function getLeadPromptReason(intent: LeadCaptureIntent, message: string): LeadPromptReason {
+  const normalizedMessage = message.toLowerCase();
+
+  if (intent === "WANTS_HUMAN_CONTACT") {
+    return "human_contact";
+  }
+
+  if (/\b(?:reserve|reservation|pa\s*reserve)\b/i.test(normalizedMessage)) {
+    return "reservation";
+  }
+
+  if (/\b(?:book|booking|schedule|appointment|viewing|visit|pa\s*book|magpa\s*book)\b/i.test(normalizedMessage)) {
+    return "booking";
+  }
+
+  if (/\b(?:quote|quotation|estimate|formal quote)\b/i.test(normalizedMessage)) {
+    return "quote";
+  }
+
+  if (/\b(?:order|buy|purchase|checkout|bumili)\b/i.test(normalizedMessage)) {
+    return "order";
+  }
+
+  return "generic";
+}
+
+function createLeadFormatReply(
+  leadFields: string[],
+  intent: LeadCaptureIntent,
+  customerMessage: string
+) {
+  return createLeadInformationPrompt(leadFields, {
+    reason: getLeadPromptReason(intent, customerMessage),
+    customerMessage,
+  });
 }
 
 export default async function handler(
@@ -442,8 +542,31 @@ export default async function handler(
               continue;
             }
 
-            if (shouldAskForLeadFormat(rawText, existingConversation)) {
-              const reply = createLeadFormatReply(leadFields);
+          }
+
+          if (!client.ai_enabled) {
+            console.info("AI webhook skipped disabled page", {
+              clientId: client.id,
+              pageId,
+              userId,
+            });
+            continue;
+          }
+
+          if (existingConversation?.ai_paused) {
+            console.info("AI webhook skipped paused conversation", {
+              clientId: client.id,
+              pageId,
+              userId,
+            });
+            continue;
+          }
+
+          if (rawText) {
+            const leadIntent = await getLeadCaptureIntent(rawText, existingConversation);
+
+            if (shouldAskForLeadFormat(leadIntent, existingConversation)) {
+              const reply = createLeadFormatReply(leadFields, leadIntent, rawText);
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
@@ -479,27 +602,7 @@ export default async function handler(
               });
               continue;
             }
-          }
 
-          if (!client.ai_enabled) {
-            console.info("AI webhook skipped disabled page", {
-              clientId: client.id,
-              pageId,
-              userId,
-            });
-            continue;
-          }
-
-          if (existingConversation?.ai_paused) {
-            console.info("AI webhook skipped paused conversation", {
-              clientId: client.id,
-              pageId,
-              userId,
-            });
-            continue;
-          }
-
-          if (rawText) {
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {

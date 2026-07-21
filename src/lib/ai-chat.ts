@@ -13,6 +13,14 @@ type ChatCompletionResponse = {
   }>;
 };
 
+export type LeadCaptureIntent =
+  | "INFO_ONLY"
+  | "SOFT_INTEREST"
+  | "READY_TO_BUY_OR_BOOK"
+  | "WANTS_HUMAN_CONTACT"
+  | "PROVIDED_LEAD_DETAILS"
+  | "UNCLEAR";
+
 type ConversationContext = {
   previousCustomerMessage?: string;
   previousAiReply?: string;
@@ -30,6 +38,14 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 160;
 const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
+const LEAD_INTENTS = new Set<LeadCaptureIntent>([
+  "INFO_ONLY",
+  "SOFT_INTEREST",
+  "READY_TO_BUY_OR_BOOK",
+  "WANTS_HUMAN_CONTACT",
+  "PROVIDED_LEAD_DETAILS",
+  "UNCLEAR",
+]);
 
 function detectReplyLanguage(userMessage: string) {
   const normalizedMessage = userMessage.toLowerCase();
@@ -103,6 +119,110 @@ function createAiHeaders(apiKey: string, apiUrl: string) {
   return headers;
 }
 
+function parseLeadIntent(value: string): LeadCaptureIntent {
+  const normalizedValue = value
+    .replace(/```(?:json)?|```/gi, "")
+    .trim()
+    .toUpperCase();
+
+  try {
+    const parsed = JSON.parse(normalizedValue) as { intent?: unknown };
+    const intent = typeof parsed.intent === "string" ? parsed.intent.toUpperCase() : "";
+
+    if (LEAD_INTENTS.has(intent as LeadCaptureIntent)) {
+      return intent as LeadCaptureIntent;
+    }
+  } catch {
+    // Some providers return the label as plain text.
+  }
+
+  const label = normalizedValue.match(
+    /\b(INFO_ONLY|SOFT_INTEREST|READY_TO_BUY_OR_BOOK|WANTS_HUMAN_CONTACT|PROVIDED_LEAD_DETAILS|UNCLEAR)\b/
+  )?.[1];
+
+  return LEAD_INTENTS.has(label as LeadCaptureIntent) ? (label as LeadCaptureIntent) : "UNCLEAR";
+}
+
+export async function classifyLeadCaptureIntent(
+  userMessage: string,
+  conversationContext: Pick<ConversationContext, "previousAiReply" | "conversationSummary" | "recentMessages"> = {}
+): Promise<LeadCaptureIntent> {
+  const { apiKey, apiUrl, model } = getAiConfig();
+
+  if (!apiUrl || !apiKey || !model) {
+    return "UNCLEAR";
+  }
+
+  const recentMessages =
+    conversationContext.recentMessages
+      ?.slice(-4)
+      .map((message) => `${message.role === "assistant" ? "Assistant" : "Customer"}: ${message.content}`)
+      .join("\n")
+      .slice(0, 900) ?? "";
+
+  const prompt = `Classify the latest customer message for lead capture.
+
+Return only JSON like {"intent":"INFO_ONLY"}.
+
+Labels:
+- INFO_ONLY: asks for info, details, price, availability, requirements, photos, location, computation, or how the process/order works.
+- SOFT_INTEREST: interested but not asking to be contacted, scheduled, reserved, quoted, or processed yet.
+- READY_TO_BUY_OR_BOOK: clearly wants to buy, place an order now, reserve, book, schedule, visit, set an appointment, or proceed.
+- WANTS_HUMAN_CONTACT: asks for a person/team/agent/specialist to call, contact, message, or assist them directly.
+- PROVIDED_LEAD_DETAILS: provides name and phone/contact details.
+- UNCLEAR: not enough context.
+
+Important:
+- Understand any language or mixed language.
+- "how to order" is INFO_ONLY unless they also say they want to order now.
+- "details", "info", "how much", "sample computation", and "available?" are INFO_ONLY.
+- Do not classify as READY_TO_BUY_OR_BOOK just because the message mentions order, quote, computation, price, details, or information.
+
+Recent conversation:
+${recentMessages || conversationContext.conversationSummary || "None"}
+
+Previous assistant reply:
+${conversationContext.previousAiReply || "None"}
+
+Latest customer message:
+${userMessage}`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: createAiHeaders(apiKey, apiUrl),
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 40,
+        messages: [
+          {
+            role: "system",
+            content: "You classify lead-capture intent. Return only valid compact JSON.",
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("Lead intent classification failed", {
+        providerUrl: apiUrl,
+        model,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return "UNCLEAR";
+    }
+
+    const data = (await response.json()) as ChatCompletionResponse;
+    return parseLeadIntent(data.choices?.[0]?.message?.content?.trim() || "");
+  } catch (error) {
+    console.warn("Lead intent classification failed", getErrorSummary(error));
+    return "UNCLEAR";
+  }
+}
+
 export async function askAi(
   userMessage: string,
   businessContext: string,
@@ -132,7 +252,8 @@ Core rules:
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
 - Match the latest customer language: English for English; English-heavy Taglish for Tagalog/Taglish. Never reply in full Tagalog.
 - For English-heavy Taglish, use mostly English with natural words like po, opo, sige, and salamat.
-- When the customer wants to order, book, schedule, view, get a quote, or talk to a human, ask for the complete details in this format:
+  - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
+  - Only ask for the complete details when the customer clearly wants to proceed, reserve, book, schedule, place an order now, request a human callback/contact, or asks the team to process a quote:
 ${leadInformationFormat}
 - Copy the format above exactly on separate lines. Never write the required fields inline in a sentence.
 - If complete lead details are already provided, say: "Thank you, I got your details. Our team will follow up shortly."
