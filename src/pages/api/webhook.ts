@@ -240,7 +240,7 @@ async function safelyCaptureLead(input: {
 }
 
 function shouldStartLeadFlow(message: string) {
-  return /\b(order|buy|book|booking|schedule|sched|appointment|viewing|quote|estimate|interested|available|avail|reserve|contact|call|inquire|inquiry|talk to|agent|specialist)\b/i.test(
+  return /\b(order|buy|book|booking|schedule|sched|appointment|meeting|meet|viewing|quote|estimate|reserve|contact|call|talk to|agent|specialist)\b/i.test(
     message
   );
 }
