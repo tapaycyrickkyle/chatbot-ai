@@ -9,7 +9,7 @@ import {
   recordWelcomeSequenceSent,
   resumeAiConversation,
 } from "@/lib/database";
-import { askAi, classifyLeadCaptureIntent, type LeadCaptureIntent } from "@/lib/ai-chat";
+import { askAi, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
   appendRecentConversationMessages,
   getDeterministicReply,
@@ -393,24 +393,15 @@ function isClearlyInfoOnlyMessage(normalizedMessage: string) {
   );
 }
 
-async function getLeadCaptureIntent(
-  message: string,
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
-) {
+function getLeadCaptureIntentFromPlan(message: string, planIntent: LeadCaptureIntent) {
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
 
   if (isClearlyInfoOnlyMessage(normalizedMessage)) {
     return "INFO_ONLY";
   }
 
-  const aiIntent = await classifyLeadCaptureIntent(message, {
-    previousAiReply: conversation?.last_ai_reply,
-    conversationSummary: conversation?.conversation_summary,
-    recentMessages: conversation?.recent_messages,
-  });
-
-  if (aiIntent !== "UNCLEAR") {
-    return aiIntent;
+  if (planIntent !== "UNCLEAR") {
+    return planIntent;
   }
 
   return getFallbackLeadIntent(message);
@@ -779,53 +770,10 @@ export default async function handler(
           }
 
           if (rawText) {
-            const leadIntent = await getLeadCaptureIntent(rawText, existingConversation);
-
-            if (shouldAskForLeadFormat(leadIntent, existingConversation)) {
-              const reply = createLeadFormatReply(leadFields, leadIntent, rawText);
-              const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
-              const recentMessages = appendRecentConversationMessages(
-                existingConversation?.recent_messages,
-                rawText,
-                reply
-              );
-              const conversationSummary = updateConversationSummary(
-                existingConversation?.conversation_summary || "",
-                rawText,
-                reply
-              );
-
-              await safelyHandleFlowSend(
-                () =>
-                  safeSendMessage(
-                    userId,
-                    reply,
-                    pageAccessToken,
-                    0,
-                    pageId,
-                    client.id
-                  ).then(() => undefined),
-                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
-              );
-              await safelyRecordAiReply({
-                clientId: client.id,
-                pageId,
-                recipientId: userId,
-                reply,
-                conversationSummary,
-                customerState,
-                recentMessages,
-              });
-              continue;
-            }
-
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {
-              const customerState = inferCustomerState(
-                existingConversation?.customer_state,
-                rawText
-              );
+              const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
                 rawText,
@@ -860,6 +808,59 @@ export default async function handler(
               continue;
             }
 
+            const aiConversationContext = {
+              previousCustomerMessage: existingConversation?.last_customer_message,
+              previousAiReply: existingConversation?.last_ai_reply,
+              conversationSummary: existingConversation?.conversation_summary,
+              customerState: existingConversation?.customer_state,
+              recentMessages: existingConversation?.recent_messages,
+              aiCharacter: client.ai_character,
+              aiTone: client.ai_tone,
+            };
+            const replyPlan = await planAiReply(rawText, client.business_info || "", aiConversationContext);
+            const leadIntent = getLeadCaptureIntentFromPlan(rawText, replyPlan.leadCaptureIntent);
+
+            if (shouldAskForLeadFormat(leadIntent, existingConversation)) {
+              const reply = createLeadFormatReply(leadFields, leadIntent, rawText);
+              const customerState = inferCustomerState(
+                existingConversation?.customer_state,
+                rawText
+              );
+              const recentMessages = appendRecentConversationMessages(
+                existingConversation?.recent_messages,
+                rawText,
+                deterministicReply
+              );
+              const conversationSummary = updateConversationSummary(
+                existingConversation?.conversation_summary || "",
+                rawText,
+                deterministicReply
+              );
+
+              await safelyHandleFlowSend(
+                () =>
+                  safeSendMessage(
+                    userId,
+                    reply,
+                    pageAccessToken,
+                    0,
+                    pageId,
+                    client.id
+                  ).then(() => undefined),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+              await safelyRecordAiReply({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                reply,
+                conversationSummary,
+                customerState,
+                recentMessages,
+              });
+              continue;
+            }
+
             await safelyHandleFlowSend(
               async () => {
                 console.info("AI webhook processing text message", {
@@ -869,14 +870,9 @@ export default async function handler(
                   preview: rawText.slice(0, 120),
                 });
                 const aiReply = await askAi(rawText, client.business_info || "", leadFields, {
-                  previousCustomerMessage: existingConversation?.last_customer_message,
-                  previousAiReply: existingConversation?.last_ai_reply,
-                  conversationSummary: existingConversation?.conversation_summary,
-                  customerState: existingConversation?.customer_state,
-                  recentMessages: existingConversation?.recent_messages,
-                  aiCharacter: client.ai_character,
-                  aiTone: client.ai_tone,
+                  ...aiConversationContext,
                   latestLeadIntent: leadIntent,
+                  replyPlan,
                 });
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,

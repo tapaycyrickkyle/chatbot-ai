@@ -22,6 +22,7 @@ type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 type SalesPlan = {
   languageName: string;
   replyInstruction: string;
+  leadCaptureIntent: LeadCaptureIntent;
   resolvedCustomerMeaning: string;
   conversationAction: string;
   buyerIntent: string;
@@ -52,6 +53,7 @@ type ConversationContext = {
   aiCharacter?: string;
   aiTone?: string;
   latestLeadIntent?: LeadCaptureIntent;
+  replyPlan?: SalesPlan;
 };
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 160;
@@ -172,6 +174,10 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
         typeof parsed.replyInstruction === "string" && parsed.replyInstruction.trim()
           ? parsed.replyInstruction.trim().slice(0, 220)
           : getReplyLanguageInstruction(fallbackStyle),
+      leadCaptureIntent:
+        typeof parsed.leadCaptureIntent === "string"
+          ? parseLeadIntent(parsed.leadCaptureIntent)
+          : "UNCLEAR",
       resolvedCustomerMeaning:
         typeof parsed.resolvedCustomerMeaning === "string"
           ? parsed.resolvedCustomerMeaning.slice(0, 240)
@@ -191,6 +197,7 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
     return {
       languageName: fallbackStyle,
       replyInstruction: getReplyLanguageInstruction(fallbackStyle),
+      leadCaptureIntent: "UNCLEAR",
       resolvedCustomerMeaning: "Interpret the latest message using the recent conversation.",
       conversationAction: "answer_latest_message",
       buyerIntent: "understand_latest_message",
@@ -338,7 +345,7 @@ async function planRealEstateSalesReply(input: {
     apiUrl: input.apiUrl,
     model: input.model,
     temperature: 0.1,
-    maxTokens: 180,
+    maxTokens: 260,
     messages: [
       {
         role: "system",
@@ -361,6 +368,15 @@ Rules:
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
 - Do not recommend asking for name/phone unless the latest message clearly wants viewing, reservation, meeting, callback, or follow-up.
+- Classify whether the latest customer message should trigger lead capture. Do not trigger lead capture for ordinary details, price, availability, computation, requirements, or how-to-order questions.
+- Lead intent labels:
+  INFO_ONLY = asks for info, details, price, availability, requirements, photos, location, computation, monthly amortization, or how the process/order works.
+  SOFT_INTEREST = interested but not asking to be contacted, scheduled, reserved, quoted, or processed yet.
+  READY_TO_BUY_OR_BOOK = clearly wants to buy, reserve, book, schedule, visit, set an appointment, or proceed now.
+  WANTS_HUMAN_CONTACT = asks for a person/team/agent/specialist to call, contact, message, or assist them directly.
+  PROVIDED_LEAD_DETAILS = provides name and phone/contact details.
+  UNCLEAR = not enough context.
+- "how to order" is INFO_ONLY unless they also say they want to order now.
 - Detect the customer's latest language or language mix from the latest customer message only. If short English like "yes", "ok", "now i understand", "got it", or "sure", classify as English.
 - The replyInstruction must tell the final assistant exactly what language or mix to use.
 - Keep the next step soft and natural.
@@ -369,6 +385,7 @@ Return only JSON:
 {
   "languageName":"English/Tagalog/Taglish/Cebuano-English/etc",
   "replyInstruction":"Reply in English only.",
+  "leadCaptureIntent":"INFO_ONLY/SOFT_INTEREST/READY_TO_BUY_OR_BOOK/WANTS_HUMAN_CONTACT/PROVIDED_LEAD_DETAILS/UNCLEAR",
   "resolvedCustomerMeaning":"what the latest customer message means in context",
   "conversationAction":"continue_previous_offer/answer_new_question/answer_choice/clarify/soft_sell/ask_next_step",
   "buyerIntent":"price/location/availability/payment/viewing/comparison/etc",
@@ -379,7 +396,7 @@ Return only JSON:
   "shouldAskFollowUp":false
 }
 
-Lead intent:
+Previous lead intent:
 ${input.latestLeadIntent || "UNCLEAR"}
 
 Recent conversation:
@@ -425,83 +442,34 @@ function parseLeadIntent(value: string): LeadCaptureIntent {
   return LEAD_INTENTS.has(label as LeadCaptureIntent) ? (label as LeadCaptureIntent) : "UNCLEAR";
 }
 
-export async function classifyLeadCaptureIntent(
+export async function planAiReply(
   userMessage: string,
-  conversationContext: Pick<ConversationContext, "previousAiReply" | "conversationSummary" | "recentMessages"> = {}
-): Promise<LeadCaptureIntent> {
+  businessContext: string,
+  conversationContext: ConversationContext = {}
+): Promise<SalesPlan> {
+  const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const { apiKey, apiUrl, model } = getAiConfig();
 
   if (!apiUrl || !apiKey || !model) {
-    return "UNCLEAR";
+    console.error("AI planning failed: missing AI_API_URL, AI_API_KEY, or AI_MODEL");
+    return parseSalesPlan("", latestLanguageStyle);
   }
 
-  const recentMessages =
-    conversationContext.recentMessages
-      ?.slice(-4)
-      .map((message) => `${message.role === "assistant" ? "Assistant" : "Customer"}: ${message.content}`)
-      .join("\n")
-      .slice(0, 900) ?? "";
-
-  const prompt = `Classify the latest customer message for lead capture.
-
-Return only JSON like {"intent":"INFO_ONLY"}.
-
-Labels:
-- INFO_ONLY: asks for info, details, price, availability, requirements, photos, location, computation, or how the process/order works.
-- SOFT_INTEREST: interested but not asking to be contacted, scheduled, reserved, quoted, or processed yet.
-- READY_TO_BUY_OR_BOOK: clearly wants to buy, place an order now, reserve, book, schedule, visit, set an appointment, or proceed.
-- WANTS_HUMAN_CONTACT: asks for a person/team/agent/specialist to call, contact, message, or assist them directly.
-- PROVIDED_LEAD_DETAILS: provides name and phone/contact details.
-- UNCLEAR: not enough context.
-
-Important:
-- Understand any language or mixed language.
-- "how to order" is INFO_ONLY unless they also say they want to order now.
-- "details", "info", "how much", "sample computation", and "available?" are INFO_ONLY.
-- Do not classify as READY_TO_BUY_OR_BOOK just because the message mentions order, quote, computation, price, details, or information.
-
-Recent conversation:
-${recentMessages || conversationContext.conversationSummary || "None"}
-
-Previous assistant reply:
-${getPreviousAiReplyForPrompt(conversationContext) || "None"}
-
-Latest customer message:
-${userMessage}`;
-
   try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: createAiHeaders(apiKey, apiUrl),
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_tokens: 40,
-        messages: [
-          {
-            role: "system",
-            content: "You classify lead-capture intent. Return only valid compact JSON.",
-          },
-          { role: "user", content: prompt },
-        ],
-      }),
+    return await planRealEstateSalesReply({
+      apiKey,
+      apiUrl,
+      model,
+      userMessage,
+      businessContext,
+      conversationSummary: getMemorySummaryForPrompt(conversationContext),
+      recentMessages: getRecentMessagesForPrompt(conversationContext),
+      latestLeadIntent: conversationContext.latestLeadIntent,
+      fallbackStyle: latestLanguageStyle,
     });
-
-    if (!response.ok) {
-      console.warn("Lead intent classification failed", {
-        providerUrl: apiUrl,
-        model,
-        status: response.status,
-        statusText: response.statusText,
-      });
-      return "UNCLEAR";
-    }
-
-    const data = (await response.json()) as ChatCompletionResponse;
-    return parseLeadIntent(data.choices?.[0]?.message?.content?.trim() || "");
   } catch (error) {
-    console.warn("Lead intent classification failed", getErrorSummary(error));
-    return "UNCLEAR";
+    console.warn("AI planning failed", getErrorSummary(error));
+    return parseSalesPlan("", latestLanguageStyle);
   }
 }
 
@@ -531,17 +499,19 @@ export async function askAi(
     }
 
     const recentMessages = getRecentMessagesForPrompt(conversationContext);
-    const salesPlan = await planRealEstateSalesReply({
-      apiKey,
-      apiUrl,
-      model,
-      userMessage,
-      businessContext,
-      conversationSummary: memorySummary,
-      recentMessages,
-      latestLeadIntent: conversationContext.latestLeadIntent,
-      fallbackStyle: latestLanguageStyle,
-    });
+    const salesPlan =
+      conversationContext.replyPlan ??
+      (await planRealEstateSalesReply({
+        apiKey,
+        apiUrl,
+        model,
+        userMessage,
+        businessContext,
+        conversationSummary: memorySummary,
+        recentMessages,
+        latestLeadIntent: conversationContext.latestLeadIntent,
+        fallbackStyle: latestLanguageStyle,
+      }));
     const systemPrompt = `You are a human-like real estate sales agent and customer support assistant.
 
 Core rules:
