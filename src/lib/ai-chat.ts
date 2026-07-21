@@ -16,7 +16,20 @@ type ChatCompletionResponse = {
 type ConversationContext = {
   previousCustomerMessage?: string;
   previousAiReply?: string;
+  conversationSummary?: string;
+  customerState?: Record<string, unknown>;
+  recentMessages?: Array<{
+    role?: string;
+    content: string;
+  }>;
+  aiCharacter?: string;
+  aiTone?: string;
 };
+
+const DEFAULT_MAX_OUTPUT_TOKENS = 160;
+const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
+const MAX_RECENT_MESSAGE_CHARS = 320;
+const MAX_MEMORY_CHARS = 900;
 
 function detectReplyLanguage(userMessage: string) {
   const normalizedMessage = userMessage.toLowerCase();
@@ -66,6 +79,16 @@ function getAiConfig() {
   };
 }
 
+function getMaxOutputTokens() {
+  const configuredValue = Number(process.env.AI_MAX_OUTPUT_TOKENS);
+
+  if (Number.isFinite(configuredValue) && configuredValue >= 60 && configuredValue <= 300) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_MAX_OUTPUT_TOKENS;
+}
+
 function createAiHeaders(apiKey: string, apiUrl: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -90,49 +113,38 @@ export async function askAi(
   const leadInformationFormat = leadFields
     .map((field) => `${field}:`)
     .join("\n");
-  const systemPrompt = `You are a sales and customer support assistant for a business. Follow any tone and character instructions included in the business information, as long as they do not conflict with the rules below.
+  const memorySummary = conversationContext.conversationSummary?.trim().slice(0, MAX_MEMORY_CHARS);
+  const customerState = conversationContext.customerState ?? {};
+  const customerStateText =
+    Object.keys(customerState).length > 0
+      ? JSON.stringify(customerState).slice(0, MAX_MEMORY_CHARS)
+      : "";
+  const aiCharacter = conversationContext.aiCharacter?.trim();
+  const aiTone = conversationContext.aiTone?.trim();
+  const systemPrompt = `You are a human-like sales and customer support assistant.
 
-YOUR CONVERSATION PROCESS:
-1. Answer the customer's message directly.
-2. If helpful, briefly connect the answer to a benefit from the business info.
-3. If the customer seems interested, guide them toward the next step without sounding pushy.
-4. If the customer has an objection, acknowledge it calmly and give the most relevant helpful point from the business info.
-5. Mention urgency, discounts, limited slots, or special offers only when the business info clearly says they exist.
-6. End with one simple next-step question, such as asking what they prefer, whether they want details, or whether they want the team to follow up.
-
-RULES:
-- ONLY use the business information provided below. Never invent prices, products, or policies.
-- If the answer isn't there, say: "Great question! Let me connect you with our specialist - one moment please."
-- Do not over-sell. Be helpful first, then gently guide the customer.
-- Suggest add-ons, upsells, or popular items only when they are relevant and included in the business information.
-- The built-in lead capture rule has priority over any business information.
-- When the customer is ready to order, book, schedule, set a meeting, view a property, get a quote, or talk to a human, ask them to send their details exactly in this format:
+Core rules:
+- Use only the business facts below. Never invent prices, products, availability, promos, or policies.
+- If the answer is missing, reply exactly: "Great question! Let me connect you with our specialist - one moment please."
+- Be helpful first, then gently guide the customer to the next step.
+- Keep replies to 1-2 short sentences by default, 3 only when needed.
+- Ask only one question unless requesting lead details.
+- Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
+- Match the latest customer language: English for English; English-heavy Taglish for Tagalog/Taglish. Never reply in full Tagalog.
+- For English-heavy Taglish, use mostly English with natural words like po, opo, sige, and salamat.
+- When the customer wants to order, book, schedule, view, get a quote, or talk to a human, ask for the complete details in this format:
 ${leadInformationFormat}
-- Do not ask lead fields one by one. Ask for the full information format in one message.
-- Do not confirm a booking, meeting, appointment, or viewing until the customer has sent the required information fields.
-- If the customer already gives the needed lead fields, say: "Thank you, I got your details. Our team will follow up shortly."
-- If the customer gives partial contact details, politely ask them to resend the complete information format.
-- Detect the language used in the customer's latest message, but never reply in full Tagalog.
-- If the customer's latest message is in English, reply in English.
-- If the customer's latest message is in Tagalog, reply in English-heavy Taglish.
-- If the customer's latest message mixes English and Tagalog, reply in English-heavy Taglish.
-- For English-heavy Taglish, use mostly English words with natural Filipino words such as "po", "opo", "sige", "salamat", and "naman" when appropriate.
-- Keep English as the majority of every reply, even when the customer writes in Tagalog.
-- Do not write full Tagalog sentences or full Tagalog paragraphs.
-- If the customer says a short English phrase with "po" or "opo" such as "How much po", answer in English-heavy Taglish, not full Tagalog.
-- Prioritize the customer's latest message over any earlier tone or language.
-- Keep replies short: 1 to 3 sentences only.
-- Do not start every reply with greetings like "Hello", "Hi there", or similar unless the customer is clearly greeting first.
-- Do not repeat greetings, filler phrases, or long introductions.
-- Use simple words. Avoid long explanations, markdown, bullets, and numbered lists in customer replies.
-- Ask only one question at a time unless requesting the full information format.
-- Always end with a question or a clear next step - never a dead end.
-- Use the previous conversation turn when the latest customer message is short, such as "yes", "no", "1 BR", "how much", or "I want to know more".
-- Do not restart the conversation, re-introduce the business, or repeat the same question if the customer already answered it.
-- Treat short confirmations like "yes" as an answer to your previous question.
+- If complete lead details are already provided, say: "Thank you, I got your details. Our team will follow up shortly."
+- Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 
-BUSINESS INFORMATION:
-${businessContext}`;
+Business facts:
+${businessContext || "No business facts provided."}
+${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
+${aiTone ? `\nTone/style:\n${aiTone}` : ""}
+${memorySummary ? `\nConversation memory:\n${memorySummary}` : ""}
+${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}
+
+Latest customer language: ${detectedLanguage}`;
   const { apiKey, apiUrl, model } = getAiConfig();
 
   try {
@@ -144,22 +156,38 @@ ${businessContext}`;
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       {
         role: "system",
-        content: `${systemPrompt}\n\nLATEST CUSTOMER LANGUAGE: ${detectedLanguage}`,
+        content: systemPrompt,
       },
     ];
 
-    if (conversationContext.previousCustomerMessage) {
-      messages.push({
-        role: "user",
-        content: conversationContext.previousCustomerMessage,
-      });
-    }
+    const recentMessages =
+      conversationContext.recentMessages?.slice(-MAX_RECENT_MESSAGES_FOR_PROMPT) ?? [];
 
-    if (conversationContext.previousAiReply) {
-      messages.push({
-        role: "assistant",
-        content: conversationContext.previousAiReply,
-      });
+    if (recentMessages.length > 0) {
+      for (const message of recentMessages) {
+        if (message.role !== "user" && message.role !== "assistant") {
+          continue;
+        }
+
+        messages.push({
+          role: message.role,
+          content: message.content.slice(0, MAX_RECENT_MESSAGE_CHARS),
+        });
+      }
+    } else {
+      if (conversationContext.previousCustomerMessage) {
+        messages.push({
+          role: "user",
+          content: conversationContext.previousCustomerMessage,
+        });
+      }
+
+      if (conversationContext.previousAiReply) {
+        messages.push({
+          role: "assistant",
+          content: conversationContext.previousAiReply,
+        });
+      }
     }
 
     messages.push({ role: "user", content: userMessage });
@@ -169,7 +197,8 @@ ${businessContext}`;
       headers: createAiHeaders(apiKey, apiUrl),
       body: JSON.stringify({
         model,
-        temperature: 0.7,
+        temperature: 0.55,
+        max_tokens: getMaxOutputTokens(),
         messages,
       }),
     });

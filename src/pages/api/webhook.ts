@@ -8,6 +8,12 @@ import {
   recordCustomerConversationMessage,
 } from "@/lib/database";
 import { askAi } from "@/lib/ai-chat";
+import {
+  appendRecentConversationMessages,
+  getDeterministicReply,
+  inferCustomerState,
+  updateConversationSummary,
+} from "@/lib/conversation-memory";
 import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
 import {
   createLeadInformationPrompt,
@@ -180,6 +186,9 @@ async function safelyRecordAiReply(input: {
   pageId: string;
   recipientId: string;
   reply: string;
+  conversationSummary?: string;
+  customerState?: Record<string, unknown>;
+  recentMessages?: Array<{ role: string; content: string }>;
 }) {
   try {
     await recordAiConversationReply(input);
@@ -359,11 +368,28 @@ export default async function handler(
             });
 
             if (capturedLead) {
+              const reply = "Thank you, I got your details. Our team will follow up shortly.";
+              const customerState = inferCustomerState(
+                existingConversation?.customer_state,
+                rawText,
+                true
+              );
+              const recentMessages = appendRecentConversationMessages(
+                existingConversation?.recent_messages,
+                rawText,
+                reply
+              );
+              const conversationSummary = updateConversationSummary(
+                existingConversation?.conversation_summary || "",
+                rawText,
+                reply
+              );
+
               await safelyHandleFlowSend(
                 () =>
                   safeSendMessage(
                     userId,
-                    "Thank you, I got your details. Our team will follow up shortly.",
+                    reply,
                     pageAccessToken,
                     0,
                     pageId,
@@ -371,15 +397,37 @@ export default async function handler(
                   ).then(() => undefined),
                 { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
               );
+              await safelyRecordAiReply({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                reply,
+                conversationSummary,
+                customerState,
+                recentMessages,
+              });
               continue;
             }
 
             if (shouldStartLeadFlow(rawText)) {
+              const reply = createLeadInformationPrompt(leadFields);
+              const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
+              const recentMessages = appendRecentConversationMessages(
+                existingConversation?.recent_messages,
+                rawText,
+                reply
+              );
+              const conversationSummary = updateConversationSummary(
+                existingConversation?.conversation_summary || "",
+                rawText,
+                reply
+              );
+
               await safelyHandleFlowSend(
                 () =>
                   safeSendMessage(
                     userId,
-                    createLeadInformationPrompt(leadFields),
+                    reply,
                     pageAccessToken,
                     0,
                     pageId,
@@ -387,6 +435,15 @@ export default async function handler(
                   ).then(() => undefined),
                 { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
               );
+              await safelyRecordAiReply({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                reply,
+                conversationSummary,
+                customerState,
+                recentMessages,
+              });
               continue;
             }
           }
@@ -410,6 +467,48 @@ export default async function handler(
           }
 
           if (rawText) {
+            const deterministicReply = getDeterministicReply(rawText);
+
+            if (deterministicReply) {
+              const customerState = inferCustomerState(
+                existingConversation?.customer_state,
+                rawText
+              );
+              const recentMessages = appendRecentConversationMessages(
+                existingConversation?.recent_messages,
+                rawText,
+                deterministicReply
+              );
+              const conversationSummary = updateConversationSummary(
+                existingConversation?.conversation_summary || "",
+                rawText,
+                deterministicReply
+              );
+
+              await safelyHandleFlowSend(
+                () =>
+                  safeSendMessage(
+                    userId,
+                    deterministicReply,
+                    pageAccessToken,
+                    0,
+                    pageId,
+                    client.id
+                  ).then(() => undefined),
+                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              );
+              await safelyRecordAiReply({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                reply: deterministicReply,
+                conversationSummary,
+                customerState,
+                recentMessages,
+              });
+              continue;
+            }
+
             await safelyHandleFlowSend(
               async () => {
                 console.info("AI webhook processing text message", {
@@ -421,7 +520,26 @@ export default async function handler(
                 const aiReply = await askAi(rawText, client.business_info || "", leadFields, {
                   previousCustomerMessage: existingConversation?.last_customer_message,
                   previousAiReply: existingConversation?.last_ai_reply,
+                  conversationSummary: existingConversation?.conversation_summary,
+                  customerState: existingConversation?.customer_state,
+                  recentMessages: existingConversation?.recent_messages,
+                  aiCharacter: client.ai_character,
+                  aiTone: client.ai_tone,
                 });
+                const customerState = inferCustomerState(
+                  existingConversation?.customer_state,
+                  rawText
+                );
+                const recentMessages = appendRecentConversationMessages(
+                  existingConversation?.recent_messages,
+                  rawText,
+                  aiReply
+                );
+                const conversationSummary = updateConversationSummary(
+                  existingConversation?.conversation_summary || "",
+                  rawText,
+                  aiReply
+                );
                 console.info("AI webhook generated reply", {
                   clientId: client.id,
                   pageId,
@@ -434,6 +552,9 @@ export default async function handler(
                   pageId,
                   recipientId: userId,
                   reply: aiReply,
+                  conversationSummary,
+                  customerState,
+                  recentMessages,
                 });
               },
               { clientId: client.id, pageId, recipientId: userId, messageType: "text" }

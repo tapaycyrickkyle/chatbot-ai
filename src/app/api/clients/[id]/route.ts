@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 import { assertSameOrigin, sanitizeIdentifier } from "@/lib/api-security";
-import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
+import {
+  MAX_AI_CHARACTER_LENGTH,
+  MAX_AI_TONE_LENGTH,
+  MAX_BUSINESS_INFO_LENGTH,
+} from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
 const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
@@ -21,6 +25,8 @@ function validateClientSettingsPayload(payload: unknown) {
     bot_type,
     business_info,
     ai_enabled,
+    ai_character,
+    ai_tone,
     google_sheets_webhook_url,
     google_sheets_tab_name,
     lead_capture_fields,
@@ -29,6 +35,8 @@ function validateClientSettingsPayload(payload: unknown) {
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
+    ai_character: string;
+    ai_tone: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
     lead_capture_fields: string;
@@ -60,6 +68,30 @@ function validateClientSettingsPayload(payload: unknown) {
     }
 
     updates.ai_enabled = ai_enabled;
+  }
+
+  if (ai_character !== undefined) {
+    if (typeof ai_character !== "string") {
+      throw new Error("Invalid AI character");
+    }
+
+    if (ai_character.length > MAX_AI_CHARACTER_LENGTH) {
+      throw new Error("AI character is too long");
+    }
+
+    updates.ai_character = ai_character.trim();
+  }
+
+  if (ai_tone !== undefined) {
+    if (typeof ai_tone !== "string") {
+      throw new Error("Invalid AI tone");
+    }
+
+    if (ai_tone.length > MAX_AI_TONE_LENGTH) {
+      throw new Error("AI tone is too long");
+    }
+
+    updates.ai_tone = ai_tone.trim();
   }
 
   if (google_sheets_webhook_url !== undefined) {
@@ -147,6 +179,8 @@ export async function GET(
       bot_type: client.bot_type,
       business_info: client.business_info,
       ai_enabled: client.ai_enabled,
+      ai_character: client.ai_character,
+      ai_tone: client.ai_tone,
       google_sheets_webhook_url: client.google_sheets_webhook_url,
       google_sheets_tab_name: client.google_sheets_tab_name,
       lead_capture_fields: client.lead_capture_fields,

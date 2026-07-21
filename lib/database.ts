@@ -11,6 +11,8 @@ type ClientRow = {
   bot_type?: string | null;
   business_info?: string | null;
   ai_enabled?: boolean | null;
+  ai_character?: string | null;
+  ai_tone?: string | null;
   google_sheets_webhook_url?: string | null;
   google_sheets_tab_name?: string | null;
   lead_capture_fields?: string | null;
@@ -23,6 +25,9 @@ type AiConversationRow = {
   recipient_id: string;
   last_customer_message: string | null;
   last_ai_reply?: string | null;
+  conversation_summary?: string | null;
+  customer_state?: Record<string, unknown> | null;
+  recent_messages?: Array<{ role?: string; content?: string }> | null;
   last_message_at: string | null;
   ai_paused: boolean | null;
   paused_at: string | null;
@@ -59,11 +64,11 @@ type OrderRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields";
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
 const AI_CONVERSATION_COLUMNS =
-  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
+  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 const LEGACY_AI_CONVERSATION_COLUMNS =
   "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 
@@ -85,6 +90,23 @@ function isMissingLastAiReplyError(error: { message?: string } | null) {
   );
 }
 
+function isMissingNewClientAiFieldsError(error: { message?: string } | null) {
+  return Boolean(
+    (error?.message?.includes("ai_character") ||
+      error?.message?.includes("ai_tone")) &&
+      error.message.includes("does not exist")
+  );
+}
+
+function isMissingConversationMemoryError(error: { message?: string } | null) {
+  return Boolean(
+    (error?.message?.includes("conversation_summary") ||
+      error?.message?.includes("customer_state") ||
+      error?.message?.includes("recent_messages")) &&
+      error.message.includes("does not exist")
+  );
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -95,6 +117,8 @@ function normalizeClient(row: ClientRow) {
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     ai_enabled: row.ai_enabled ?? true,
+    ai_character: row.ai_character ?? "",
+    ai_tone: row.ai_tone ?? "",
     google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
     google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
     lead_capture_fields: row.lead_capture_fields ?? "Full Name\nPhone",
@@ -103,6 +127,17 @@ function normalizeClient(row: ClientRow) {
 }
 
 function normalizeAiConversation(row: AiConversationRow) {
+  const recentMessages = Array.isArray(row.recent_messages)
+    ? row.recent_messages.flatMap((message) => {
+        const role = message?.role === "user" || message?.role === "assistant"
+          ? message.role
+          : null;
+        const content = typeof message?.content === "string" ? message.content : "";
+
+        return role && content ? [{ role, content }] : [];
+      })
+    : [];
+
   return {
     id: String(row.id),
     client_id: String(row.client_id),
@@ -110,6 +145,9 @@ function normalizeAiConversation(row: AiConversationRow) {
     recipient_id: row.recipient_id,
     last_customer_message: row.last_customer_message ?? "",
     last_ai_reply: row.last_ai_reply ?? "",
+    conversation_summary: row.conversation_summary ?? "",
+    customer_state: row.customer_state ?? {},
+    recent_messages: recentMessages,
     last_message_at: row.last_message_at ?? row.updated_at,
     ai_paused: Boolean(row.ai_paused),
     paused_at: row.paused_at ?? "",
@@ -160,7 +198,9 @@ export async function getClients() {
     .from("clients")
     .select(CLIENT_COLUMNS)
     .order("created_at", { ascending: true });
-  const { data, error } = isMissingGoogleSheetsTabNameError(response.error)
+  const { data, error } =
+    isMissingGoogleSheetsTabNameError(response.error) ||
+    isMissingNewClientAiFieldsError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -218,7 +258,9 @@ export async function getClientById(clientId: string) {
     .select(CLIENT_COLUMNS)
     .eq("id", clientId)
     .maybeSingle();
-  const { data, error } = isMissingGoogleSheetsTabNameError(response.error)
+  const { data, error } =
+    isMissingGoogleSheetsTabNameError(response.error) ||
+    isMissingNewClientAiFieldsError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -243,6 +285,8 @@ export async function updateClientSettings(
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
+    ai_character: string;
+    ai_tone: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
     lead_capture_fields: string;
@@ -263,7 +307,9 @@ export async function getAiConversationsForClient(clientId: string) {
     .select(AI_CONVERSATION_COLUMNS)
     .eq("client_id", clientId)
     .order("last_message_at", { ascending: false, nullsFirst: false });
-  const { data, error } = isMissingLastAiReplyError(response.error)
+  const { data, error } =
+    isMissingLastAiReplyError(response.error) ||
+    isMissingConversationMemoryError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -286,7 +332,9 @@ export async function getAiConversation(clientId: string, recipientId: string) {
     .eq("client_id", clientId)
     .eq("recipient_id", recipientId)
     .maybeSingle();
-  const { data, error } = isMissingLastAiReplyError(response.error)
+  const { data, error } =
+    isMissingLastAiReplyError(response.error) ||
+    isMissingConversationMemoryError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -332,29 +380,55 @@ export async function recordAiConversationReply(input: {
   pageId: string;
   recipientId: string;
   reply: string;
+  conversationSummary?: string;
+  customerState?: Record<string, unknown>;
+  recentMessages?: Array<{ role: string; content: string }>;
 }) {
   const now = new Date().toISOString();
   const supabase = getDb();
+  const updates: Record<string, unknown> = {
+    client_id: input.clientId,
+    page_id: input.pageId,
+    recipient_id: input.recipientId,
+    last_ai_reply: input.reply,
+    last_message_at: now,
+    updated_at: now,
+  };
+
+  if (input.conversationSummary !== undefined) {
+    updates.conversation_summary = input.conversationSummary;
+  }
+
+  if (input.customerState !== undefined) {
+    updates.customer_state = input.customerState;
+  }
+
+  if (input.recentMessages !== undefined) {
+    updates.recent_messages = input.recentMessages;
+  }
+
   const response = await supabase.from("ai_conversations").upsert(
-    {
-      client_id: input.clientId,
-      page_id: input.pageId,
-      recipient_id: input.recipientId,
-      last_ai_reply: input.reply,
-      last_message_at: now,
-      updated_at: now,
-    },
+    updates,
     { onConflict: "client_id,recipient_id" }
   );
-  const { error } = isMissingLastAiReplyError(response.error)
+  const shouldFallback =
+    isMissingLastAiReplyError(response.error) ||
+    isMissingConversationMemoryError(response.error);
+  const fallbackUpdates: Record<string, unknown> = {
+    client_id: input.clientId,
+    page_id: input.pageId,
+    recipient_id: input.recipientId,
+    last_message_at: now,
+    updated_at: now,
+  };
+
+  if (!isMissingLastAiReplyError(response.error)) {
+    fallbackUpdates.last_ai_reply = input.reply;
+  }
+
+  const { error } = shouldFallback
     ? await supabase.from("ai_conversations").upsert(
-        {
-          client_id: input.clientId,
-          page_id: input.pageId,
-          recipient_id: input.recipientId,
-          last_message_at: now,
-          updated_at: now,
-        },
+        fallbackUpdates,
         { onConflict: "client_id,recipient_id" }
       )
     : response;
