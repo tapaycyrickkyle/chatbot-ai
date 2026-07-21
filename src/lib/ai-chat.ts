@@ -19,12 +19,9 @@ type ChatCompletionResponse = {
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-type LanguageDetection = {
+type SalesPlan = {
   languageName: string;
   replyInstruction: string;
-};
-
-type SalesPlan = {
   resolvedCustomerMeaning: string;
   conversationAction: string;
   buyerIntent: string;
@@ -139,21 +136,6 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
   }
 }
 
-function getStrictLanguageInstruction(languageStyle: CustomerLanguageStyle) {
-  switch (languageStyle) {
-    case "english":
-      return "The customer's latest message is English. Reply in English only. Remove all Tagalog, Taglish, Bisaya/Cebuano, and words like po/opo.";
-    case "cebuano":
-      return "The customer's latest message is Bisaya/Cebuano. Reply in natural Bisaya/Cebuano only. Do not use Tagalog phrases.";
-    case "tagalog":
-      return "The customer's latest message is Tagalog. Reply in natural Tagalog only. Do not use Bisaya/Cebuano phrases.";
-    case "taglish":
-      return "The customer's latest message is Taglish. Reply in natural Taglish only. Do not switch to full Bisaya/Cebuano.";
-    default:
-      return "Reply in English only unless the latest customer message contains clear Tagalog or Bisaya/Cebuano words.";
-  }
-}
-
 function hasWrongReplyLanguage(reply: string, languageStyle: CustomerLanguageStyle) {
   switch (languageStyle) {
     case "english":
@@ -177,35 +159,19 @@ function cleanJsonText(value: string) {
   return value.replace(/```(?:json)?|```/gi, "").trim();
 }
 
-function parseLanguageDetection(value: string, fallbackStyle: CustomerLanguageStyle): LanguageDetection {
-  try {
-    const parsed = JSON.parse(cleanJsonText(value)) as {
-      languageName?: unknown;
-      replyInstruction?: unknown;
-    };
-    const languageName =
-      typeof parsed.languageName === "string" && parsed.languageName.trim()
-        ? parsed.languageName.trim().slice(0, 80)
-        : fallbackStyle;
-    const replyInstruction =
-      typeof parsed.replyInstruction === "string" && parsed.replyInstruction.trim()
-        ? parsed.replyInstruction.trim().slice(0, 220)
-        : getReplyLanguageInstruction(fallbackStyle);
-
-    return { languageName, replyInstruction };
-  } catch {
-    return {
-      languageName: fallbackStyle,
-      replyInstruction: getReplyLanguageInstruction(fallbackStyle),
-    };
-  }
-}
-
-function parseSalesPlan(value: string): SalesPlan {
+function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): SalesPlan {
   try {
     const parsed = JSON.parse(cleanJsonText(value)) as Partial<Record<keyof SalesPlan, unknown>>;
 
     return {
+      languageName:
+        typeof parsed.languageName === "string" && parsed.languageName.trim()
+          ? parsed.languageName.trim().slice(0, 80)
+          : fallbackStyle,
+      replyInstruction:
+        typeof parsed.replyInstruction === "string" && parsed.replyInstruction.trim()
+          ? parsed.replyInstruction.trim().slice(0, 220)
+          : getReplyLanguageInstruction(fallbackStyle),
       resolvedCustomerMeaning:
         typeof parsed.resolvedCustomerMeaning === "string"
           ? parsed.resolvedCustomerMeaning.slice(0, 240)
@@ -223,6 +189,8 @@ function parseSalesPlan(value: string): SalesPlan {
     };
   } catch {
     return {
+      languageName: fallbackStyle,
+      replyInstruction: getReplyLanguageInstruction(fallbackStyle),
       resolvedCustomerMeaning: "Interpret the latest message using the recent conversation.",
       conversationAction: "answer_latest_message",
       buyerIntent: "understand_latest_message",
@@ -348,111 +316,6 @@ async function requestChatCompletion(input: {
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
-async function detectLatestCustomerLanguage(input: {
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  userMessage: string;
-  fallbackStyle: CustomerLanguageStyle;
-}) {
-  const fallbackDetection = {
-    languageName: input.fallbackStyle,
-    replyInstruction: getReplyLanguageInstruction(input.fallbackStyle),
-  };
-
-  const response = await requestChatCompletion({
-    apiKey: input.apiKey,
-    apiUrl: input.apiUrl,
-    model: input.model,
-    temperature: 0,
-    maxTokens: 90,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You detect the language of the latest customer message for a Messenger chatbot. Return only compact JSON. Do not answer the customer.",
-      },
-      {
-        role: "user",
-        content: `Identify the language or language mix of this latest customer message only.
-
-Rules:
-- Ignore previous conversation. Use only this message.
-- If the message is short English like "yes", "ok", "now i understand", "got it", or "sure", classify it as English.
-- If it is mixed, name the mix, for example "Taglish" or "Cebuano-English".
-- The replyInstruction must tell the assistant exactly what language or mix to use.
-
-Return only JSON:
-{"languageName":"English","replyInstruction":"Reply in English only."}
-
-Latest customer message:
-${input.userMessage}`,
-      },
-    ],
-  });
-
-  if (!response || response === AI_TEMPORARY_UNAVAILABLE_MESSAGE) {
-    return fallbackDetection;
-  }
-
-  return parseLanguageDetection(response, input.fallbackStyle);
-}
-
-async function validateReplyLanguage(input: {
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  userMessage: string;
-  reply: string;
-  languageDetection: LanguageDetection;
-}) {
-  const response = await requestChatCompletion({
-    apiKey: input.apiKey,
-    apiUrl: input.apiUrl,
-    model: input.model,
-    temperature: 0,
-    maxTokens: 30,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You validate whether an assistant reply follows the required customer language. Return only JSON.",
-      },
-      {
-        role: "user",
-        content: `Required language:
-${input.languageDetection.languageName}
-
-Required instruction:
-${input.languageDetection.replyInstruction}
-
-Latest customer message:
-${input.userMessage}
-
-Assistant reply:
-${input.reply}
-
-Return only JSON:
-{"valid":true}
-or
-{"valid":false}`,
-      },
-    ],
-  });
-
-  if (!response || response === AI_TEMPORARY_UNAVAILABLE_MESSAGE) {
-    return true;
-  }
-
-  try {
-    const parsed = JSON.parse(cleanJsonText(response)) as { valid?: unknown };
-
-    return parsed.valid === true;
-  } catch {
-    return true;
-  }
-}
-
 async function planRealEstateSalesReply(input: {
   apiKey: string;
   apiUrl: string;
@@ -462,7 +325,7 @@ async function planRealEstateSalesReply(input: {
   conversationSummary: string;
   recentMessages: Array<{ role?: string; content: string }>;
   latestLeadIntent?: LeadCaptureIntent;
-  languageDetection: LanguageDetection;
+  fallbackStyle: CustomerLanguageStyle;
 }) {
   const recentMessages = input.recentMessages
     .slice(-4)
@@ -498,11 +361,14 @@ Rules:
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
 - Do not recommend asking for name/phone unless the latest message clearly wants viewing, reservation, meeting, callback, or follow-up.
+- Detect the customer's latest language or language mix from the latest customer message only. If short English like "yes", "ok", "now i understand", "got it", or "sure", classify as English.
+- The replyInstruction must tell the final assistant exactly what language or mix to use.
 - Keep the next step soft and natural.
-- Customer language: ${input.languageDetection.languageName}. ${input.languageDetection.replyInstruction}
 
 Return only JSON:
 {
+  "languageName":"English/Tagalog/Taglish/Cebuano-English/etc",
+  "replyInstruction":"Reply in English only.",
   "resolvedCustomerMeaning":"what the latest customer message means in context",
   "conversationAction":"continue_previous_offer/answer_new_question/answer_choice/clarify/soft_sell/ask_next_step",
   "buyerIntent":"price/location/availability/payment/viewing/comparison/etc",
@@ -529,10 +395,10 @@ ${input.userMessage}`,
   });
 
   if (!response || response === AI_TEMPORARY_UNAVAILABLE_MESSAGE) {
-    return parseSalesPlan("");
+    return parseSalesPlan("", input.fallbackStyle);
   }
 
-  return parseSalesPlan(response);
+  return parseSalesPlan(response, input.fallbackStyle);
 }
 
 function parseLeadIntent(value: string): LeadCaptureIntent {
@@ -664,13 +530,6 @@ export async function askAi(
       return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
     }
 
-    const languageDetection = await detectLatestCustomerLanguage({
-      apiKey,
-      apiUrl,
-      model,
-      userMessage,
-      fallbackStyle: latestLanguageStyle,
-    });
     const recentMessages = getRecentMessagesForPrompt(conversationContext);
     const salesPlan = await planRealEstateSalesReply({
       apiKey,
@@ -681,7 +540,7 @@ export async function askAi(
       conversationSummary: memorySummary,
       recentMessages,
       latestLeadIntent: conversationContext.latestLeadIntent,
-      languageDetection,
+      fallbackStyle: latestLanguageStyle,
     });
     const systemPrompt = `You are a human-like real estate sales agent and customer support assistant.
 
@@ -696,8 +555,8 @@ Core rules:
 - If the customer asks price, computation, availability, location, parking, requirements, or how to avail, answer the information first before asking anything.
 - If exact price, availability, computation, parking terms, requirements, or schedule details are missing from the business facts, say the team can confirm instead of inventing.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
-- AI-detected latest customer language/style: ${languageDetection.languageName}.
-- Mandatory reply language instruction: ${languageDetection.replyInstruction}
+- AI-detected latest customer language/style: ${salesPlan.languageName}.
+- Mandatory reply language instruction: ${salesPlan.replyInstruction}
 - Use this latest detected language/style for this reply only.
 - Do not keep using a previous customer's language if the latest message switches languages.
 - If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
@@ -777,7 +636,7 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
 
     messages.push({
       role: "system",
-      content: `Language lock for the next reply: ${languageDetection.replyInstruction}`,
+      content: `Language lock for the next reply: ${salesPlan.replyInstruction}`,
     });
     messages.push({
       role: "system",
@@ -785,7 +644,7 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
     });
     messages.push({ role: "user", content: userMessage });
 
-    let reply = await requestChatCompletion({
+    const reply = await requestChatCompletion({
       apiKey,
       apiUrl,
       model,
@@ -794,47 +653,13 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
       maxTokens: getMaxOutputTokens(),
     });
 
-    if (
-      reply &&
-      reply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE &&
-      (needsReplyRewrite(reply, latestLanguageStyle) ||
-        !(await validateReplyLanguage({
-          apiKey,
-          apiUrl,
-          model,
-          userMessage,
-          reply,
-          languageDetection,
-        })))
-    ) {
-      console.warn("AI reply rewritten for language/tone mismatch", {
+    if (reply && reply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE && needsReplyRewrite(reply, latestLanguageStyle)) {
+      console.warn("AI reply blocked for local language/tone mismatch", {
         latestLanguageStyle,
-        detectedLanguage: languageDetection.languageName,
+        detectedLanguage: salesPlan.languageName,
         preview: reply.slice(0, 160),
       });
-
-      reply = await requestChatCompletion({
-        apiKey,
-        apiUrl,
-        model,
-        messages: [
-          ...messages,
-          {
-            role: "assistant",
-            content: reply,
-          },
-          {
-            role: "system",
-            content: `${languageDetection.replyInstruction} ${getStrictLanguageInstruction(latestLanguageStyle)} Also sound friendly and direct. Do not say "talagang gusto mo" or imply the customer is arguing, repeating themselves, or being difficult.`,
-          },
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-        temperature: 0.2,
-        maxTokens: getMaxOutputTokens(),
-      });
+      return missingInfoReply;
     }
 
     if (reply && mentionsUnsupportedContactChannel(reply, businessContext)) {
