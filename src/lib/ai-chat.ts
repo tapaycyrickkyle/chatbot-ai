@@ -24,6 +24,15 @@ type LanguageDetection = {
   replyInstruction: string;
 };
 
+type SalesPlan = {
+  buyerIntent: string;
+  buyerStage: string;
+  likelyConcern: string;
+  bestAnswerAngle: string;
+  bestNextStep: string;
+  shouldAskFollowUp: boolean;
+};
+
 export type LeadCaptureIntent =
   | "INFO_ONLY"
   | "SOFT_INTEREST"
@@ -186,6 +195,30 @@ function parseLanguageDetection(value: string, fallbackStyle: CustomerLanguageSt
     return {
       languageName: fallbackStyle,
       replyInstruction: getReplyLanguageInstruction(fallbackStyle),
+    };
+  }
+}
+
+function parseSalesPlan(value: string): SalesPlan {
+  try {
+    const parsed = JSON.parse(cleanJsonText(value)) as Partial<Record<keyof SalesPlan, unknown>>;
+
+    return {
+      buyerIntent: typeof parsed.buyerIntent === "string" ? parsed.buyerIntent.slice(0, 120) : "understand_latest_message",
+      buyerStage: typeof parsed.buyerStage === "string" ? parsed.buyerStage.slice(0, 80) : "unknown",
+      likelyConcern: typeof parsed.likelyConcern === "string" ? parsed.likelyConcern.slice(0, 160) : "none",
+      bestAnswerAngle: typeof parsed.bestAnswerAngle === "string" ? parsed.bestAnswerAngle.slice(0, 220) : "answer_directly_using_business_facts",
+      bestNextStep: typeof parsed.bestNextStep === "string" ? parsed.bestNextStep.slice(0, 180) : "answer_only",
+      shouldAskFollowUp: parsed.shouldAskFollowUp === true,
+    };
+  } catch {
+    return {
+      buyerIntent: "understand_latest_message",
+      buyerStage: "unknown",
+      likelyConcern: "none",
+      bestAnswerAngle: "answer_directly_using_business_facts",
+      bestNextStep: "answer_only",
+      shouldAskFollowUp: false,
     };
   }
 }
@@ -408,6 +441,79 @@ or
   }
 }
 
+async function planRealEstateSalesReply(input: {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  userMessage: string;
+  businessContext: string;
+  conversationSummary: string;
+  recentMessages: Array<{ role?: string; content: string }>;
+  latestLeadIntent?: LeadCaptureIntent;
+  languageDetection: LanguageDetection;
+}) {
+  const recentMessages = input.recentMessages
+    .slice(-4)
+    .map((message) => `${message.role === "assistant" ? "Assistant" : "Customer"}: ${message.content}`)
+    .join("\n")
+    .slice(0, 1000);
+
+  const response = await requestChatCompletion({
+    apiKey: input.apiKey,
+    apiUrl: input.apiUrl,
+    model: input.model,
+    temperature: 0.1,
+    maxTokens: 180,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are the private sales strategist for a real estate Messenger agent. Think carefully, but return only compact JSON. Do not write the customer-facing reply.",
+      },
+      {
+        role: "user",
+        content: `Plan the best real estate sales response for the latest customer message.
+
+Rules:
+- Use only the business facts. Do not invent prices, availability, promos, financing terms, requirements, or schedules.
+- Identify what the buyer is really trying to decide.
+- Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
+- Do not recommend asking for name/phone unless the latest message clearly wants viewing, reservation, meeting, callback, or follow-up.
+- Keep the next step soft and natural.
+- Customer language: ${input.languageDetection.languageName}. ${input.languageDetection.replyInstruction}
+
+Return only JSON:
+{
+  "buyerIntent":"price/location/availability/payment/viewing/comparison/etc",
+  "buyerStage":"browsing/interested/qualified/ready_to_schedule/ready_to_reserve",
+  "likelyConcern":"short description",
+  "bestAnswerAngle":"what the final reply should emphasize",
+  "bestNextStep":"one soft next step or answer_only",
+  "shouldAskFollowUp":false
+}
+
+Lead intent:
+${input.latestLeadIntent || "UNCLEAR"}
+
+Recent conversation:
+${recentMessages || input.conversationSummary || "None"}
+
+Business facts:
+${input.businessContext || "No business facts provided."}
+
+Latest customer message:
+${input.userMessage}`,
+      },
+    ],
+  });
+
+  if (!response || response === AI_TEMPORARY_UNAVAILABLE_MESSAGE) {
+    return parseSalesPlan("");
+  }
+
+  return parseSalesPlan(response);
+}
+
 function parseLeadIntent(value: string): LeadCaptureIntent {
   const normalizedValue = value
     .replace(/```(?:json)?|```/gi, "")
@@ -544,6 +650,18 @@ export async function askAi(
       userMessage,
       fallbackStyle: latestLanguageStyle,
     });
+    const recentMessages = getRecentMessagesForPrompt(conversationContext);
+    const salesPlan = await planRealEstateSalesReply({
+      apiKey,
+      apiUrl,
+      model,
+      userMessage,
+      businessContext,
+      conversationSummary: memorySummary,
+      recentMessages,
+      latestLeadIntent: conversationContext.latestLeadIntent,
+      languageDetection,
+    });
     const systemPrompt = `You are a human-like real estate sales agent and customer support assistant.
 
 Core rules:
@@ -570,6 +688,7 @@ Core rules:
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
 - Never sound annoyed, confrontational, sarcastic, or like the customer is looking for a fight. Do not say phrases like "talagang gusto mo", "you keep asking", "obviously", or similar.
 - Sound natural and consultative: warm, clear, confident, and lightly persuasive without pressure.
+- Do not over-sell or use generic marketing fluff. Make the customer feel understood, then give the most useful next step.
 - If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
 - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
 - Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
@@ -578,11 +697,19 @@ Core rules:
 - If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 - Prior conversation is context only. Never copy its language if the latest customer message uses a different language.
+- Use the private sales plan below to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
 
 Business facts:
 ${businessContext || "No business facts provided."}
 ${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
 ${aiTone ? `\nTone/style:\n${aiTone}` : ""}
+Private sales plan:
+- Buyer intent: ${salesPlan.buyerIntent}
+- Buyer stage: ${salesPlan.buyerStage}
+- Likely concern: ${salesPlan.likelyConcern}
+- Best answer angle: ${salesPlan.bestAnswerAngle}
+- Best next step: ${salesPlan.bestNextStep}
+- Ask follow-up: ${salesPlan.shouldAskFollowUp ? "yes, if natural" : "no unless necessary"}
 ${memorySummary ? `\nConversation memory:\n${memorySummary}` : ""}
 ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
 
@@ -592,8 +719,6 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
         content: systemPrompt,
       },
     ];
-
-    const recentMessages = getRecentMessagesForPrompt(conversationContext);
 
     if (recentMessages.length > 0) {
       for (const message of recentMessages) {
