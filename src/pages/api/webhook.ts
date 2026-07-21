@@ -11,6 +11,7 @@ import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
 import {
   createLeadInformationPrompt,
   extractFormattedLeadFromMessage,
+  extractLeadFromMessage,
   parseLeadFields,
 } from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -183,10 +184,12 @@ async function safelyCaptureLead(input: {
   googleSheetsWebhookUrl: string;
   leadFields: string[];
 }) {
-  const lead = extractFormattedLeadFromMessage(input.message, input.leadFields);
+  const lead =
+    extractFormattedLeadFromMessage(input.message, input.leadFields) ??
+    extractLeadFromMessage(input.message, input.leadFields);
 
   if (!lead) {
-    console.info("Google Sheets lead capture skipped: formatted lead not detected", {
+    console.info("Google Sheets lead capture skipped: lead details not detected", {
       pageId: input.pageId,
       recipientId: input.recipientId,
       requiredFields: input.leadFields,
