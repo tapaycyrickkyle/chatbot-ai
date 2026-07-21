@@ -275,15 +275,8 @@ function wasLeadFormatRecentlyRequested(
 
 function getFallbackLeadIntent(message: string): LeadCaptureIntent {
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
-  const asksForInfoOnly =
-    /\b(details?|info|information|price|how much|hm|available|availability|requirements?|photos?|pictures?|location|sample computation|computation|monthly|amortization|dp|down payment)\b/i.test(
-      normalizedMessage
-    ) ||
-    /\bhow\s+(?:to|do i|can i)\s+(?:order|buy|book|reserve|schedule|get|avail)/i.test(
-      normalizedMessage
-    );
 
-  if (asksForInfoOnly) {
+  if (isClearlyInfoOnlyMessage(normalizedMessage)) {
     return "INFO_ONLY";
   }
 
@@ -322,10 +315,39 @@ function getFallbackLeadIntent(message: string): LeadCaptureIntent {
   return "UNCLEAR";
 }
 
+function isClearlyInfoOnlyMessage(normalizedMessage: string) {
+  const withoutPoliteWords = normalizedMessage
+    .replace(/\b(?:po|please|pls|sir|maam|ma'am|boss|thanks|thank you|salamat)\b/gi, "")
+    .replace(/[^\p{L}\p{N}\s?]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const asksForInfoOnly =
+    /\b(details?|info|information|price|how much|hm|available|availability|requirements?|photos?|pictures?|location|sample computation|computation|monthly|amortization|dp|down payment)\b/i.test(
+      normalizedMessage
+    ) ||
+    /\bhow\s+(?:to|do i|can i)\s+(?:order|buy|book|reserve|schedule|get|avail)/i.test(
+      normalizedMessage
+    );
+
+  return (
+    asksForInfoOnly &&
+    !/\b(?:call me|contact me|message me|pm me|dm me|talk to|speak to|agent|specialist|human|staff|representative|order now|place order|checkout|buy now|reserve now|book now|schedule viewing|book viewing|set appointment|make appointment|proceed with|go ahead|pa\s*reserve|pa\s*book|magpa\s*book|magpa\s*reserve)\b/i.test(
+      normalizedMessage
+    ) &&
+    withoutPoliteWords.split(/\s+/).filter(Boolean).length <= 6
+  );
+}
+
 async function getLeadCaptureIntent(
   message: string,
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
 ) {
+  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
+
+  if (isClearlyInfoOnlyMessage(normalizedMessage)) {
+    return "INFO_ONLY";
+  }
+
   const aiIntent = await classifyLeadCaptureIntent(message, {
     previousAiReply: conversation?.last_ai_reply,
     conversationSummary: conversation?.conversation_summary,
