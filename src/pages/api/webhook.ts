@@ -41,6 +41,7 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
+const DEFAULT_IGNORED_PAGE_ECHO_APP_IDS = ["1567190244970637"];
 const HUMAN_REPLY_MIN_DELAY_MS = 4500;
 const HUMAN_REPLY_MAX_DELAY_MS = 12000;
 const HUMAN_REPLY_MS_PER_CHAR = 35;
@@ -136,12 +137,29 @@ function isOwnerMessageEcho(
   }
 
   const appId = event.message.app_id ? String(event.message.app_id) : "";
+  const ignoredAppIds = getIgnoredPageEchoAppIds();
 
-  if (!appId) {
-    return true;
+  if (appId && ignoredAppIds.has(appId)) {
+    return false;
   }
 
-  return false;
+  return true;
+}
+
+function getIgnoredPageEchoAppIds() {
+  const configuredIds = [
+    process.env.FACEBOOK_APP_ID,
+    process.env.BOTCAKE_APP_ID,
+    process.env.BOTCAKE_APP_IDS,
+    process.env.IGNORED_PAGE_ECHO_APP_IDS,
+  ]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return new Set([...DEFAULT_IGNORED_PAGE_ECHO_APP_IDS, ...configuredIds]);
 }
 
 async function safelyPauseAiForOwnerReply(input: {
@@ -630,6 +648,13 @@ export default async function handler(
               clientId: client.id,
               pageId,
               recipientId: userId,
+              pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
+            });
+            console.info("AI paused after manual page reply", {
+              clientId: client.id,
+              pageId,
+              userId,
+              appId: event.message?.app_id ? String(event.message.app_id) : "",
               pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
             });
             continue;
