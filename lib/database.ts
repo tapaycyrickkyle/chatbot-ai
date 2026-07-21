@@ -71,7 +71,9 @@ type OrderRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls, manual_ai_pause_minutes";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
+const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
+  `${CLIENT_COLUMNS}, manual_ai_pause_minutes`;
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
 const AI_CONVERSATION_COLUMNS =
@@ -235,18 +237,23 @@ export async function getClients() {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS)
+    .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
     .order("created_at", { ascending: true });
+  const modernResponse = isMissingManualAiPauseMinutesError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS)
+        .order("created_at", { ascending: true })
+    : response;
   const { data, error } =
-    isMissingGoogleSheetsTabNameError(response.error) ||
-    isMissingNewClientAiFieldsError(response.error) ||
-    isMissingWelcomeSequenceError(response.error) ||
-    isMissingManualAiPauseMinutesError(response.error)
+    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
+    isMissingNewClientAiFieldsError(modernResponse.error) ||
+    isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
         .order("created_at", { ascending: true })
-    : response;
+    : modernResponse;
 
   if (error) {
     throw new Error(error.message || "Failed to load clients");
@@ -296,20 +303,26 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS)
+    .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
     .eq("id", clientId)
     .maybeSingle();
+  const modernResponse = isMissingManualAiPauseMinutesError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS)
+        .eq("id", clientId)
+        .maybeSingle()
+    : response;
   const { data, error } =
-    isMissingGoogleSheetsTabNameError(response.error) ||
-    isMissingNewClientAiFieldsError(response.error) ||
-    isMissingWelcomeSequenceError(response.error) ||
-    isMissingManualAiPauseMinutesError(response.error)
+    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
+    isMissingNewClientAiFieldsError(modernResponse.error) ||
+    isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
         .eq("id", clientId)
         .maybeSingle()
-    : response;
+    : modernResponse;
 
   if (error) {
     throw new Error(error.message || "Failed to load client");
