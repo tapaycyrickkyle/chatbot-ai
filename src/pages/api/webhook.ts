@@ -138,9 +138,14 @@ function isOwnerMessageEcho(
 
   const appId = event.message.app_id ? String(event.message.app_id) : "";
   const ignoredAppIds = getIgnoredPageEchoAppIds();
+  const humanAppIds = getHumanPageEchoAppIds();
 
   if (appId && ignoredAppIds.has(appId)) {
     return false;
+  }
+
+  if (appId) {
+    return humanAppIds.has(appId);
   }
 
   return true;
@@ -160,6 +165,31 @@ function getIgnoredPageEchoAppIds() {
     .filter(Boolean);
 
   return new Set([...DEFAULT_IGNORED_PAGE_ECHO_APP_IDS, ...configuredIds]);
+}
+
+function getHumanPageEchoAppIds() {
+  const configuredIds = [
+    process.env.HUMAN_REPLY_APP_ID,
+    process.env.HUMAN_REPLY_APP_IDS,
+  ]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return new Set(configuredIds);
+}
+
+function summarizePageEcho(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
+) {
+  return {
+    senderId: event.sender.id,
+    recipientId: event.recipient?.id || "",
+    appId: event.message?.app_id ? String(event.message.app_id) : "",
+    textPreview: event.message?.text?.slice(0, 120) || "",
+  };
 }
 
 async function safelyPauseAiForOwnerReply(input: {
@@ -643,6 +673,15 @@ export default async function handler(
           const rawText = event.message?.text;
           const postbackPayload = event.postback?.payload;
 
+          if (event.message?.is_echo && event.sender.id === pageId) {
+            console.info("Page echo received", {
+              clientId: client.id,
+              pageId,
+              userId,
+              ...summarizePageEcho(event),
+            });
+          }
+
           if (isOwnerMessageEcho(event, pageId)) {
             await safelyPauseAiForOwnerReply({
               clientId: client.id,
@@ -661,11 +700,11 @@ export default async function handler(
           }
 
           if (event.message?.is_echo) {
-            console.info("AI webhook ignored Page message echo", {
+            console.info("AI webhook ignored Page message echo automation or unknown app", {
               clientId: client.id,
               pageId,
               userId,
-              appId: event.message.app_id ? String(event.message.app_id) : "",
+              ...summarizePageEcho(event),
             });
             continue;
           }
