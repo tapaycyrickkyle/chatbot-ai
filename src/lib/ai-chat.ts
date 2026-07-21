@@ -94,6 +94,21 @@ function getRecentMessagesForPrompt(context: ConversationContext) {
   return recentMessages.filter((message) => !isLeadCollectionText(message.content));
 }
 
+function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCustomerLanguageStyle>) {
+  switch (languageStyle) {
+    case "english":
+      return "Write the next assistant reply in English only. Do not use Bisaya/Cebuano, Tagalog, or Taglish, even if previous messages used them.";
+    case "cebuano":
+      return "Write the next assistant reply in Bisaya/Cebuano only. Do not use Tagalog or English except for unavoidable product names.";
+    case "tagalog":
+      return "Write the next assistant reply in Tagalog only. Do not use Bisaya/Cebuano or English except for unavoidable product names.";
+    case "taglish":
+      return "Write the next assistant reply in natural Taglish, matching the latest customer message. Do not use Bisaya/Cebuano.";
+    default:
+      return "Write the next assistant reply in the same language or language mix as the latest customer message.";
+  }
+}
+
 function getErrorSummary(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -286,6 +301,7 @@ Core rules:
 - Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
 - If complete lead details are already provided, say: "Thank you, I got your details. Our team will follow up shortly."
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
+- Prior conversation is context only. Never copy its language if the latest customer message uses a different language.
 
 Business facts:
 ${businessContext || "No business facts provided."}
@@ -339,6 +355,10 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
       }
     }
 
+    messages.push({
+      role: "system",
+      content: `Language lock for the next reply: ${getReplyLanguageInstruction(latestLanguageStyle)}`,
+    });
     messages.push({ role: "user", content: userMessage });
 
     const response = await fetch(apiUrl, {
