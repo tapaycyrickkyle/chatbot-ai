@@ -435,15 +435,15 @@ export default function ClientSettingsPage() {
                   role="switch"
                   aria-checked={welcomeSequenceEnabled}
                   onClick={() => setWelcomeSequenceEnabled((value) => !value)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 ${
                     welcomeSequenceEnabled
                       ? "border-[var(--accent-bright)] bg-[var(--accent)]"
                       : "border-[var(--border)] bg-[var(--surface-strong)]"
                   }`}
                 >
                   <span
-                    className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white transition-transform ${
-                      welcomeSequenceEnabled ? "translate-x-5" : "translate-x-1"
+                    className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      welcomeSequenceEnabled ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>
