@@ -489,9 +489,11 @@ async function planRealEstateSalesReply(input: {
 Rules:
 - Use only the business facts. Do not invent prices, availability, promos, financing terms, requirements, or schedules.
 - First resolve what the customer really means using recent conversation and the previous assistant reply.
-- Short replies such as "yes", "opo", "oo", "sige", "sure", "go", "tell me", "okay", "hm", or a unit type must be interpreted from context, not treated as a new standalone topic.
-- If the previous assistant offered to explain something and the customer says yes/opo/sige, the action is continue_previous_offer and the answer should provide the explanation promised.
+- Understand confirmations, refusals, choices, fragments, follow-ups, and corrections in any language. Do not require fixed keywords or triggers from the customer.
+- Short replies such as "yes", "opo", "oo", "sige", "sure", "go", "tell me", "okay", "hm", "why", "how", "that one", "1BR", or any local-language equivalent must be interpreted from context, not treated as a new standalone topic.
+- If the previous assistant offered to explain something and the customer confirms in any language, the action is continue_previous_offer and the answer should provide the explanation promised.
 - If the previous assistant asked a choice question and the customer answers with one option, continue with that option.
+- If the customer refuses or hesitates in any language, answer gently and offer a lower-pressure next step.
 - If the customer asks a new question, answer the new question directly.
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
@@ -715,8 +717,9 @@ Core rules:
 - Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
 - If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
+- Customers never need to use fixed triggers or exact keywords. Understand their intent naturally from any language, slang, short reply, typo, or mixed-language message using the conversation context.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
-- For short confirmations like "opo", "oo", "yes", "sige", "sure", "go", or "okay", answer what the customer agreed to receive based on the previous assistant message.
+- For short confirmations, refusals, choices, fragments, or follow-ups in any language, answer what the customer means based on the previous assistant message and recent conversation.
 - Prior conversation is context only. Never copy its language if the latest customer message uses a different language.
 - Use the private sales plan below to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
 
