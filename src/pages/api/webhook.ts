@@ -683,6 +683,7 @@ export default async function handler(
                   recentMessages: existingConversation?.recent_messages,
                   aiCharacter: client.ai_character,
                   aiTone: client.ai_tone,
+                  latestLeadIntent: leadIntent,
                 });
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,

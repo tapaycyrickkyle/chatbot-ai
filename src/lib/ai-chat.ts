@@ -32,6 +32,7 @@ type ConversationContext = {
   }>;
   aiCharacter?: string;
   aiTone?: string;
+  latestLeadIntent?: LeadCaptureIntent;
 };
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 160;
@@ -46,6 +47,52 @@ const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "PROVIDED_LEAD_DETAILS",
   "UNCLEAR",
 ]);
+
+function isLeadCollectionText(value = "") {
+  const normalizedValue = value.toLowerCase();
+
+  return (
+    (normalizedValue.includes("full name:") &&
+      (normalizedValue.includes("phone:") || normalizedValue.includes("contact number:"))) ||
+    /\b(?:send|provide)\s+(?:your\s+)?details\b/i.test(normalizedValue) ||
+    /\bwould you like to proceed\b/i.test(normalizedValue) ||
+    /\bto proceed\b/i.test(normalizedValue)
+  );
+}
+
+function shouldSuppressLeadContext(intent?: LeadCaptureIntent) {
+  return intent === "INFO_ONLY" || intent === "SOFT_INTEREST" || intent === "UNCLEAR";
+}
+
+function getMemorySummaryForPrompt(context: ConversationContext) {
+  const memorySummary = context.conversationSummary?.trim() ?? "";
+
+  if (!memorySummary || shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(memorySummary)) {
+    return "";
+  }
+
+  return memorySummary.slice(0, MAX_MEMORY_CHARS);
+}
+
+function getPreviousAiReplyForPrompt(context: ConversationContext) {
+  const previousAiReply = context.previousAiReply?.trim() ?? "";
+
+  if (!previousAiReply || shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(previousAiReply)) {
+    return "";
+  }
+
+  return previousAiReply;
+}
+
+function getRecentMessagesForPrompt(context: ConversationContext) {
+  const recentMessages = context.recentMessages?.slice(-MAX_RECENT_MESSAGES_FOR_PROMPT) ?? [];
+
+  if (!shouldSuppressLeadContext(context.latestLeadIntent)) {
+    return recentMessages;
+  }
+
+  return recentMessages.filter((message) => !isLeadCollectionText(message.content));
+}
 
 function detectReplyLanguage(userMessage: string) {
   const normalizedMessage = userMessage.toLowerCase();
@@ -182,7 +229,7 @@ Recent conversation:
 ${recentMessages || conversationContext.conversationSummary || "None"}
 
 Previous assistant reply:
-${conversationContext.previousAiReply || "None"}
+${getPreviousAiReplyForPrompt(conversationContext) || "None"}
 
 Latest customer message:
 ${userMessage}`;
@@ -231,7 +278,7 @@ export async function askAi(
 ) {
   void _leadFields;
   const detectedLanguage = detectReplyLanguage(userMessage);
-  const memorySummary = conversationContext.conversationSummary?.trim().slice(0, MAX_MEMORY_CHARS);
+  const memorySummary = getMemorySummaryForPrompt(conversationContext);
   const customerState = conversationContext.customerState ?? {};
   const customerStateText =
     Object.keys(customerState).length > 0
@@ -244,7 +291,7 @@ export async function askAi(
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, or policies.
 - If the answer is missing, reply exactly: "Great question! Let me connect you with our specialist - one moment please."
-- Be helpful first, then gently guide the customer to the next step.
+- Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
 - Ask only one question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
@@ -252,6 +299,8 @@ Core rules:
 - For English-heavy Taglish, use mostly English with natural words like po, opo, sige, and salamat.
 - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
 - Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
+- If the latest customer message is an information question, ignore any earlier lead-form request and answer the latest question directly.
+- Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
 - If complete lead details are already provided, say: "Thank you, I got your details. Our team will follow up shortly."
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 
@@ -278,8 +327,7 @@ Latest customer language: ${detectedLanguage}`;
       },
     ];
 
-    const recentMessages =
-      conversationContext.recentMessages?.slice(-MAX_RECENT_MESSAGES_FOR_PROMPT) ?? [];
+    const recentMessages = getRecentMessagesForPrompt(conversationContext);
 
     if (recentMessages.length > 0) {
       for (const message of recentMessages) {
@@ -300,10 +348,12 @@ Latest customer language: ${detectedLanguage}`;
         });
       }
 
-      if (conversationContext.previousAiReply) {
+      const previousAiReply = getPreviousAiReplyForPrompt(conversationContext);
+
+      if (previousAiReply) {
         messages.push({
           role: "assistant",
-          content: conversationContext.previousAiReply,
+          content: previousAiReply,
         });
       }
     }
