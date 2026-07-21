@@ -66,3 +66,16 @@ export function getMissingInfoReply(customerMessage = "") {
       return "I do not have that exact info yet. I can still help with other questions, or we can forward this to our team if needed.";
   }
 }
+
+export function getLeadCapturedReply(customerMessage = "") {
+  switch (detectCustomerLanguageStyle(customerMessage)) {
+    case "cebuano":
+      return "Salamat, nadawat na nako imong details. Mo-follow up ang among team sa imoha soon.";
+    case "tagalog":
+      return "Salamat, nakuha ko na ang details mo. Magfo-follow up ang team namin sa iyo soon.";
+    case "taglish":
+      return "Thank you po, I got your details. Our team will follow up shortly.";
+    default:
+      return "Thank you, I got your details. Our team will follow up shortly.";
+  }
+}

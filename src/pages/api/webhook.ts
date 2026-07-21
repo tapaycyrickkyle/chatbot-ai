@@ -21,6 +21,7 @@ import {
   extractLeadFromMessage,
   parseLeadFields,
 } from "@/lib/lead-capture";
+import { getLeadCapturedReply } from "@/lib/language-style";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -273,6 +274,12 @@ function wasLeadFormatRecentlyRequested(
   );
 }
 
+function wasLeadAlreadyCaptured(
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+) {
+  return conversation?.customer_state?.lead_status === "captured";
+}
+
 function getFallbackLeadIntent(message: string): LeadCaptureIntent {
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -512,18 +519,20 @@ export default async function handler(
               message: rawText,
             });
 
-            const capturedLead = await safelyCaptureLead({
-              clientName: client.client_name,
-              pageId,
-              recipientId: userId,
-              message: rawText,
-              googleSheetsWebhookUrl: client.google_sheets_webhook_url,
-              googleSheetsTabName: client.google_sheets_tab_name,
-              leadFields,
-            });
+            const capturedLead = wasLeadAlreadyCaptured(existingConversation)
+              ? false
+              : await safelyCaptureLead({
+                  clientName: client.client_name,
+                  pageId,
+                  recipientId: userId,
+                  message: rawText,
+                  googleSheetsWebhookUrl: client.google_sheets_webhook_url,
+                  googleSheetsTabName: client.google_sheets_tab_name,
+                  leadFields,
+                });
 
             if (capturedLead) {
-              const reply = "Thank you, I got your details. Our team will follow up shortly.";
+              const reply = getLeadCapturedReply(rawText);
               const customerState = inferCustomerState(
                 existingConversation?.customer_state,
                 rawText,
