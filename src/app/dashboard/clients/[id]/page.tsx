@@ -14,6 +14,7 @@ type ClientSettings = {
   bot_type: "ai";
   business_info: string;
   google_sheets_webhook_url: string;
+  google_sheets_tab_name: string;
   lead_capture_fields: string;
 };
 
@@ -31,19 +32,26 @@ function getLeadFieldList(value: string) {
   ];
 }
 
-function buildAppsScript(leadFields: string[]) {
+function buildAppsScript(leadFields: string[], defaultSheetName: string) {
   return `const COLUMNS = ${JSON.stringify(leadFields, null, 2)};
+const DEFAULT_SHEET_NAME = ${JSON.stringify(defaultSheetName || "Sheet1")};
 
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
-  appendLeadRow(data.fields || {});
+  const sheet = getLeadSheet(data.sheetName || DEFAULT_SHEET_NAME);
+  appendLeadRow(sheet, data.fields || {});
 
   return jsonResponse({ success: true });
 }
 
-function appendLeadRow(fields) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+function getLeadSheet(sheetName) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const normalizedSheetName = String(sheetName || DEFAULT_SHEET_NAME).trim() || DEFAULT_SHEET_NAME;
 
+  return spreadsheet.getSheetByName(normalizedSheetName) || spreadsheet.insertSheet(normalizedSheetName);
+}
+
+function appendLeadRow(sheet, fields) {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(COLUMNS);
   }
@@ -69,6 +77,7 @@ export default function ClientSettingsPage() {
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
+  const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
   const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
@@ -76,7 +85,7 @@ export default function ClientSettingsPage() {
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
   const leadFields = getLeadFieldList(leadCaptureFields);
   const sheetColumns = leadFields;
-  const generatedAppsScript = buildAppsScript(leadFields);
+  const generatedAppsScript = buildAppsScript(leadFields, googleSheetsTabName.trim() || "Sheet1");
 
   useEffect(() => {
     if (!clientId) {
@@ -101,6 +110,7 @@ export default function ClientSettingsPage() {
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
         setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
+        setGoogleSheetsTabName(data.google_sheets_tab_name || "Sheet1");
         setLeadCaptureFields(data.lead_capture_fields || "Full Name\nPhone");
       } catch (error) {
         console.error(error);
@@ -170,6 +180,7 @@ export default function ClientSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           google_sheets_webhook_url: googleSheetsWebhookUrl,
+          google_sheets_tab_name: googleSheetsTabName,
           lead_capture_fields: leadCaptureFields,
         }),
       });
@@ -321,6 +332,23 @@ export default function ClientSettingsPage() {
               />
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
                 Leads captured from this Facebook Page will be sent to this sheet. Leave it empty to skip Google Sheets for this Page.
+              </p>
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="google-sheets-tab-name"
+              >
+                Sheet Tab Name
+              </label>
+              <input
+                id="google-sheets-tab-name"
+                type="text"
+                value={googleSheetsTabName}
+                onChange={(event) => setGoogleSheetsTabName(event.target.value)}
+                placeholder="Sheet1, Leads, Orders..."
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Leads will be written to this tab inside the client&apos;s spreadsheet. If the tab does not exist, the generated script creates it.
               </p>
               <label
                 className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"

@@ -5,6 +5,7 @@ export type GoogleSheetsLeadInput = {
   phone: string;
   pageId: string;
   pageName: string;
+  sheetName: string;
   recipientId: string;
   message: string;
   capturedAt: string;

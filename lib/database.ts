@@ -12,6 +12,7 @@ type ClientRow = {
   business_info?: string | null;
   ai_enabled?: boolean | null;
   google_sheets_webhook_url?: string | null;
+  google_sheets_tab_name?: string | null;
   lead_capture_fields?: string | null;
 };
 
@@ -56,8 +57,20 @@ type OrderRow = {
   updated_at: string;
 };
 
+const CLIENT_COLUMNS =
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields";
+const LEGACY_CLIENT_COLUMNS =
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
+
 function buildPagePictureUrl(pageId: string) {
   return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
+}
+
+function isMissingGoogleSheetsTabNameError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("google_sheets_tab_name") &&
+      error.message.includes("does not exist")
+  );
 }
 
 function normalizeClient(row: ClientRow) {
@@ -71,6 +84,7 @@ function normalizeClient(row: ClientRow) {
     business_info: row.business_info ?? "",
     ai_enabled: row.ai_enabled ?? true,
     google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
+    google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
     lead_capture_fields: row.lead_capture_fields ?? "Full Name\nPhone",
     picture_url: buildPagePictureUrl(row.page_id),
   };
@@ -129,10 +143,16 @@ function getDb() {
 
 export async function getClients() {
   const supabase = getDb();
-  const { data, error } = await supabase
+  const response = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields")
+    .select(CLIENT_COLUMNS)
     .order("created_at", { ascending: true });
+  const { data, error } = isMissingGoogleSheetsTabNameError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(LEGACY_CLIENT_COLUMNS)
+        .order("created_at", { ascending: true })
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to load clients");
@@ -180,11 +200,18 @@ export async function deleteClientById(clientId: string) {
 
 export async function getClientById(clientId: string) {
   const supabase = getDb();
-  const { data, error } = await supabase
+  const response = await supabase
     .from("clients")
-    .select("id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields")
+    .select(CLIENT_COLUMNS)
     .eq("id", clientId)
     .maybeSingle();
+  const { data, error } = isMissingGoogleSheetsTabNameError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(LEGACY_CLIENT_COLUMNS)
+        .eq("id", clientId)
+        .maybeSingle()
+    : response;
 
   if (error) {
     throw new Error(error.message || "Failed to load client");
@@ -204,6 +231,7 @@ export async function updateClientSettings(
     business_info: string;
     ai_enabled: boolean;
     google_sheets_webhook_url: string;
+    google_sheets_tab_name: string;
     lead_capture_fields: string;
   }>
 ) {

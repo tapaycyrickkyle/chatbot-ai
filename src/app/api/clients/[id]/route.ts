@@ -5,6 +5,8 @@ import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
 const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
+const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
+const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,13 +17,20 @@ function validateClientSettingsPayload(payload: unknown) {
     throw new Error("Invalid request body");
   }
 
-  const { bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields } =
-    payload as Record<string, unknown>;
+  const {
+    bot_type,
+    business_info,
+    ai_enabled,
+    google_sheets_webhook_url,
+    google_sheets_tab_name,
+    lead_capture_fields,
+  } = payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
     google_sheets_webhook_url: string;
+    google_sheets_tab_name: string;
     lead_capture_fields: string;
   }> = {};
 
@@ -77,6 +86,24 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.google_sheets_webhook_url = trimmedUrl;
   }
 
+  if (google_sheets_tab_name !== undefined) {
+    if (typeof google_sheets_tab_name !== "string") {
+      throw new Error("Invalid Google Sheets tab name");
+    }
+
+    const trimmedTabName = google_sheets_tab_name.trim() || "Sheet1";
+
+    if (trimmedTabName.length > MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH) {
+      throw new Error("Google Sheets tab name is too long");
+    }
+
+    if (INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN.test(trimmedTabName)) {
+      throw new Error("Google Sheets tab name cannot contain: : \\ / ? * [ ]");
+    }
+
+    updates.google_sheets_tab_name = trimmedTabName;
+  }
+
   if (lead_capture_fields !== undefined) {
     if (typeof lead_capture_fields !== "string") {
       throw new Error("Invalid lead capture fields");
@@ -121,6 +148,7 @@ export async function GET(
       business_info: client.business_info,
       ai_enabled: client.ai_enabled,
       google_sheets_webhook_url: client.google_sheets_webhook_url,
+      google_sheets_tab_name: client.google_sheets_tab_name,
       lead_capture_fields: client.lead_capture_fields,
     });
   } catch (error) {

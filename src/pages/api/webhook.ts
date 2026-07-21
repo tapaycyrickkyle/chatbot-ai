@@ -182,6 +182,7 @@ async function safelyCaptureLead(input: {
   recipientId: string;
   message: string;
   googleSheetsWebhookUrl: string;
+  googleSheetsTabName: string;
   leadFields: string[];
 }) {
   const lead =
@@ -204,6 +205,7 @@ async function safelyCaptureLead(input: {
       phone: lead.phone,
       pageId: input.pageId,
       pageName: input.clientName,
+      sheetName: input.googleSheetsTabName,
       recipientId: input.recipientId,
       message: input.message,
       capturedAt: new Date().toISOString(),
@@ -338,6 +340,7 @@ export default async function handler(
               recipientId: userId,
               message: rawText,
               googleSheetsWebhookUrl: client.google_sheets_webhook_url,
+              googleSheetsTabName: client.google_sheets_tab_name,
               leadFields,
             });
 
