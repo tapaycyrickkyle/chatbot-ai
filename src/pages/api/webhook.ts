@@ -42,6 +42,7 @@ const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
 const DEFAULT_IGNORED_PAGE_ECHO_APP_IDS = ["1567190244970637"];
+const OWNER_TAKEOVER_TRIGGER = "/ ";
 const HUMAN_REPLY_MIN_DELAY_MS = 4500;
 const HUMAN_REPLY_MAX_DELAY_MS = 12000;
 const HUMAN_REPLY_MS_PER_CHAR = 35;
@@ -149,6 +150,18 @@ function isOwnerMessageEcho(
   }
 
   return true;
+}
+
+function isOwnerTakeoverTriggerEcho(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
+  pageId: string
+) {
+  return Boolean(
+    event.message?.is_echo &&
+      event.sender.id === pageId &&
+      event.recipient?.id &&
+      event.message.text?.startsWith(OWNER_TAKEOVER_TRIGGER)
+  );
 }
 
 function getIgnoredPageEchoAppIds() {
@@ -682,7 +695,7 @@ export default async function handler(
             });
           }
 
-          if (isOwnerMessageEcho(event, pageId)) {
+          if (isOwnerTakeoverTriggerEcho(event, pageId) || isOwnerMessageEcho(event, pageId)) {
             await safelyPauseAiForOwnerReply({
               clientId: client.id,
               pageId,
@@ -694,6 +707,7 @@ export default async function handler(
               pageId,
               userId,
               appId: event.message?.app_id ? String(event.message.app_id) : "",
+              triggeredByPrefix: isOwnerTakeoverTriggerEcho(event, pageId),
               pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
             });
             continue;
