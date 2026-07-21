@@ -10,6 +10,10 @@ import { getClientById, updateClientSettings } from "@/lib/database";
 
 const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
 const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
+const MAX_WELCOME_MESSAGE_LENGTH = 1200;
+const MAX_WELCOME_URL_LENGTH = 2000;
+const MAX_WELCOME_IMAGE_URLS_LENGTH = 6000;
+const MAX_WELCOME_IMAGE_URLS = 5;
 const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 
 function unauthorizedResponse() {
@@ -30,6 +34,10 @@ function validateClientSettingsPayload(payload: unknown) {
     google_sheets_webhook_url,
     google_sheets_tab_name,
     lead_capture_fields,
+    welcome_sequence_enabled,
+    welcome_message,
+    welcome_link_url,
+    welcome_image_urls,
   } = payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
@@ -40,6 +48,10 @@ function validateClientSettingsPayload(payload: unknown) {
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
     lead_capture_fields: string;
+    welcome_sequence_enabled: boolean;
+    welcome_message: string;
+    welcome_link_url: string;
+    welcome_image_urls: string;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -148,6 +160,93 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.lead_capture_fields = lead_capture_fields.trim();
   }
 
+  if (welcome_sequence_enabled !== undefined) {
+    if (typeof welcome_sequence_enabled !== "boolean") {
+      throw new Error("Invalid welcome sequence status");
+    }
+
+    updates.welcome_sequence_enabled = welcome_sequence_enabled;
+  }
+
+  if (welcome_message !== undefined) {
+    if (typeof welcome_message !== "string") {
+      throw new Error("Invalid welcome message");
+    }
+
+    if (welcome_message.length > MAX_WELCOME_MESSAGE_LENGTH) {
+      throw new Error("Welcome message is too long");
+    }
+
+    updates.welcome_message = welcome_message.trim();
+  }
+
+  if (welcome_link_url !== undefined) {
+    if (typeof welcome_link_url !== "string") {
+      throw new Error("Invalid welcome link URL");
+    }
+
+    const trimmedUrl = welcome_link_url.trim();
+
+    if (trimmedUrl.length > MAX_WELCOME_URL_LENGTH) {
+      throw new Error("Welcome link URL is too long");
+    }
+
+    if (trimmedUrl) {
+      let parsedUrl: URL;
+
+      try {
+        parsedUrl = new URL(trimmedUrl);
+      } catch {
+        throw new Error("Invalid welcome link URL");
+      }
+
+      if (parsedUrl.protocol !== "https:") {
+        throw new Error("Welcome link URL must use HTTPS");
+      }
+    }
+
+    updates.welcome_link_url = trimmedUrl;
+  }
+
+  if (welcome_image_urls !== undefined) {
+    if (typeof welcome_image_urls !== "string") {
+      throw new Error("Invalid welcome image URLs");
+    }
+
+    if (welcome_image_urls.length > MAX_WELCOME_IMAGE_URLS_LENGTH) {
+      throw new Error("Welcome image URLs are too long");
+    }
+
+    const imageUrls = welcome_image_urls
+      .split(/\r?\n/)
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    if (imageUrls.length > MAX_WELCOME_IMAGE_URLS) {
+      throw new Error(`Use ${MAX_WELCOME_IMAGE_URLS} welcome image URLs or fewer`);
+    }
+
+    for (const imageUrl of imageUrls) {
+      if (imageUrl.length > MAX_WELCOME_URL_LENGTH) {
+        throw new Error("Welcome image URL is too long");
+      }
+
+      let parsedUrl: URL;
+
+      try {
+        parsedUrl = new URL(imageUrl);
+      } catch {
+        throw new Error("Invalid welcome image URL");
+      }
+
+      if (parsedUrl.protocol !== "https:") {
+        throw new Error("Welcome image URLs must use HTTPS");
+      }
+    }
+
+    updates.welcome_image_urls = imageUrls.join("\n");
+  }
+
   return updates;
 }
 
@@ -184,6 +283,10 @@ export async function GET(
       google_sheets_webhook_url: client.google_sheets_webhook_url,
       google_sheets_tab_name: client.google_sheets_tab_name,
       lead_capture_fields: client.lead_capture_fields,
+      welcome_sequence_enabled: client.welcome_sequence_enabled,
+      welcome_message: client.welcome_message,
+      welcome_link_url: client.welcome_link_url,
+      welcome_image_urls: client.welcome_image_urls,
     });
   } catch (error) {
     console.error(error);

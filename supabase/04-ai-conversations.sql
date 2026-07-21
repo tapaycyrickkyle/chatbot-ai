@@ -11,6 +11,7 @@ create table if not exists public.ai_conversations (
   conversation_summary text not null default '',
   customer_state jsonb not null default '{}'::jsonb,
   recent_messages jsonb not null default '[]'::jsonb,
+  welcome_sequence_sent boolean not null default false,
   last_message_at timestamptz,
   ai_paused boolean not null default false,
   paused_at timestamptz,
@@ -44,6 +45,9 @@ alter table public.ai_conversations
 
 alter table public.ai_conversations
   add column if not exists recent_messages jsonb not null default '[]'::jsonb;
+
+alter table public.ai_conversations
+  add column if not exists welcome_sequence_sent boolean not null default false;
 
 alter table public.ai_conversations
   add column if not exists ai_paused boolean not null default false;

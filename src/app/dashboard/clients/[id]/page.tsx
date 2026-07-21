@@ -15,6 +15,10 @@ type ClientSettings = {
   google_sheets_webhook_url: string;
   google_sheets_tab_name: string;
   lead_capture_fields: string;
+  welcome_sequence_enabled: boolean;
+  welcome_message: string;
+  welcome_link_url: string;
+  welcome_image_urls: string;
 };
 
 function getLeadFieldList(value: string) {
@@ -90,10 +94,15 @@ export default function ClientSettingsPage() {
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
   const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
   const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
+  const [welcomeSequenceEnabled, setWelcomeSequenceEnabled] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
+  const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
+  const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
   const leadFields = getLeadFieldList(leadCaptureFields);
   const sheetColumns = leadFields;
   const generatedAppsScript = buildAppsScript(leadFields, googleSheetsTabName.trim() || "Sheet1");
@@ -123,6 +132,10 @@ export default function ClientSettingsPage() {
         setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
         setGoogleSheetsTabName(data.google_sheets_tab_name || "Sheet1");
         setLeadCaptureFields(data.lead_capture_fields || "Full Name\nPhone");
+        setWelcomeSequenceEnabled(Boolean(data.welcome_sequence_enabled));
+        setWelcomeMessage(data.welcome_message || "");
+        setWelcomeLinkUrl(data.welcome_link_url || "");
+        setWelcomeImageUrls(data.welcome_image_urls || "");
       } catch (error) {
         console.error(error);
         showToast({
@@ -211,6 +224,43 @@ export default function ClientSettingsPage() {
       });
     } finally {
       setSavingSheetsUrl(false);
+    }
+  };
+
+  const saveWelcomeSequence = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    setSavingWelcomeSequence(true);
+
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          welcome_sequence_enabled: welcomeSequenceEnabled,
+          welcome_message: welcomeMessage,
+          welcome_link_url: welcomeLinkUrl,
+          welcome_image_urls: welcomeImageUrls,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save first reply sequence");
+      }
+
+      showToast({ tone: "success", message: "First reply sequence saved." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to save first reply sequence.",
+      });
+    } finally {
+      setSavingWelcomeSequence(false);
     }
   };
 
@@ -320,6 +370,97 @@ export default function ClientSettingsPage() {
                 <p className="mt-2 break-all text-[15px] font-semibold text-[var(--text-primary)]">
                   {pageId || "Not available"}
                 </p>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                    First Reply Sequence
+                  </p>
+                  <p className="mt-2 text-[14px] text-[var(--text-primary)]">
+                    Send this once after a customer first replies in Messenger.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={welcomeSequenceEnabled}
+                  onClick={() => setWelcomeSequenceEnabled((value) => !value)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                    welcomeSequenceEnabled
+                      ? "border-[var(--accent-bright)] bg-[var(--accent)]"
+                      : "border-[var(--border)] bg-[var(--surface-strong)]"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white transition-transform ${
+                      welcomeSequenceEnabled ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="welcome-message"
+              >
+                Message
+              </label>
+              <textarea
+                id="welcome-message"
+                value={welcomeMessage}
+                onChange={(event) => setWelcomeMessage(event.target.value)}
+                rows={4}
+                maxLength={1200}
+                placeholder="Welcome! Here are the details you requested..."
+                className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="welcome-link-url"
+              >
+                Link URL
+              </label>
+              <input
+                id="welcome-link-url"
+                type="url"
+                value={welcomeLinkUrl}
+                onChange={(event) => setWelcomeLinkUrl(event.target.value)}
+                placeholder="https://facebook.com/your-page-or-post"
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="welcome-image-urls"
+              >
+                Image URLs
+              </label>
+              <textarea
+                id="welcome-image-urls"
+                value={welcomeImageUrls}
+                onChange={(event) => setWelcomeImageUrls(event.target.value)}
+                rows={4}
+                maxLength={6000}
+                placeholder={"https://example.com/image-1.jpg\nhttps://example.com/image-2.jpg"}
+                className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Use HTTPS image URLs, one per line, up to 5 images.
+              </p>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => void saveWelcomeSequence()}
+                  disabled={savingWelcomeSequence || loading}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {savingWelcomeSequence ? "Saving..." : "Save First Reply"}
+                </button>
               </div>
             </div>
 
@@ -508,8 +649,14 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || savingSheetsUrl}
-        message={savingSheetsUrl ? "Saving Google Sheets URL..." : "Cleaning old data..."}
+        isOpen={cleaningStorage || savingSheetsUrl || savingWelcomeSequence}
+        message={
+          savingWelcomeSequence
+            ? "Saving first reply sequence..."
+            : savingSheetsUrl
+              ? "Saving Google Sheets URL..."
+              : "Cleaning old data..."
+        }
       />
     </>
   );

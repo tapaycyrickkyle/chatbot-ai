@@ -19,6 +19,10 @@ create table if not exists public.clients (
   google_sheets_tab_name text not null default 'Sheet1',
   lead_capture_fields text not null default 'Full Name
 Phone',
+  welcome_sequence_enabled boolean not null default false,
+  welcome_message text not null default '',
+  welcome_link_url text not null default '',
+  welcome_image_urls text not null default '',
   constraint clients_page_id_key unique (page_id)
 );
 
@@ -35,7 +39,11 @@ alter table public.clients
   add column if not exists google_sheets_webhook_url text not null default '',
   add column if not exists google_sheets_tab_name text not null default 'Sheet1',
   add column if not exists lead_capture_fields text not null default 'Full Name
-Phone';
+Phone',
+  add column if not exists welcome_sequence_enabled boolean not null default false,
+  add column if not exists welcome_message text not null default '',
+  add column if not exists welcome_link_url text not null default '',
+  add column if not exists welcome_image_urls text not null default '';
 
 update public.clients
 set
@@ -50,7 +58,11 @@ set
   google_sheets_webhook_url = coalesce(google_sheets_webhook_url, ''),
   google_sheets_tab_name = coalesce(nullif(google_sheets_tab_name, ''), 'Sheet1'),
   lead_capture_fields = coalesce(nullif(lead_capture_fields, ''), 'Full Name
-Phone');
+Phone'),
+  welcome_sequence_enabled = coalesce(welcome_sequence_enabled, false),
+  welcome_message = coalesce(welcome_message, ''),
+  welcome_link_url = coalesce(welcome_link_url, ''),
+  welcome_image_urls = coalesce(welcome_image_urls, '');
 
 alter table public.clients
   alter column client_name set not null,
@@ -73,7 +85,15 @@ Phone',
   alter column ai_tone set not null,
   alter column google_sheets_webhook_url set not null,
   alter column google_sheets_tab_name set not null,
-  alter column lead_capture_fields set not null;
+  alter column lead_capture_fields set not null,
+  alter column welcome_sequence_enabled set default false,
+  alter column welcome_message set default '',
+  alter column welcome_link_url set default '',
+  alter column welcome_image_urls set default '',
+  alter column welcome_sequence_enabled set not null,
+  alter column welcome_message set not null,
+  alter column welcome_link_url set not null,
+  alter column welcome_image_urls set not null;
 
 do $$
 begin
@@ -150,6 +170,7 @@ create table if not exists public.ai_conversations (
   conversation_summary text not null default '',
   customer_state jsonb not null default '{}'::jsonb,
   recent_messages jsonb not null default '[]'::jsonb,
+  welcome_sequence_sent boolean not null default false,
   last_message_at timestamptz,
   ai_paused boolean not null default false,
   paused_at timestamptz,
@@ -169,6 +190,7 @@ alter table public.ai_conversations
   add column if not exists conversation_summary text not null default '',
   add column if not exists customer_state jsonb not null default '{}'::jsonb,
   add column if not exists recent_messages jsonb not null default '[]'::jsonb,
+  add column if not exists welcome_sequence_sent boolean not null default false,
   add column if not exists last_message_at timestamptz,
   add column if not exists ai_paused boolean not null default false,
   add column if not exists paused_at timestamptz,

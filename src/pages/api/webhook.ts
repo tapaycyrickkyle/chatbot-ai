@@ -6,6 +6,7 @@ import {
   pauseAiConversation,
   recordAiConversationReply,
   recordCustomerConversationMessage,
+  recordWelcomeSequenceSent,
 } from "@/lib/database";
 import { askAi, classifyLeadCaptureIntent, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
@@ -94,7 +95,7 @@ type SafeSendContext = {
   clientId: string;
   pageId: string;
   recipientId: string;
-  messageType: "text";
+  messageType: "text" | "image";
 };
 
 function summarizeWebhookEvent(
@@ -185,6 +186,18 @@ async function safelyRecordAiReply(input: {
     await recordAiConversationReply(input);
   } catch (error) {
     console.warn("Failed to record AI reply", error);
+  }
+}
+
+async function safelyRecordWelcomeSequenceSent(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+}) {
+  try {
+    await recordWelcomeSequenceSent(input);
+  } catch (error) {
+    console.warn("Failed to record welcome sequence", error);
   }
 }
 
@@ -406,6 +419,110 @@ function createLeadFormatReply(
   });
 }
 
+function getWelcomeImageUrls(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>>[number]) {
+  return Boolean(
+    client.welcome_message.trim() ||
+      client.welcome_link_url.trim() ||
+      getWelcomeImageUrls(client.welcome_image_urls).length > 0
+  );
+}
+
+function shouldSendWelcomeSequence(
+  client: Awaited<ReturnType<typeof getClients>>[number],
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+) {
+  return (
+    client.welcome_sequence_enabled &&
+    !conversation?.welcome_sequence_sent &&
+    hasWelcomeSequenceContent(client)
+  );
+}
+
+async function sendWelcomeSequence(input: {
+  client: Awaited<ReturnType<typeof getClients>>[number];
+  pageId: string;
+  recipientId: string;
+  pageAccessToken: string;
+}) {
+  const message = input.client.welcome_message.trim();
+  const linkUrl = input.client.welcome_link_url.trim();
+  const imageUrls = getWelcomeImageUrls(input.client.welcome_image_urls);
+
+  if (message) {
+    await safelyHandleFlowSend(
+      () =>
+        safeSendMessage(
+          input.recipientId,
+          message,
+          input.pageAccessToken,
+          0,
+          input.pageId,
+          input.client.id
+        ).then(() => undefined),
+      {
+        clientId: input.client.id,
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        messageType: "text",
+      }
+    );
+  }
+
+  if (linkUrl) {
+    await safelyHandleFlowSend(
+      () =>
+        safeSendMessage(
+          input.recipientId,
+          linkUrl,
+          input.pageAccessToken,
+          0,
+          input.pageId,
+          input.client.id
+        ).then(() => undefined),
+      {
+        clientId: input.client.id,
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        messageType: "text",
+      }
+    );
+  }
+
+  for (const imageUrl of imageUrls) {
+    await safelyHandleFlowSend(
+      () =>
+        safeSendImage(
+          input.recipientId,
+          imageUrl,
+          input.pageAccessToken,
+          0,
+          input.pageId,
+          input.client.id
+        ).then(() => undefined),
+      {
+        clientId: input.client.id,
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        messageType: "image",
+      }
+    );
+  }
+
+  await safelyRecordWelcomeSequenceSent({
+    clientId: input.client.id,
+    pageId: input.pageId,
+    recipientId: input.recipientId,
+  });
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -581,6 +698,18 @@ export default async function handler(
               userId,
             });
             continue;
+          }
+
+          if (
+            rawText &&
+            shouldSendWelcomeSequence(client, existingConversation)
+          ) {
+            await sendWelcomeSequence({
+              client,
+              pageId,
+              recipientId: userId,
+              pageAccessToken,
+            });
           }
 
           if (rawText) {
@@ -863,6 +992,108 @@ async function safeSendMessage(
   }
 }
 
+async function safeSendImage(
+  recipientId: string,
+  imageUrl: string,
+  pageToken: string,
+  retryCount = 0,
+  pageId = "unknown",
+  clientId = "unknown"
+): Promise<boolean> {
+  const url = `${GRAPH_API_MESSAGES_URL}?access_token=${pageToken}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify(createImageMessageBody(recipientId, imageUrl)),
+    });
+    clearTimeout(timeoutId);
+
+    const appUsageRaw = res.headers.get("X-App-Usage") ?? "";
+    const pageUsageRaw = res.headers.get("X-Page-Usage") ?? "";
+
+    if (appUsageRaw || pageUsageRaw) {
+      const usageSummary = getUsageSummary(res.headers);
+      await handleUsageSummary(
+        { clientId, pageId, recipientId, messageType: "image" },
+        usageSummary
+      );
+      await logUsageSnapshot({
+        clientId,
+        pageId,
+        recipientId,
+        messageType: "image",
+        appUsage: appUsageRaw,
+        pageUsage: pageUsageRaw,
+      });
+    }
+
+    const responseText = await res.text().catch(() => "");
+    const errorPayload = parseMessengerErrorPayload(responseText);
+    const errorCode = errorPayload?.error?.code;
+    const isRateLimited = res.status === 429 || errorCode === 4 || errorCode === 32;
+
+    if (isRateLimited) {
+      if (retryCount >= MAX_SEND_RETRIES) {
+        console.error(`Image rate limit retry exhausted for user ${recipientId}`);
+        await logSendFailure({
+          clientId,
+          pageId,
+          recipientId,
+          messageType: "image",
+          statusCode: res.status,
+          errorCode,
+          errorSubcode: errorPayload?.error?.error_subcode,
+          errorMessage: "Rate limit retry exhausted",
+          payload: createImageMessageBody(recipientId, imageUrl),
+        });
+        return false;
+      }
+
+      const delay = withJitter(Math.pow(2, retryCount) * 1000);
+      console.warn(`Image send rate limited. Retry ${retryCount + 1} in ${delay}ms`);
+      await sleep(delay);
+      return safeSendImage(recipientId, imageUrl, pageToken, retryCount + 1, pageId, clientId);
+    }
+
+    if (!res.ok) {
+      const errorData = errorPayload ?? responseText;
+      console.error("Image Send API error:", errorData);
+      await logSendFailure({
+        clientId,
+        pageId,
+        recipientId,
+        messageType: "image",
+        statusCode: res.status,
+        errorCode,
+        errorSubcode: errorPayload?.error?.error_subcode,
+        errorMessage: typeof errorData === "string" ? errorData : JSON.stringify(errorData),
+        payload: createImageMessageBody(recipientId, imageUrl),
+      });
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.error("Network error in safeSendImage:", err);
+    await logSendFailure({
+      clientId,
+      pageId,
+      recipientId,
+      messageType: "image",
+      statusCode: 0,
+      errorMessage: err instanceof Error ? err.message : "Unknown network error",
+      payload: createImageMessageBody(recipientId, imageUrl),
+    });
+    return false;
+  }
+}
+
 async function handleUsageSummary(context: SafeSendContext, usageSummary: UsageSummary) {
   if (usageSummary.appUsageRaw) {
     console.warn(`[Messenger Usage] X-App-Usage for page ${context.pageId}: ${usageSummary.appUsageRaw}`);
@@ -1012,6 +1243,21 @@ function createTextMessageBody(recipientId: string, text: string): MessengerRequ
   return {
     recipient: { id: recipientId },
     message: { text },
+  };
+}
+
+function createImageMessageBody(recipientId: string, imageUrl: string): MessengerRequestBody {
+  return {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "image",
+        payload: {
+          url: imageUrl,
+          is_reusable: true,
+        },
+      },
+    },
   };
 }
 

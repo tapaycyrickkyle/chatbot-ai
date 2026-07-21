@@ -16,6 +16,10 @@ type ClientRow = {
   google_sheets_webhook_url?: string | null;
   google_sheets_tab_name?: string | null;
   lead_capture_fields?: string | null;
+  welcome_sequence_enabled?: boolean | null;
+  welcome_message?: string | null;
+  welcome_link_url?: string | null;
+  welcome_image_urls?: string | null;
 };
 
 type AiConversationRow = {
@@ -28,6 +32,7 @@ type AiConversationRow = {
   conversation_summary?: string | null;
   customer_state?: Record<string, unknown> | null;
   recent_messages?: Array<{ role?: string; content?: string }> | null;
+  welcome_sequence_sent?: boolean | null;
   last_message_at: string | null;
   ai_paused: boolean | null;
   paused_at: string | null;
@@ -64,11 +69,11 @@ type OrderRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
 const AI_CONVERSATION_COLUMNS =
-  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
+  "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, welcome_sequence_sent, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 const LEGACY_AI_CONVERSATION_COLUMNS =
   "id, client_id, page_id, recipient_id, last_customer_message, last_message_at, ai_paused, paused_at, paused_by, resumed_at, created_at, updated_at";
 
@@ -107,6 +112,17 @@ function isMissingConversationMemoryError(error: { message?: string } | null) {
   );
 }
 
+function isMissingWelcomeSequenceError(error: { message?: string } | null) {
+  return Boolean(
+    (error?.message?.includes("welcome_sequence_enabled") ||
+      error?.message?.includes("welcome_message") ||
+      error?.message?.includes("welcome_link_url") ||
+      error?.message?.includes("welcome_image_urls") ||
+      error?.message?.includes("welcome_sequence_sent")) &&
+      error.message.includes("does not exist")
+  );
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -122,6 +138,10 @@ function normalizeClient(row: ClientRow) {
     google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
     google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
     lead_capture_fields: row.lead_capture_fields ?? "Full Name\nPhone",
+    welcome_sequence_enabled: row.welcome_sequence_enabled ?? false,
+    welcome_message: row.welcome_message ?? "",
+    welcome_link_url: row.welcome_link_url ?? "",
+    welcome_image_urls: row.welcome_image_urls ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -148,6 +168,7 @@ function normalizeAiConversation(row: AiConversationRow) {
     conversation_summary: row.conversation_summary ?? "",
     customer_state: row.customer_state ?? {},
     recent_messages: recentMessages,
+    welcome_sequence_sent: Boolean(row.welcome_sequence_sent),
     last_message_at: row.last_message_at ?? row.updated_at,
     ai_paused: Boolean(row.ai_paused),
     paused_at: row.paused_at ?? "",
@@ -200,7 +221,8 @@ export async function getClients() {
     .order("created_at", { ascending: true });
   const { data, error } =
     isMissingGoogleSheetsTabNameError(response.error) ||
-    isMissingNewClientAiFieldsError(response.error)
+    isMissingNewClientAiFieldsError(response.error) ||
+    isMissingWelcomeSequenceError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -260,7 +282,8 @@ export async function getClientById(clientId: string) {
     .maybeSingle();
   const { data, error } =
     isMissingGoogleSheetsTabNameError(response.error) ||
-    isMissingNewClientAiFieldsError(response.error)
+    isMissingNewClientAiFieldsError(response.error) ||
+    isMissingWelcomeSequenceError(response.error)
     ? await supabase
         .from("clients")
         .select(LEGACY_CLIENT_COLUMNS)
@@ -290,6 +313,10 @@ export async function updateClientSettings(
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
     lead_capture_fields: string;
+    welcome_sequence_enabled: boolean;
+    welcome_message: string;
+    welcome_link_url: string;
+    welcome_image_urls: string;
   }>
 ) {
   const supabase = getDb();
@@ -309,7 +336,8 @@ export async function getAiConversationsForClient(clientId: string) {
     .order("last_message_at", { ascending: false, nullsFirst: false });
   const { data, error } =
     isMissingLastAiReplyError(response.error) ||
-    isMissingConversationMemoryError(response.error)
+    isMissingConversationMemoryError(response.error) ||
+    isMissingWelcomeSequenceError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -334,7 +362,8 @@ export async function getAiConversation(clientId: string, recipientId: string) {
     .maybeSingle();
   const { data, error } =
     isMissingLastAiReplyError(response.error) ||
-    isMissingConversationMemoryError(response.error)
+    isMissingConversationMemoryError(response.error) ||
+    isMissingWelcomeSequenceError(response.error)
     ? await supabase
         .from("ai_conversations")
         .select(LEGACY_AI_CONVERSATION_COLUMNS)
@@ -372,6 +401,42 @@ export async function recordCustomerConversationMessage(input: {
 
   if (error) {
     throw new Error(error.message || "Failed to record conversation");
+  }
+}
+
+export async function recordWelcomeSequenceSent(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+}) {
+  const now = new Date().toISOString();
+  const supabase = getDb();
+  const response = await supabase.from("ai_conversations").upsert(
+    {
+      client_id: input.clientId,
+      page_id: input.pageId,
+      recipient_id: input.recipientId,
+      welcome_sequence_sent: true,
+      last_message_at: now,
+      updated_at: now,
+    },
+    { onConflict: "client_id,recipient_id" }
+  );
+  const { error } = isMissingWelcomeSequenceError(response.error)
+    ? await supabase.from("ai_conversations").upsert(
+        {
+          client_id: input.clientId,
+          page_id: input.pageId,
+          recipient_id: input.recipientId,
+          last_message_at: now,
+          updated_at: now,
+        },
+        { onConflict: "client_id,recipient_id" }
+      )
+    : response;
+
+  if (error) {
+    throw new Error(error.message || "Failed to record welcome sequence");
   }
 }
 
@@ -413,7 +478,8 @@ export async function recordAiConversationReply(input: {
   );
   const shouldFallback =
     isMissingLastAiReplyError(response.error) ||
-    isMissingConversationMemoryError(response.error);
+    isMissingConversationMemoryError(response.error) ||
+    isMissingWelcomeSequenceError(response.error);
   const fallbackUpdates: Record<string, unknown> = {
     client_id: input.clientId,
     page_id: input.pageId,
