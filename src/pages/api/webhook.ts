@@ -343,7 +343,7 @@ export default async function handler(
                 () =>
                   safeSendMessage(
                     userId,
-                    "Thanks, I got your details. Our team will follow up shortly.",
+                    "Thank you, I got your details. Our team will follow up shortly.",
                     pageAccessToken,
                     0,
                     pageId,
