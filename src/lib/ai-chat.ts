@@ -1,9 +1,9 @@
 import "server-only";
 
+import { getMissingInfoReply } from "@/lib/language-style";
+
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
   "Our AI assistant is temporarily unavailable. Please try again later.";
-const AI_FALLBACK_REPLY =
-  "Great question! Let me connect you with our specialist - one moment please.";
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -263,16 +263,19 @@ export async function askAi(
       : "";
   const aiCharacter = conversationContext.aiCharacter?.trim();
   const aiTone = conversationContext.aiTone?.trim();
+  const missingInfoReply = getMissingInfoReply(userMessage);
   const systemPrompt = `You are a human-like sales and customer support assistant.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, or policies.
-- If the answer is missing, reply exactly: "Great question! Let me connect you with our specialist - one moment please."
+- Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
+- If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
+- If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
+- If the answer is missing, reply exactly in the customer's language: "${missingInfoReply}"
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
 - Ask only one question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
-- Match the latest customer's language and style naturally. If they use Tagalog, reply in Tagalog; if they use Taglish, reply in Taglish; if they use another language, reply in that language.
 - If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
 - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
 - Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
@@ -361,7 +364,7 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
     const data = (await response.json()) as ChatCompletionResponse;
     const reply = data.choices?.[0]?.message?.content?.trim();
 
-    return reply || AI_FALLBACK_REPLY;
+    return reply || missingInfoReply;
   } catch (error) {
     console.error("AI request failed", getErrorSummary(error));
     return AI_TEMPORARY_UNAVAILABLE_MESSAGE;

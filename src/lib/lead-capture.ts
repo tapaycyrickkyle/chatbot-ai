@@ -1,5 +1,7 @@
 import "server-only";
 
+import { detectCustomerLanguageStyle } from "@/lib/language-style";
+
 const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/;
 const NAME_PATTERNS = [
   /\b(?:my name is|name is|full name is|i am|i'm|im)\s+([a-z][a-z\s.'-]{2,80})/i,
@@ -179,19 +181,30 @@ type LeadPromptReason =
   | "generic";
 
 function detectLeadPromptLanguage(message = "") {
-  const normalizedMessage = message.toLowerCase();
-  const hasFilipinoCue =
-    /\b(po|opo|sige|pwede|pede|ako|magpa|pa\s*(?:reserve|book|contact|call)|gusto|bumili|kailangan|salamat)\b/i.test(
-      normalizedMessage
-    );
-
-  return hasFilipinoCue ? "taglish" : "english";
+  return detectCustomerLanguageStyle(message);
 }
 
 function getLeadPromptIntro(reason: LeadPromptReason, message = "") {
   const language = detectLeadPromptLanguage(message);
 
-  if (language === "taglish") {
+  if (language === "cebuano") {
+    switch (reason) {
+      case "order":
+        return "Sige. Para matabangan ta og prepare ang imong order, palihug send sa imong details:";
+      case "booking":
+        return "Sige, makatabang mi og arrange ana. Palihug send sa imong details para ma-confirm sa team ang schedule:";
+      case "human_contact":
+        return "Sige, ipa-contact tika sa among team. Palihug send sa imong details:";
+      case "quote":
+        return "Sige, ipa-forward nato ni para sa sakto nga quote. Palihug send sa imong details:";
+      case "reservation":
+        return "Sige, makatabang ko og forward sa imong reservation request. Palihug send sa imong details:";
+      default:
+        return "Sige, ipa-forward nato ni sa among team. Palihug send sa imong details:";
+    }
+  }
+
+  if (language === "tagalog" || language === "taglish") {
     switch (reason) {
       case "order":
         return "Got it po. To help prepare your order, please send your details below:";

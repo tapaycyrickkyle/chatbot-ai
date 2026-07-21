@@ -1,5 +1,7 @@
 import "server-only";
 
+import { detectCustomerLanguageStyle } from "@/lib/language-style";
+
 export type ConversationMemoryState = Record<string, unknown>;
 
 export type RecentConversationMessage = {
@@ -147,12 +149,29 @@ export function updateConversationSummary(
 
 export function getDeterministicReply(message: string) {
   const normalizedMessage = message.trim().toLowerCase();
+  const languageStyle = detectCustomerLanguageStyle(message);
 
   if (/^(thanks|thank you|ty|salamat|salamat po|thank you po)[.!?]*$/.test(normalizedMessage)) {
+    if (languageStyle === "cebuano") {
+      return "Walay sapayan. Message lang kung naa pa kay pangutana.";
+    }
+
+    if (languageStyle === "tagalog") {
+      return "Walang anuman. Message ka lang kung may iba ka pang tanong.";
+    }
+
     return "You're welcome po. Message us anytime if you need anything else.";
   }
 
   if (/^(ok|okay|sige|noted)[.!?]*$/.test(normalizedMessage)) {
+    if (languageStyle === "cebuano") {
+      return "Sige. Naa ra ko diri kung naa pa kay pangutana.";
+    }
+
+    if (languageStyle === "tagalog") {
+      return "Sige. Nandito lang ako kung may iba ka pang tanong.";
+    }
+
     return "Sige po. I'll be here if you need more details.";
   }
 
