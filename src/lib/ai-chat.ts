@@ -94,28 +94,6 @@ function getRecentMessagesForPrompt(context: ConversationContext) {
   return recentMessages.filter((message) => !isLeadCollectionText(message.content));
 }
 
-function detectReplyLanguage(userMessage: string) {
-  const normalizedMessage = userMessage.toLowerCase();
-  const hasTagalogCue =
-    /\b(ang|mga|naman|po|opo|pwede|pede|ano|saan|kailan|magkano|meron|wala|para|ako|ikaw|siya|kami|tayo|nila|dito|iyan|yan|lang|talaga|ba|na)\b/.test(
-      normalizedMessage
-    );
-  const hasEnglishCue =
-    /\b(the|and|is|are|can|do|does|how|what|when|where|price|available|order|buy|shipping|delivery)\b/.test(
-      normalizedMessage
-    );
-
-  if (hasTagalogCue && hasEnglishCue) {
-    return "Taglish";
-  }
-
-  if (hasTagalogCue) {
-    return "English-heavy Taglish";
-  }
-
-  return "English";
-}
-
 function getErrorSummary(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -277,7 +255,6 @@ export async function askAi(
   conversationContext: ConversationContext = {}
 ) {
   void _leadFields;
-  const detectedLanguage = detectReplyLanguage(userMessage);
   const memorySummary = getMemorySummaryForPrompt(conversationContext);
   const customerState = conversationContext.customerState ?? {};
   const customerStateText =
@@ -295,8 +272,8 @@ Core rules:
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
 - Ask only one question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
-- Match the latest customer language: English for English; English-heavy Taglish for Tagalog/Taglish. Never reply in full Tagalog.
-- For English-heavy Taglish, use mostly English with natural words like po, opo, sige, and salamat.
+- Match the latest customer's language and style naturally. If they use Tagalog, reply in Tagalog; if they use Taglish, reply in Taglish; if they use another language, reply in that language.
+- If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
 - Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
 - Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
 - If the latest customer message is an information question, ignore any earlier lead-form request and answer the latest question directly.
@@ -309,9 +286,7 @@ ${businessContext || "No business facts provided."}
 ${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
 ${aiTone ? `\nTone/style:\n${aiTone}` : ""}
 ${memorySummary ? `\nConversation memory:\n${memorySummary}` : ""}
-${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}
-
-Latest customer language: ${detectedLanguage}`;
+${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
   const { apiKey, apiUrl, model } = getAiConfig();
 
   try {
