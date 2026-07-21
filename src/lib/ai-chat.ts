@@ -25,6 +25,8 @@ type LanguageDetection = {
 };
 
 type SalesPlan = {
+  resolvedCustomerMeaning: string;
+  conversationAction: string;
   buyerIntent: string;
   buyerStage: string;
   likelyConcern: string;
@@ -204,6 +206,14 @@ function parseSalesPlan(value: string): SalesPlan {
     const parsed = JSON.parse(cleanJsonText(value)) as Partial<Record<keyof SalesPlan, unknown>>;
 
     return {
+      resolvedCustomerMeaning:
+        typeof parsed.resolvedCustomerMeaning === "string"
+          ? parsed.resolvedCustomerMeaning.slice(0, 240)
+          : "Interpret the latest message using the recent conversation.",
+      conversationAction:
+        typeof parsed.conversationAction === "string"
+          ? parsed.conversationAction.slice(0, 120)
+          : "answer_latest_message",
       buyerIntent: typeof parsed.buyerIntent === "string" ? parsed.buyerIntent.slice(0, 120) : "understand_latest_message",
       buyerStage: typeof parsed.buyerStage === "string" ? parsed.buyerStage.slice(0, 80) : "unknown",
       likelyConcern: typeof parsed.likelyConcern === "string" ? parsed.likelyConcern.slice(0, 160) : "none",
@@ -213,6 +223,8 @@ function parseSalesPlan(value: string): SalesPlan {
     };
   } catch {
     return {
+      resolvedCustomerMeaning: "Interpret the latest message using the recent conversation.",
+      conversationAction: "answer_latest_message",
       buyerIntent: "understand_latest_message",
       buyerStage: "unknown",
       likelyConcern: "none",
@@ -472,10 +484,15 @@ async function planRealEstateSalesReply(input: {
       },
       {
         role: "user",
-        content: `Plan the best real estate sales response for the latest customer message.
+        content: `Understand the latest customer turn in context, then plan the best real estate sales response.
 
 Rules:
 - Use only the business facts. Do not invent prices, availability, promos, financing terms, requirements, or schedules.
+- First resolve what the customer really means using recent conversation and the previous assistant reply.
+- Short replies such as "yes", "opo", "oo", "sige", "sure", "go", "tell me", "okay", "hm", or a unit type must be interpreted from context, not treated as a new standalone topic.
+- If the previous assistant offered to explain something and the customer says yes/opo/sige, the action is continue_previous_offer and the answer should provide the explanation promised.
+- If the previous assistant asked a choice question and the customer answers with one option, continue with that option.
+- If the customer asks a new question, answer the new question directly.
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
 - Do not recommend asking for name/phone unless the latest message clearly wants viewing, reservation, meeting, callback, or follow-up.
@@ -484,6 +501,8 @@ Rules:
 
 Return only JSON:
 {
+  "resolvedCustomerMeaning":"what the latest customer message means in context",
+  "conversationAction":"continue_previous_offer/answer_new_question/answer_choice/clarify/soft_sell/ask_next_step",
   "buyerIntent":"price/location/availability/payment/viewing/comparison/etc",
   "buyerStage":"browsing/interested/qualified/ready_to_schedule/ready_to_reserve",
   "likelyConcern":"short description",
@@ -696,6 +715,8 @@ Core rules:
 - Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
 - If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
+- If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
+- For short confirmations like "opo", "oo", "yes", "sige", "sure", "go", or "okay", answer what the customer agreed to receive based on the previous assistant message.
 - Prior conversation is context only. Never copy its language if the latest customer message uses a different language.
 - Use the private sales plan below to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
 
@@ -704,6 +725,8 @@ ${businessContext || "No business facts provided."}
 ${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
 ${aiTone ? `\nTone/style:\n${aiTone}` : ""}
 Private sales plan:
+- Resolved customer meaning: ${salesPlan.resolvedCustomerMeaning}
+- Conversation action: ${salesPlan.conversationAction}
 - Buyer intent: ${salesPlan.buyerIntent}
 - Buyer stage: ${salesPlan.buyerStage}
 - Likely concern: ${salesPlan.likelyConcern}
@@ -752,6 +775,10 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
     messages.push({
       role: "system",
       content: `Language lock for the next reply: ${languageDetection.replyInstruction}`,
+    });
+    messages.push({
+      role: "system",
+      content: `Resolved latest customer meaning: ${salesPlan.resolvedCustomerMeaning}. Required conversation action: ${salesPlan.conversationAction}. Answer this meaning, not just the literal words if the latest message is short.`,
     });
     messages.push({ role: "user", content: userMessage });
 
