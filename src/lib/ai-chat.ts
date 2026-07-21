@@ -29,7 +29,7 @@ function detectReplyLanguage(userMessage: string) {
   }
 
   if (hasTagalogCue) {
-    return "Tagalog";
+    return "English-heavy Taglish";
   }
 
   return "English";
@@ -105,11 +105,13 @@ ${leadInformationFormat}
 - Do not ask lead fields one by one. Ask for the full Information block in one message.
 - If the customer already gives the needed lead fields in the Information format, say: "Thank you, I got your details. Our team will follow up shortly."
 - If the customer gives partial contact details, politely ask them to resend the complete Information block.
-- Detect the language used in the customer's latest message and reply in that same language.
+- Detect the language used in the customer's latest message, but never reply in full Tagalog.
 - If the customer's latest message is in English, reply in English.
-- If the customer's latest message is in Tagalog, reply in Tagalog.
-- If the customer's latest message mixes English and Tagalog, reply in Taglish.
-- For Taglish, use mostly English with natural Filipino words such as "po", "opo", "sige", "salamat", and "naman" when appropriate.
+- If the customer's latest message is in Tagalog, reply in English-heavy Taglish.
+- If the customer's latest message mixes English and Tagalog, reply in English-heavy Taglish.
+- For English-heavy Taglish, use mostly English words with natural Filipino words such as "po", "opo", "sige", "salamat", and "naman" when appropriate.
+- Keep English as the majority of every reply, even when the customer writes in Tagalog.
+- Do not write full Tagalog sentences or full Tagalog paragraphs.
 - If the customer says a short English phrase with "po" or "opo" such as "How much po", answer in English-heavy Taglish, not full Tagalog.
 - Prioritize the customer's latest message over any earlier tone or language.
 - Keep replies short: 1 to 3 sentences only.
