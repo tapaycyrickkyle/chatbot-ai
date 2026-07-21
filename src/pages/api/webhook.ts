@@ -424,7 +424,7 @@ function getWelcomeImageAttachmentIds(value: string) {
     .split(/\r?\n/)
     .map((attachmentId) => attachmentId.trim())
     .filter(Boolean)
-    .slice(0, 5);
+    .slice(0, 11);
 }
 
 function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>>[number]) {

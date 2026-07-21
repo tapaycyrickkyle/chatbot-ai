@@ -296,7 +296,7 @@ export default function ClientSettingsPage() {
       const nextAttachmentIds = [
         ...welcomeImageUrls.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
         data.attachmentId,
-      ].slice(0, 5);
+      ].slice(0, 11);
 
       setWelcomeImageUrls(nextAttachmentIds.join("\n"));
       showToast({ tone: "success", message: "Image uploaded to Messenger." });
@@ -495,7 +495,7 @@ export default function ClientSettingsPage() {
                   event.target.value = "";
                   void uploadWelcomeImage(file);
                 }}
-                disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 5}
+                disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 11}
                 className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70"
               />
               <textarea
@@ -508,7 +508,7 @@ export default function ClientSettingsPage() {
                 className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
               />
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Upload images here to create reusable Messenger attachment IDs. The image file is stored by Facebook, not Supabase. {welcomeAttachmentIds.length} / 5 used.
+                Upload images here to create reusable Messenger attachment IDs. The image file is stored by Facebook, not Supabase. {welcomeAttachmentIds.length} / 11 used.
               </p>
 
               <div className="mt-4">
