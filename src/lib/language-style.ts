@@ -7,8 +7,10 @@ export type CustomerLanguageStyle =
   | "english"
   | "unknown";
 
-const CEBUANO_PATTERN =
-  /\b(?:pila|unsa|asa|naa|wala|karon|ani|kana|kini|namo|nimo|ninyo|amo|inyong|adto|ari|diri|didto|pwede|pede|palihug|salamat|maayo|gusto|mopalit|kuhaon|bayad|abot|avail|available|tagpila|kumusta|ug|sa|ko|ka|mi|mo)\b/i;
+const STRONG_CEBUANO_PATTERN =
+  /\b(?:pila|unsa|asa|naa|karon|ani|kana|kini|namo|nimo|ninyo|inyong|adto|ari|diri|didto|palihug|maayo|mopalit|kuhaon|tagpila|kumusta)\b/i;
+const WEAK_CEBUANO_PATTERN =
+  /\b(?:wala|pwede|pede|salamat|gusto|bayad|abot|ug|sa|ko|ka|mi|mo)\b/i;
 const TAGALOG_PATTERN =
   /\b(?:magkano|ano|saan|meron|mayroon|wala|ito|iyan|yun|ako|ikaw|kami|tayo|nila|pwede|pede|paki|salamat|gusto|bumili|kuha|bayad|po|opo|ba|naman|lang|talaga)\b/i;
 const ENGLISH_PATTERN =
@@ -16,15 +18,24 @@ const ENGLISH_PATTERN =
 
 export function detectCustomerLanguageStyle(message = ""): CustomerLanguageStyle {
   const normalizedMessage = message.toLowerCase();
-  const hasCebuano = CEBUANO_PATTERN.test(normalizedMessage);
+  const hasStrongCebuano = STRONG_CEBUANO_PATTERN.test(normalizedMessage);
+  const hasWeakCebuano = WEAK_CEBUANO_PATTERN.test(normalizedMessage);
   const hasTagalog = TAGALOG_PATTERN.test(normalizedMessage);
   const hasEnglish = ENGLISH_PATTERN.test(normalizedMessage);
 
-  if (hasCebuano && !hasTagalog) {
+  if (hasEnglish && !hasStrongCebuano && !hasTagalog) {
+    return "english";
+  }
+
+  if (hasStrongCebuano && !hasTagalog) {
     return "cebuano";
   }
 
-  if (hasCebuano && hasEnglish && !hasTagalog) {
+  if (hasStrongCebuano && hasEnglish && !hasTagalog) {
+    return "cebuano";
+  }
+
+  if (hasWeakCebuano && !hasEnglish && !hasTagalog) {
     return "cebuano";
   }
 

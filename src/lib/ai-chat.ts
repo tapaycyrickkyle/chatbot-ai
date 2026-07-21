@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMissingInfoReply } from "@/lib/language-style";
+import { detectCustomerLanguageStyle, getMissingInfoReply } from "@/lib/language-style";
 
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
   "Our AI assistant is temporarily unavailable. Please try again later.";
@@ -263,12 +263,15 @@ export async function askAi(
       : "";
   const aiCharacter = conversationContext.aiCharacter?.trim();
   const aiTone = conversationContext.aiTone?.trim();
+  const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const missingInfoReply = getMissingInfoReply(userMessage);
   const systemPrompt = `You are a human-like sales and customer support assistant.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, or policies.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
+- Detected latest customer language/style: ${latestLanguageStyle}. Use this latest detected language/style for this reply only.
+- Do not keep using a previous customer's language if the latest message switches languages.
 - If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - If the answer is missing, reply exactly in the customer's language: "${missingInfoReply}"
