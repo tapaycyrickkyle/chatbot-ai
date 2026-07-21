@@ -22,17 +22,9 @@ const navigationItems = [
 
 type DashboardShellProps = {
   children: ReactNode;
-  activeNav?: "Pages" | "Owner Accounts";
-  searchPlaceholder?: string;
-  showTopBar?: boolean;
 };
 
-const DashboardShell = ({
-  children,
-  activeNav = "Pages",
-  searchPlaceholder = "Search pages...",
-  showTopBar = true,
-}: DashboardShellProps) => {
+const DashboardShell = ({ children }: DashboardShellProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,6 +34,14 @@ const DashboardShell = ({
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const isDesktopSidebarExpanded = isDesktopViewport || isSidebarOpen;
+  const activeNav = currentPathname.startsWith("/dashboard/owners")
+    ? "Owner Accounts"
+    : "Pages";
+  const searchPlaceholder = currentPathname.includes("/conversations")
+    ? "Search conversations..."
+    : activeNav === "Owner Accounts"
+      ? "Search owners..."
+      : "Search pages...";
 
   useEffect(() => {
     const syncViewport = () => {
@@ -95,17 +95,6 @@ const DashboardShell = ({
 
   return (
     <main className="page-enter flex min-h-screen bg-background text-foreground">
-      {!isSidebarOpen && !showTopBar ? (
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(true)}
-          className="fixed right-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
-          aria-label="Open sidebar"
-        >
-          <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
-        </button>
-      ) : null}
-
       {isSidebarOpen && !isDesktopViewport ? (
         <button
           type="button"
@@ -202,37 +191,35 @@ const DashboardShell = ({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col xl:pl-[274px]">
-        {showTopBar ? (
-          <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center justify-between gap-4">
-                <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
-                  AI Inbox Admin
-                </h1>
-                <button
-                  type="button"
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
-                  aria-label="Open sidebar"
-                >
-                  <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
-                </button>
-              </div>
+        <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
+                AI Inbox Admin
+              </h1>
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
+                aria-label="Open sidebar"
+              >
+                <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />
+              </button>
+            </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <div className="relative min-w-0 flex-1 sm:max-w-[320px] lg:w-[320px]">
-                  <input
-                    type="search"
-                    value={searchInputValue}
-                    onChange={(event) => setSearchInputValue(event.target.value)}
-                    placeholder={searchPlaceholder}
-                    className="w-full rounded-md border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                  />
-                </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative min-w-0 flex-1 sm:max-w-[320px] lg:w-[320px]">
+                <input
+                  type="search"
+                  value={searchInputValue}
+                  onChange={(event) => setSearchInputValue(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full rounded-md border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                />
               </div>
             </div>
-          </header>
-        ) : null}
+          </div>
+        </header>
 
         <section className="px-4 py-6 sm:px-8 lg:px-10">{children}</section>
       </div>

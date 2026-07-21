@@ -13,7 +13,6 @@ import {
   MAX_AI_TONE_LENGTH,
   MAX_BUSINESS_INFO_LENGTH,
 } from "@/lib/business-info";
-import DashboardShell from "../../../_components/DashboardShell";
 
 type ClientSettings = {
   id: string;
@@ -156,7 +155,7 @@ export default function PromptBuilderPage() {
   const remainingToneCharacters = MAX_AI_TONE_LENGTH - aiTone.length;
 
   return (
-    <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
+    <>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -318,6 +317,6 @@ export default function PromptBuilderPage() {
         isOpen={saving || updatingAi}
         message={updatingAi ? "Updating AI status..." : "Saving prompt..."}
       />
-    </DashboardShell>
+    </>
   );
 }

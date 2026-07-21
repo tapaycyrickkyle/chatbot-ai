@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
-import DashboardShell from "../../../_components/DashboardShell";
 
 type Conversation = {
   id: string;
@@ -146,7 +145,7 @@ export default function ConversationsPage() {
   };
 
   return (
-    <DashboardShell activeNav="Pages" searchPlaceholder="Search conversations..." showTopBar={false}>
+    <>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -247,8 +246,8 @@ export default function ConversationsPage() {
             </div>
         )}
       </section>
-      <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
+        <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
       </div>
-    </DashboardShell>
+    </>
   );
 }

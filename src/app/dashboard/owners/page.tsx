@@ -1,9 +1,10 @@
 "use client";
 
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
-import DashboardShell from "../_components/DashboardShell";
 
 type ClientOption = {
   id: string;
@@ -33,6 +34,7 @@ export default function OwnerAccountsPage() {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [clientId, setClientId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,6 +93,7 @@ export default function OwnerAccountsPage() {
       showToast({ tone: "success", message: "Owner account saved." });
       setEmail("");
       setPassword("");
+      setShowPassword(false);
       setIsCreateModalOpen(false);
       await loadOwners();
     } catch (error) {
@@ -141,7 +144,7 @@ export default function OwnerAccountsPage() {
   };
 
   return (
-    <DashboardShell activeNav="Owner Accounts" searchPlaceholder="Search owners..." showTopBar={false}>
+    <>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -218,14 +221,28 @@ export default function OwnerAccountsPage() {
                     <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-password">
                       Temporary Password
                     </label>
-                    <input
-                      id="owner-password"
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder="At least 6 characters"
-                      className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                    />
+                    <div className="relative mt-2">
+                      <input
+                        id="owner-password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="At least 6 characters"
+                        className="w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 pr-11 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
+                      >
+                        <FontAwesomeIcon
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          icon={showPassword ? faEyeSlash : faEye}
+                        />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="owner-client">
@@ -319,6 +336,6 @@ export default function OwnerAccountsPage() {
         isOpen={saving || Boolean(deletingOwnerId)}
         message={saving ? "Saving owner account..." : "Removing owner access..."}
       />
-    </DashboardShell>
+    </>
   );
 }

@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
-import DashboardShell from "../../_components/DashboardShell";
 
 type ClientSettings = {
   id: string;
@@ -277,7 +276,7 @@ export default function ClientSettingsPage() {
   };
 
   return (
-    <DashboardShell activeNav="Pages" searchPlaceholder="Search pages..." showTopBar={false}>
+    <>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -512,6 +511,6 @@ export default function ClientSettingsPage() {
         isOpen={cleaningStorage || savingSheetsUrl}
         message={savingSheetsUrl ? "Saving Google Sheets URL..." : "Cleaning old data..."}
       />
-    </DashboardShell>
+    </>
   );
 }

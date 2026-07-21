@@ -8,7 +8,6 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "../_components/ToastProvider";
 import LoadingModal from "../_components/LoadingModal";
-import DashboardShell from "./_components/DashboardShell";
 
 type ClientRow = {
   id: string;
@@ -299,8 +298,7 @@ const DashboardPage = () => {
 
   return (
     <>
-      <DashboardShell activeNav="Pages" searchPlaceholder="Search pages...">
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-[760px]">
               <h2 className="text-[1.8rem] font-extrabold sm:text-[2.1rem]">
@@ -453,8 +451,7 @@ const DashboardPage = () => {
               })()
             ))}
           </div>
-        </div>
-      </DashboardShell>
+      </div>
       {disconnectTarget ? (
         <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">

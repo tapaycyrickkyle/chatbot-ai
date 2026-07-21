@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
+import DashboardShell from "./_components/DashboardShell";
 
 export default async function DashboardLayout({
   children,
@@ -16,5 +17,5 @@ export default async function DashboardLayout({
     redirect("/sign-in");
   }
 
-  return children;
+  return <DashboardShell>{children}</DashboardShell>;
 }
