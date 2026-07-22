@@ -17,7 +17,6 @@ import chatbotWebIcon from "../../chatbot-web-icon.png";
 
 const navigationItems = [
   { label: "Pages", href: "/dashboard", icon: "clients" as const },
-  { label: "Owner Accounts", href: "/dashboard/owners", icon: "owners" as const },
 ];
 
 type DashboardShellProps = {
@@ -34,14 +33,10 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const isDesktopSidebarExpanded = isDesktopViewport || isSidebarOpen;
-  const activeNav = currentPathname.startsWith("/dashboard/owners")
-    ? "Owner Accounts"
-    : "Pages";
+  const activeNav = "Pages";
   const searchPlaceholder = currentPathname.includes("/conversations")
     ? "Search conversations..."
-    : activeNav === "Owner Accounts"
-      ? "Search owners..."
-      : "Search pages...";
+    : "Search pages...";
 
   useEffect(() => {
     const syncViewport = () => {
@@ -146,7 +141,7 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
 
           {isDesktopSidebarExpanded ? (
             <p className="mt-4 text-[13px] text-[var(--text-muted)]">
-              Manage pages, prompts, handoff, and owner access.
+              Manage pages, prompts, handoff, and automation.
             </p>
           ) : null}
         </div>

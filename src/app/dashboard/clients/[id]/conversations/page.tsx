@@ -156,7 +156,7 @@ export default function ConversationsPage() {
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Pause or resume AI replies when the owner takes over a customer conversation.
+              Pause or resume AI replies when a human takes over a customer conversation.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
@@ -215,7 +215,7 @@ export default function ConversationsPage() {
                       </p>
                       {conversation.ai_paused ? (
                         <p className="mt-1 break-words text-[12px] text-[var(--text-subtle)]">
-                          Paused by {conversation.paused_by || "owner"} at {formatTimestamp(conversation.paused_at)}
+                          Paused by {conversation.paused_by === "owner" ? "manual Page reply" : conversation.paused_by || "manual Page reply"} at {formatTimestamp(conversation.paused_at)}
                         </p>
                       ) : null}
                     </div>

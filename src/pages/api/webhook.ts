@@ -206,7 +206,7 @@ function summarizePageEcho(
   };
 }
 
-async function safelyPauseAiForOwnerReply(input: {
+async function safelyPauseAiForManualPageReply(input: {
   clientId: string;
   pageId: string;
   recipientId: string;
@@ -225,7 +225,7 @@ async function safelyPauseAiForOwnerReply(input: {
       pauseExpiresAt,
     });
   } catch (error) {
-    console.warn("Failed to pause AI after owner reply", error);
+    console.warn("Failed to pause AI after manual Page reply", error);
   }
 }
 
@@ -748,7 +748,7 @@ export default async function handler(
               continue;
             }
 
-            await safelyPauseAiForOwnerReply({
+            await safelyPauseAiForManualPageReply({
               clientId: client.id,
               pageId,
               recipientId: userId,

@@ -45,32 +45,6 @@ type AiConversationRow = {
   updated_at: string;
 };
 
-type BusinessUserRow = {
-  id: string;
-  client_id: string;
-  email: string;
-  role: string | null;
-  created_at: string;
-};
-
-type OrderRow = {
-  id: string;
-  client_id: string;
-  page_id: string;
-  recipient_id: string;
-  customer_name: string | null;
-  contact_number: string | null;
-  order_summary: string;
-  status: string;
-  total_amount: number | null;
-  payment_method: string | null;
-  delivery_method: string | null;
-  delivery_address: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 const CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
@@ -205,36 +179,6 @@ function normalizeAiConversation(row: AiConversationRow) {
     paused_by: row.paused_by ?? "",
     ai_pause_expires_at: row.ai_pause_expires_at ?? "",
     resumed_at: row.resumed_at ?? "",
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
-}
-
-function normalizeBusinessUser(row: BusinessUserRow) {
-  return {
-    id: String(row.id),
-    client_id: String(row.client_id),
-    email: row.email.trim().toLowerCase(),
-    role: row.role || "owner",
-    created_at: row.created_at,
-  };
-}
-
-function normalizeOrder(row: OrderRow) {
-  return {
-    id: String(row.id),
-    client_id: String(row.client_id),
-    page_id: row.page_id,
-    recipient_id: row.recipient_id,
-    customer_name: row.customer_name ?? "",
-    contact_number: row.contact_number ?? "",
-    order_summary: row.order_summary,
-    status: row.status,
-    total_amount: row.total_amount,
-    payment_method: row.payment_method ?? "",
-    delivery_method: row.delivery_method ?? "",
-    delivery_address: row.delivery_address ?? "",
-    notes: row.notes ?? "",
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -640,89 +584,3 @@ export async function resumeAiConversation(clientId: string, recipientId: string
   }
 }
 
-export async function getBusinessUserByEmail(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("business_users")
-    .select("id, client_id, email, role, created_at")
-    .eq("email", normalizedEmail)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message || "Failed to load business user");
-  }
-
-  return data ? normalizeBusinessUser(data as BusinessUserRow) : null;
-}
-
-export async function getBusinessUsers() {
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("business_users")
-    .select("id, client_id, email, role, created_at")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || "Failed to load business users");
-  }
-
-  return (data ?? []).map((row) => normalizeBusinessUser(row as BusinessUserRow));
-}
-
-export async function upsertBusinessUser(input: {
-  clientId: string;
-  email: string;
-}) {
-  const email = input.email.trim().toLowerCase();
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("business_users")
-    .upsert(
-      {
-        client_id: input.clientId,
-        email,
-        role: "owner",
-      },
-      { onConflict: "email" }
-    )
-    .select("id, client_id, email, role, created_at")
-    .single();
-
-  if (error) {
-    throw new Error(error.message || "Failed to save business user");
-  }
-
-  return normalizeBusinessUser(data as BusinessUserRow);
-}
-
-export async function deleteBusinessUser(ownerId: string) {
-  const supabase = getDb();
-  const { error } = await supabase.from("business_users").delete().eq("id", ownerId);
-
-  if (error) {
-    throw new Error(error.message || "Failed to delete business user");
-  }
-}
-
-export async function getOrdersForClient(clientId: string) {
-  const supabase = getDb();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(
-      "id, client_id, page_id, recipient_id, customer_name, contact_number, order_summary, status, total_amount, payment_method, delivery_method, delivery_address, notes, created_at, updated_at"
-    )
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || "Failed to load orders");
-  }
-
-  return (data ?? []).map((row) => normalizeOrder(row as OrderRow));
-}

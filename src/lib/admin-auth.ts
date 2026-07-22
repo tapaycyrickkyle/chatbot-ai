@@ -1,7 +1,6 @@
 import "server-only";
 
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { getBusinessUserByEmail, getClientById } from "../../lib/database";
 import { getSupabaseServerClient } from "../../lib/supabase";
 
 export const ADMIN_ACCESS_TOKEN_COOKIE = "sb_access_token";
@@ -69,58 +68,6 @@ async function getAuthUser(accessToken: string | undefined | null) {
     email,
     userId: data.user.id,
   };
-}
-
-export async function verifyBusinessOwnerAccessToken(accessToken: string | undefined | null) {
-  const authUser = await getAuthUser(accessToken);
-
-  if (!authUser) {
-    return null;
-  }
-
-  const businessUser = await getBusinessUserByEmail(authUser.email);
-
-  if (!businessUser) {
-    return null;
-  }
-
-  const client = await getClientById(businessUser.client_id);
-
-  if (!client) {
-    return null;
-  }
-
-  return {
-    email: authUser.email,
-    userId: authUser.userId,
-    businessUserId: businessUser.id,
-    clientId: businessUser.client_id,
-    clientName: client.client_name,
-    pageId: client.page_id,
-    manualAiPauseMinutes: client.manual_ai_pause_minutes,
-  };
-}
-
-export async function verifyAppAccessToken(accessToken: string | undefined | null) {
-  const admin = await verifyAdminAccessToken(accessToken);
-
-  if (admin) {
-    return {
-      role: "admin" as const,
-      ...admin,
-    };
-  }
-
-  const owner = await verifyBusinessOwnerAccessToken(accessToken);
-
-  if (owner) {
-    return {
-      role: "owner" as const,
-      ...owner,
-    };
-  }
-
-  return null;
 }
 
 export function generateFacebookOAuthState() {

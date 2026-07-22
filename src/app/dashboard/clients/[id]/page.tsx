@@ -19,6 +19,7 @@ type ClientSettings = {
   welcome_message: string;
   welcome_link_url: string;
   welcome_image_urls: string;
+  manual_ai_pause_minutes: number;
   auto_reply_ignore_pattern: string;
 };
 
@@ -99,6 +100,7 @@ export default function ClientSettingsPage() {
   const [welcomeMessage, setWelcomeMessage] = useState("");
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
+  const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(5);
   const [autoReplyIgnorePattern, setAutoReplyIgnorePattern] = useState("");
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
@@ -145,6 +147,7 @@ export default function ClientSettingsPage() {
         setWelcomeMessage(data.welcome_message || "");
         setWelcomeLinkUrl(data.welcome_link_url || "");
         setWelcomeImageUrls(data.welcome_image_urls || "");
+        setManualAiPauseMinutes(data.manual_ai_pause_minutes || 5);
         setAutoReplyIgnorePattern(data.auto_reply_ignore_pattern || "");
       } catch (error) {
         console.error(error);
@@ -319,21 +322,22 @@ export default function ClientSettingsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          manual_ai_pause_minutes: manualAiPauseMinutes,
           auto_reply_ignore_pattern: autoReplyIgnorePattern,
         }),
       });
       const data = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to save auto-reply ignore pattern");
+        throw new Error(data?.error || "Failed to save AI conversation controls");
       }
 
-      showToast({ tone: "success", message: "Auto-reply ignore pattern saved." });
+      showToast({ tone: "success", message: "AI conversation controls saved." });
     } catch (error) {
       console.error(error);
       showToast({
         tone: "error",
-        message: error instanceof Error ? error.message : "Failed to save auto-reply ignore pattern.",
+        message: error instanceof Error ? error.message : "Failed to save AI conversation controls.",
       });
     } finally {
       setSavingAutoReplyIgnorePattern(false);
@@ -742,7 +746,28 @@ export default function ClientSettingsPage() {
                 AI Conversation Control
               </p>
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                Pause or resume AI replies when a human owner takes over a conversation.
+                Configure how long AI pauses for one customer after a human replies from the Page inbox.
+              </p>
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="manual-ai-pause-minutes"
+              >
+                Manual reply pause duration
+              </label>
+              <input
+                id="manual-ai-pause-minutes"
+                type="number"
+                min={1}
+                max={1440}
+                value={manualAiPauseMinutes}
+                onChange={(event) => {
+                  const nextValue = Number(event.target.value);
+                  setManualAiPauseMinutes(Number.isFinite(nextValue) ? nextValue : 5);
+                }}
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Applies to each customer individually. Other customers continue chatting with AI normally.
               </p>
               <label
                 className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
@@ -760,7 +785,7 @@ export default function ClientSettingsPage() {
                 className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
               />
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Use {"{name}"} for the changing customer name. Matching Page echoes will not pause AI; other owner replies will pause AI.
+                Use {"{name}"} for the changing customer name. Matching Page echoes will not pause AI; other manual Page replies will pause AI for that customer.
               </p>
               <div className="mt-4">
                 <button
@@ -769,7 +794,7 @@ export default function ClientSettingsPage() {
                   disabled={savingAutoReplyIgnorePattern || loading}
                   className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                 >
-                  {savingAutoReplyIgnorePattern ? "Saving..." : "Save Auto-reply Ignore"}
+                  {savingAutoReplyIgnorePattern ? "Saving..." : "Save AI Controls"}
                 </button>
               </div>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -789,7 +814,7 @@ export default function ClientSettingsPage() {
                 </button>
               </div>
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Use this if manual owner replies are not appearing in Vercel logs. It re-subscribes this Page to messages, postbacks, and message echoes.
+                Use this if manual Page replies are not appearing in Vercel logs. It re-subscribes this Page to messages, postbacks, and message echoes.
               </p>
             </div>
 
@@ -827,7 +852,7 @@ export default function ClientSettingsPage() {
             : savingWelcomeSequence
             ? "Saving first reply sequence..."
             : savingAutoReplyIgnorePattern
-            ? "Saving auto-reply ignore pattern..."
+            ? "Saving AI conversation controls..."
             : savingSheetsUrl
               ? "Saving Google Sheets URL..."
               : "Cleaning old data..."

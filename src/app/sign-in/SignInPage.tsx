@@ -103,7 +103,7 @@ const SignInPage = () => {
                   Sign in
                 </h2>
                 <p className="mt-1 text-[13px] text-[#8a8a8f]">
-                  Admin and business owner accounts use the same login.
+                  Admin access for connected Page automation.
                 </p>
               </div>
 

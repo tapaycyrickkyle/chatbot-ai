@@ -17,7 +17,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "AI Inbox",
-  description: "AI Inbox workspace for Facebook Page automation, handoff, and orders.",
+  description: "AI Inbox workspace for Facebook Page automation and handoff.",
   icons: {
     icon: chatbotWebIcon.src,
     apple: chatbotWebIcon.src,
