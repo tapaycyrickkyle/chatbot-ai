@@ -15,6 +15,19 @@ type ChatCompletionResponse = {
       content?: string;
     };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens_details?: {
+      cached_tokens?: number;
+      cache_write_tokens?: number;
+      prompt_cache_hit_tokens?: number;
+      prompt_cache_miss_tokens?: number;
+    };
+    prompt_cache_hit_tokens?: number;
+    prompt_cache_miss_tokens?: number;
+  };
 };
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -60,6 +73,7 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 160;
 const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
+const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = 6000;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
   "SOFT_INTEREST",
@@ -93,10 +107,32 @@ function shouldSuppressLeadContext(intent?: LeadCaptureIntent) {
   return intent === "INFO_ONLY" || intent === "SOFT_INTEREST" || intent === "UNCLEAR";
 }
 
+function createFallbackSalesPlan(
+  languageStyle: CustomerLanguageStyle,
+  latestLeadIntent?: LeadCaptureIntent
+): SalesPlan {
+  return {
+    ...parseSalesPlan("", languageStyle),
+    leadCaptureIntent: latestLeadIntent ?? "UNCLEAR",
+    resolvedCustomerMeaning:
+      "Answer the latest customer message directly using the business facts and recent conversation only when needed.",
+    conversationAction: "answer_latest_message",
+    buyerIntent: "understand_latest_message",
+    buyerStage: "unknown",
+    likelyConcern: "none",
+    bestAnswerAngle: "answer_directly_using_business_facts",
+    bestNextStep: "answer_only",
+    shouldAskFollowUp: false,
+  };
+}
+
 function getMemorySummaryForPrompt(context: ConversationContext) {
   const memorySummary = context.conversationSummary?.trim() ?? "";
 
-  if (!memorySummary || shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(memorySummary)) {
+  if (
+    !memorySummary ||
+    (shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(memorySummary))
+  ) {
     return "";
   }
 
@@ -106,7 +142,10 @@ function getMemorySummaryForPrompt(context: ConversationContext) {
 function getPreviousAiReplyForPrompt(context: ConversationContext) {
   const previousAiReply = context.previousAiReply?.trim() ?? "";
 
-  if (!previousAiReply || shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(previousAiReply)) {
+  if (
+    !previousAiReply ||
+    (shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(previousAiReply))
+  ) {
     return "";
   }
 
@@ -271,6 +310,32 @@ function getMaxOutputTokens() {
   return DEFAULT_MAX_OUTPUT_TOKENS;
 }
 
+function getMaxBusinessContextChars() {
+  const configuredValue = Number(process.env.AI_MAX_BUSINESS_CONTEXT_CHARS);
+
+  if (Number.isFinite(configuredValue) && configuredValue >= 1000 && configuredValue <= 20000) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_MAX_BUSINESS_CONTEXT_CHARS;
+}
+
+function getBusinessContextForPrompt(value: string) {
+  const cleanedValue = value.replace(/\s+/g, " ").trim();
+  const maxLength = getMaxBusinessContextChars();
+
+  if (cleanedValue.length <= maxLength) {
+    return cleanedValue;
+  }
+
+  console.warn("AI business context clipped for token control", {
+    originalChars: cleanedValue.length,
+    maxChars: maxLength,
+  });
+
+  return `${cleanedValue.slice(0, maxLength - 3).trim()}...`;
+}
+
 function createAiHeaders(apiKey: string, apiUrl: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -292,6 +357,7 @@ async function requestChatCompletion(input: {
   messages: ChatMessage[];
   temperature: number;
   maxTokens: number;
+  purpose: "planner" | "reply";
 }) {
   const response = await fetch(input.apiUrl, {
     method: "POST",
@@ -319,6 +385,23 @@ async function requestChatCompletion(input: {
   }
 
   const data = (await response.json()) as ChatCompletionResponse;
+  const usage = data.usage;
+
+  if (usage) {
+    console.info("AI token usage", {
+      purpose: input.purpose,
+      model: input.model,
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+      totalTokens: usage.total_tokens,
+      cachedTokens: usage.prompt_tokens_details?.cached_tokens,
+      cacheWriteTokens: usage.prompt_tokens_details?.cache_write_tokens,
+      promptCacheHitTokens:
+        usage.prompt_cache_hit_tokens ?? usage.prompt_tokens_details?.prompt_cache_hit_tokens,
+      promptCacheMissTokens:
+        usage.prompt_cache_miss_tokens ?? usage.prompt_tokens_details?.prompt_cache_miss_tokens,
+    });
+  }
 
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
@@ -346,6 +429,7 @@ async function planRealEstateSalesReply(input: {
     model: input.model,
     temperature: 0.1,
     maxTokens: 260,
+    purpose: "planner",
     messages: [
       {
         role: "system",
@@ -403,7 +487,7 @@ Recent conversation:
 ${recentMessages || input.conversationSummary || "None"}
 
 Business facts:
-${input.businessContext || "No business facts provided."}
+${getBusinessContextForPrompt(input.businessContext) || "No business facts provided."}
 
 Latest customer message:
 ${input.userMessage}`,
@@ -490,6 +574,10 @@ export async function askAi(
   const aiTone = conversationContext.aiTone?.trim();
   const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const missingInfoReply = getMissingInfoReply(userMessage);
+  const fallbackPlan = createFallbackSalesPlan(
+    latestLanguageStyle,
+    conversationContext.latestLeadIntent
+  );
   const { apiKey, apiUrl, model } = getAiConfig();
 
   try {
@@ -499,25 +587,14 @@ export async function askAi(
     }
 
     const recentMessages = getRecentMessagesForPrompt(conversationContext);
-    const salesPlan =
-      conversationContext.replyPlan ??
-      (await planRealEstateSalesReply({
-        apiKey,
-        apiUrl,
-        model,
-        userMessage,
-        businessContext,
-        conversationSummary: memorySummary,
-        recentMessages,
-        latestLeadIntent: conversationContext.latestLeadIntent,
-        fallbackStyle: latestLanguageStyle,
-      }));
-    const systemPrompt = `You are a human-like real estate sales agent and customer support assistant.
+    const salesPlan = conversationContext.replyPlan ?? fallbackPlan;
+    const businessContextForPrompt = getBusinessContextForPrompt(businessContext);
+    const stableSystemPrompt = `You are a human-like real estate sales agent and customer support assistant.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
 - Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
-- If a detail is not in the business facts, use the missing-info reply. Do not guess and do not create an alternative process.
+- If a detail is not in the business facts, use the missing-info reply provided in the dynamic instructions. Do not guess and do not create an alternative process.
 - Act like a helpful real estate agent, not a passive FAQ bot. Understand what the customer is trying to decide: price, unit fit, location, availability, parking, payment, viewing, reservation, or next step.
 - Answer the latest customer question directly first. After answering, add one natural follow-up only when it helps move the buyer forward.
 - Sell softly using only business facts: highlight location, unit options, amenities, payment options, or buyer fit only when relevant to the customer's question.
@@ -525,13 +602,9 @@ Core rules:
 - If the customer asks price, computation, availability, location, parking, requirements, or how to avail, answer the information first before asking anything.
 - If exact price, availability, computation, parking terms, requirements, or schedule details are missing from the business facts, say the team can confirm instead of inventing.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
-- AI-detected latest customer language/style: ${salesPlan.languageName}.
-- Mandatory reply language instruction: ${salesPlan.replyInstruction}
-- Use this latest detected language/style for this reply only.
 - Do not keep using a previous customer's language if the latest message switches languages.
 - If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
-- If the answer is missing, reply exactly in the customer's language: "${missingInfoReply}"
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
 - Keep replies to 1-2 short sentences by default, 3 only when needed.
 - Ask at most one question, and only if it is useful for the customer's next decision. It is okay to answer with no question.
@@ -547,15 +620,21 @@ Core rules:
 - If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 - Customers never need to use fixed triggers or exact keywords. Understand their intent naturally from any language, slang, short reply, typo, or mixed-language message using the conversation context.
-- If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
 - For short confirmations, refusals, choices, fragments, or follow-ups in any language, answer what the customer means based on the previous assistant message and recent conversation.
 - Prior conversation is context only. Never copy its language if the latest customer message uses a different language.
-- Use the private sales plan below to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
+- If dynamic instructions include a private sales plan, use it to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
 
 Business facts:
-${businessContext || "No business facts provided."}
+${businessContextForPrompt || "No business facts provided."}
 ${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
-${aiTone ? `\nTone/style:\n${aiTone}` : ""}
+${aiTone ? `\nTone/style:\n${aiTone}` : ""}`;
+    const dynamicInstructionPrompt = `Dynamic reply instructions:
+- AI-detected latest customer language/style: ${salesPlan.languageName}.
+- Mandatory reply language instruction: ${salesPlan.replyInstruction}
+- Use this latest detected language/style for this reply only.
+- If the answer is missing, reply exactly in the customer's language: "${missingInfoReply}"
+- If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
+
 Private sales plan:
 - Resolved customer meaning: ${salesPlan.resolvedCustomerMeaning}
 - Conversation action: ${salesPlan.conversationAction}
@@ -571,7 +650,11 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
     const messages: ChatMessage[] = [
       {
         role: "system",
-        content: systemPrompt,
+        content: stableSystemPrompt,
+      },
+      {
+        role: "system",
+        content: dynamicInstructionPrompt,
       },
     ];
 
@@ -621,6 +704,7 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
       messages,
       temperature: 0.35,
       maxTokens: getMaxOutputTokens(),
+      purpose: "reply",
     });
 
     if (reply && reply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE && needsReplyRewrite(reply, latestLanguageStyle)) {

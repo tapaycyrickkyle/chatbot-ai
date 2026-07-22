@@ -462,6 +462,33 @@ function getLeadCaptureIntentFromPlan(message: string, planIntent: LeadCaptureIn
   return getFallbackLeadIntent(message);
 }
 
+function shouldUseAiReplyPlanner(
+  message: string,
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
+  fallbackIntent: LeadCaptureIntent
+) {
+  if (fallbackIntent !== "UNCLEAR") {
+    return false;
+  }
+
+  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
+  const words = normalizedMessage.split(/\s+/).filter(Boolean);
+  const hasConversationContext = Boolean(
+    conversation?.last_ai_reply || conversation?.recent_messages?.length
+  );
+  const isShortContextualReply =
+    words.length <= 3 ||
+    /^(?:yes|yeah|yep|sure|ok|okay|no|nope|why|how|hm|that|this|that one|this one|go|sige|oo|opo|hindi|dili|1br|2br|3br)\b/i.test(
+      normalizedMessage
+    );
+  const refersToPreviousMessage =
+    /\b(?:that|this|it|one|option|same|previous|earlier|yes please|go ahead|tell me more)\b/i.test(
+      normalizedMessage
+    );
+
+  return hasConversationContext && (isShortContextualReply || refersToPreviousMessage);
+}
+
 function shouldAskForLeadFormat(
   intent: LeadCaptureIntent,
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
@@ -905,8 +932,28 @@ export default async function handler(
               aiCharacter: client.ai_character,
               aiTone: client.ai_tone,
             };
-            const replyPlan = await planAiReply(rawText, client.business_info || "", aiConversationContext);
-            const leadIntent = getLeadCaptureIntentFromPlan(rawText, replyPlan.leadCaptureIntent);
+            const fallbackLeadIntent = getFallbackLeadIntent(rawText);
+            const shouldPlanReply = shouldUseAiReplyPlanner(
+              rawText,
+              existingConversation,
+              fallbackLeadIntent
+            );
+            const replyPlan = shouldPlanReply
+              ? await planAiReply(rawText, client.business_info || "", aiConversationContext)
+              : undefined;
+            const leadIntent = getLeadCaptureIntentFromPlan(
+              rawText,
+              replyPlan?.leadCaptureIntent ?? fallbackLeadIntent
+            );
+
+            if (!shouldPlanReply) {
+              console.info("AI reply planner skipped for token control", {
+                clientId: client.id,
+                pageId,
+                userId,
+                fallbackLeadIntent,
+              });
+            }
 
             if (shouldAskForLeadFormat(leadIntent, existingConversation)) {
               const reply = createLeadFormatReply(leadFields, leadIntent, rawText);
@@ -917,12 +964,12 @@ export default async function handler(
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
                 rawText,
-                deterministicReply
+                reply
               );
               const conversationSummary = updateConversationSummary(
                 existingConversation?.conversation_summary || "",
                 rawText,
-                deterministicReply
+                reply
               );
 
               await safelyHandleFlowSend(
@@ -960,7 +1007,7 @@ export default async function handler(
                 const aiReply = await askAi(rawText, client.business_info || "", leadFields, {
                   ...aiConversationContext,
                   latestLeadIntent: leadIntent,
-                  replyPlan,
+                  ...(replyPlan ? { replyPlan } : {}),
                 });
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,
