@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { getSupabaseServerClient } from "./supabase";
 
 type ClientRow = {
@@ -41,6 +42,23 @@ type AiConversationRow = {
   paused_by: string | null;
   ai_pause_expires_at?: string | null;
   resumed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type AiMessageJobRow = {
+  id: string;
+  source: string;
+  body_hash: string;
+  payload: unknown;
+  status: string;
+  attempts: number;
+  max_attempts: number;
+  locked_at: string | null;
+  locked_by: string | null;
+  next_attempt_at: string;
+  last_error: string | null;
+  processed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -188,6 +206,29 @@ function getDb() {
   return getSupabaseServerClient();
 }
 
+function normalizeAiMessageJob(row: AiMessageJobRow) {
+  return {
+    id: String(row.id),
+    source: row.source,
+    body_hash: row.body_hash,
+    payload: row.payload,
+    status: row.status,
+    attempts: row.attempts,
+    max_attempts: row.max_attempts,
+    locked_at: row.locked_at ?? "",
+    locked_by: row.locked_by ?? "",
+    next_attempt_at: row.next_attempt_at,
+    last_error: row.last_error ?? "",
+    processed_at: row.processed_at ?? "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function createBodyHash(rawBody: string) {
+  return createHash("sha256").update(rawBody).digest("hex");
+}
+
 export async function getClients() {
   const supabase = getDb();
   const response = await supabase
@@ -221,6 +262,102 @@ export async function getClients() {
   }
 
   return (data ?? []).map((row) => normalizeClient(row as ClientRow));
+}
+
+export async function enqueueAiMessageJob(input: {
+  rawBody: string;
+  payload: unknown;
+  source?: string;
+}) {
+  const supabase = getDb();
+  const bodyHash = createBodyHash(input.rawBody);
+  const { data, error } = await supabase
+    .from("ai_message_jobs")
+    .upsert(
+      {
+        source: input.source ?? "messenger_webhook",
+        body_hash: bodyHash,
+        payload: input.payload,
+        status: "queued",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "body_hash", ignoreDuplicates: true }
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || "Failed to enqueue AI message job");
+  }
+
+  return {
+    id: data?.id ? String(data.id) : "",
+    duplicate: !data?.id,
+    bodyHash,
+  };
+}
+
+export async function claimAiMessageJobs(input: {
+  batchSize: number;
+  workerId: string;
+}) {
+  const supabase = getDb();
+  const { data, error } = await supabase.rpc("claim_ai_message_jobs", {
+    batch_size: input.batchSize,
+    worker_id: input.workerId,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to claim AI message jobs");
+  }
+
+  return ((data ?? []) as AiMessageJobRow[]).map(normalizeAiMessageJob);
+}
+
+export async function completeAiMessageJob(jobId: string) {
+  const supabase = getDb();
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("ai_message_jobs")
+    .update({
+      status: "sent",
+      processed_at: now,
+      locked_at: null,
+      locked_by: null,
+      updated_at: now,
+    })
+    .eq("id", jobId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to complete AI message job");
+  }
+}
+
+export async function failAiMessageJob(input: {
+  jobId: string;
+  errorMessage: string;
+  attempts: number;
+  maxAttempts: number;
+}) {
+  const supabase = getDb();
+  const now = new Date().toISOString();
+  const retryDelaySeconds = Math.min(300, Math.pow(2, Math.max(0, input.attempts - 1)) * 10);
+  const shouldRetry = input.attempts < input.maxAttempts;
+  const { error } = await supabase
+    .from("ai_message_jobs")
+    .update({
+      status: shouldRetry ? "retrying" : "failed",
+      last_error: input.errorMessage.slice(0, 1000),
+      next_attempt_at: new Date(Date.now() + retryDelaySeconds * 1000).toISOString(),
+      locked_at: null,
+      locked_by: null,
+      updated_at: now,
+    })
+    .eq("id", input.jobId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to fail AI message job");
+  }
 }
 
 export async function addClient(clientData: {

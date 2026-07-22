@@ -69,11 +69,12 @@ type ConversationContext = {
   replyPlan?: SalesPlan;
 };
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 160;
+const DEFAULT_MAX_OUTPUT_TOKENS = 120;
 const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
 const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = 6000;
+const DEFAULT_REPLY_SENTENCE_LIMIT = 2;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
   "SOFT_INTEREST",
@@ -318,6 +319,16 @@ function getMaxBusinessContextChars() {
   }
 
   return DEFAULT_MAX_BUSINESS_CONTEXT_CHARS;
+}
+
+function getReplySentenceLimit() {
+  const configuredValue = Number(process.env.AI_REPLY_SENTENCE_LIMIT);
+
+  if (Number.isFinite(configuredValue) && configuredValue >= 1 && configuredValue <= 3) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_REPLY_SENTENCE_LIMIT;
 }
 
 function getBusinessContextForPrompt(value: string) {
@@ -589,10 +600,14 @@ export async function askAi(
     const recentMessages = getRecentMessagesForPrompt(conversationContext);
     const salesPlan = conversationContext.replyPlan ?? fallbackPlan;
     const businessContextForPrompt = getBusinessContextForPrompt(businessContext);
+    const replySentenceLimit = getReplySentenceLimit();
     const stableSystemPrompt = `You are a human-like real estate sales agent and customer support assistant.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
+- Be direct: answer the latest message in the first sentence. Do not recap the conversation, explain your reasoning, or warm up before the answer.
+- Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum unless the customer explicitly asks for a list or detailed explanation.
+- Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop or ask one useful next-step question.
 - Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
 - If a detail is not in the business facts, use the missing-info reply provided in the dynamic instructions. Do not guess and do not create an alternative process.
 - Act like a helpful real estate agent, not a passive FAQ bot. Understand what the customer is trying to decide: price, unit fit, location, availability, parking, payment, viewing, reservation, or next step.
@@ -606,7 +621,7 @@ Core rules:
 - If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
-- Keep replies to 1-2 short sentences by default, 3 only when needed.
+- Keep replies brief. Never use more than ${replySentenceLimit} sentence${replySentenceLimit === 1 ? "" : "s"} unless the customer explicitly asks for a list or detailed explanation.
 - Ask at most one question, and only if it is useful for the customer's next decision. It is okay to answer with no question.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
 - Never sound annoyed, confrontational, sarcastic, or like the customer is looking for a fight. Do not say phrases like "talagang gusto mo", "you keep asking", "obviously", or similar.

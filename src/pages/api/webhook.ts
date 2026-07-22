@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   getAiConversation,
+  enqueueAiMessageJob,
   getClients,
   pauseAiConversation,
   recordAiConversationReply,
@@ -41,9 +42,9 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
-const HUMAN_REPLY_MIN_DELAY_MS = 4500;
-const HUMAN_REPLY_MAX_DELAY_MS = 12000;
-const HUMAN_REPLY_MS_PER_CHAR = 35;
+const DEFAULT_HUMAN_REPLY_MIN_DELAY_MS = 800;
+const DEFAULT_HUMAN_REPLY_MAX_DELAY_MS = 2500;
+const DEFAULT_HUMAN_REPLY_MS_PER_CHAR = 10;
 const AUTO_REPLY_NAME_TOKEN = "{name}";
 
 type WebhookBody = {
@@ -672,8 +673,9 @@ export default async function handler(
     }
 
     const signature = req.headers["x-hub-signature-256"];
+    const isWorkerRequest = isValidWorkerRequest(req);
 
-    if (!isValidWebhookSignature(rawBody, signature)) {
+    if (!isWorkerRequest && !isValidWebhookSignature(rawBody, signature)) {
       return res.status(403).json({ error: "Invalid signature" });
     }
 
@@ -684,6 +686,31 @@ export default async function handler(
     } catch (error) {
       console.error("Invalid webhook JSON payload", error);
       return res.status(400).json({ error: "Invalid JSON payload" });
+    }
+
+    if (!isWorkerRequest && shouldQueueWebhookDeliveries()) {
+      try {
+        const queuedJob = await enqueueAiMessageJob({
+          rawBody,
+          payload: body,
+        });
+
+        console.info("AI webhook delivery queued", {
+          jobId: queuedJob.id,
+          duplicate: queuedJob.duplicate,
+          bodyHash: queuedJob.bodyHash,
+        });
+
+        triggerAiMessageJobWorker(req);
+
+        return res.status(200).json({
+          status: queuedJob.duplicate ? "duplicate" : "queued",
+          jobId: queuedJob.id,
+        });
+      } catch (error) {
+        console.error("Failed to queue AI webhook delivery", error);
+        return res.status(500).json({ error: "Failed to queue webhook delivery" });
+      }
     }
 
     if (body.object === "page") {
@@ -1556,18 +1583,141 @@ function isValidWebhookSignature(
   return timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
+function shouldQueueWebhookDeliveries() {
+  return process.env.AI_QUEUE_ENABLED !== "false" && Boolean(getWorkerSecret());
+}
+
+function isValidWorkerRequest(req: NextApiRequest) {
+  const workerSecret = getWorkerSecret();
+  const providedSecret =
+    getHeaderValue(req.headers["x-ai-worker-secret"]) ||
+    getBearerToken(getHeaderValue(req.headers.authorization));
+
+  return Boolean(workerSecret && providedSecret && providedSecret === workerSecret);
+}
+
+function getWorkerSecret() {
+  return process.env.AI_WORKER_SECRET?.trim() || process.env.CRON_SECRET?.trim() || "";
+}
+
+function getHeaderValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function getBearerToken(value: string) {
+  return value.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
+}
+
+function triggerAiMessageJobWorker(req: NextApiRequest) {
+  const workerSecret = getWorkerSecret();
+
+  if (!workerSecret) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+  fetch(`${getRequestOrigin(req)}/api/ai-message-jobs/process`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-ai-worker-secret": workerSecret,
+    },
+    signal: controller.signal,
+  })
+    .then((response) => {
+      if (!response.ok) {
+        console.warn("AI message job worker self-kick failed", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+      }
+    })
+    .catch((error) => {
+      console.warn("AI message job worker self-kick failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    })
+    .finally(() => clearTimeout(timeoutId));
+}
+
+function getRequestOrigin(req: NextApiRequest) {
+  const forwardedProto = getHeaderValue(req.headers["x-forwarded-proto"]) || "https";
+  const forwardedHost =
+    getHeaderValue(req.headers["x-forwarded-host"]) || getHeaderValue(req.headers.host);
+
+  if (forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+
+  if (vercelUrl) {
+    return `https://${vercelUrl}`;
+  }
+
+  return process.env.AI_SITE_URL?.trim() || "http://localhost:3000";
+}
+
 function sleep(durationMs: number) {
   return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
 function getHumanReplyDelayMs(text: string) {
-  const typedDelay = text.length * HUMAN_REPLY_MS_PER_CHAR;
+  const delayConfig = getHumanReplyDelayConfig();
+  const typedDelay = text.length * delayConfig.msPerChar;
   const baseDelay = Math.min(
-    HUMAN_REPLY_MAX_DELAY_MS,
-    Math.max(HUMAN_REPLY_MIN_DELAY_MS, typedDelay)
+    delayConfig.maxMs,
+    Math.max(delayConfig.minMs, typedDelay)
   );
 
   return withJitter(baseDelay);
+}
+
+function getHumanReplyDelayConfig() {
+  const minMs = getConfiguredDelayMs(
+    "AI_HUMAN_REPLY_MIN_DELAY_MS",
+    DEFAULT_HUMAN_REPLY_MIN_DELAY_MS,
+    0,
+    5000
+  );
+  const maxMs = getConfiguredDelayMs(
+    "AI_HUMAN_REPLY_MAX_DELAY_MS",
+    DEFAULT_HUMAN_REPLY_MAX_DELAY_MS,
+    0,
+    8000
+  );
+
+  return {
+    minMs: Math.min(minMs, maxMs),
+    maxMs: Math.max(minMs, maxMs),
+    msPerChar: getConfiguredDelayMs(
+      "AI_HUMAN_REPLY_MS_PER_CHAR",
+      DEFAULT_HUMAN_REPLY_MS_PER_CHAR,
+      0,
+      50
+    ),
+  };
+}
+
+function getConfiguredDelayMs(
+  envName: string,
+  fallbackValue: number,
+  minValue: number,
+  maxValue: number
+) {
+  const configuredValue = Number(process.env[envName]);
+
+  if (
+    Number.isFinite(configuredValue) &&
+    configuredValue >= minValue &&
+    configuredValue <= maxValue
+  ) {
+    return Math.floor(configuredValue);
+  }
+
+  return fallbackValue;
 }
 
 function withJitter(durationMs: number) {

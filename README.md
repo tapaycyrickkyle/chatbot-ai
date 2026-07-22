@@ -32,6 +32,27 @@ AI_API_KEY="sk-your-deepseek-key"
 AI_MODEL="deepseek-chat"
 ```
 
+## AI Message Queue
+
+For higher Messenger traffic, configure the webhook to queue deliveries and process them through a worker:
+
+```env
+AI_WORKER_SECRET="long-random-secret"
+AI_QUEUE_ENABLED="true"
+AI_MESSAGE_JOB_BATCH_SIZE="5"
+```
+
+Run `supabase/17-ai-message-jobs.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery. For a free backup, add these GitHub Actions repository secrets:
+
+```text
+AI_WORKER_URL=https://your-vercel-domain.com/api/ai-message-jobs/process
+AI_WORKER_SECRET=long-random-secret
+```
+
+The workflow in `.github/workflows/process-ai-message-jobs.yml` calls the worker every 5 minutes to rescue any jobs that were not handled by the self-kick.
+
+If `AI_WORKER_SECRET` or `CRON_SECRET` is missing, the webhook falls back to inline processing so messages are not trapped in the queue.
+
 ## Google Sheets Lead Capture
 
 The Messenger webhook can send captured leads to a free Google Apps Script Web App. Each connected Facebook Page can have its own URL in:
