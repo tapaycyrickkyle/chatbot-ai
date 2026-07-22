@@ -21,6 +21,7 @@ type ClientRow = {
   welcome_link_url?: string | null;
   welcome_image_urls?: string | null;
   manual_ai_pause_minutes?: number | null;
+  auto_reply_ignore_pattern?: string | null;
 };
 
 type AiConversationRow = {
@@ -74,6 +75,8 @@ const CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
   `${CLIENT_COLUMNS}, manual_ai_pause_minutes`;
+const CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE =
+  `${CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE}, auto_reply_ignore_pattern`;
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
 const AI_CONVERSATION_COLUMNS =
@@ -134,6 +137,13 @@ function isMissingManualAiPauseMinutesError(error: { message?: string } | null) 
   );
 }
 
+function isMissingAutoReplyIgnorePatternError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("auto_reply_ignore_pattern") &&
+      error.message.includes("does not exist")
+  );
+}
+
 function isMissingAiPauseExpiresAtError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("ai_pause_expires_at") &&
@@ -161,6 +171,7 @@ function normalizeClient(row: ClientRow) {
     welcome_link_url: row.welcome_link_url ?? "",
     welcome_image_urls: row.welcome_image_urls ?? "",
     manual_ai_pause_minutes: row.manual_ai_pause_minutes ?? 5,
+    auto_reply_ignore_pattern: row.auto_reply_ignore_pattern ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -237,14 +248,20 @@ export async function getClients() {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
     .order("created_at", { ascending: true });
-  const modernResponse = isMissingManualAiPauseMinutesError(response.error)
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
+        .order("created_at", { ascending: true })
+    : response;
+  const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
     ? await supabase
         .from("clients")
         .select(CLIENT_COLUMNS)
         .order("created_at", { ascending: true })
-    : response;
+    : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
     isMissingNewClientAiFieldsError(modernResponse.error) ||
@@ -303,16 +320,23 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
     .eq("id", clientId)
     .maybeSingle();
-  const modernResponse = isMissingManualAiPauseMinutesError(response.error)
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
+        .eq("id", clientId)
+        .maybeSingle()
+    : response;
+  const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
     ? await supabase
         .from("clients")
         .select(CLIENT_COLUMNS)
         .eq("id", clientId)
         .maybeSingle()
-    : response;
+    : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
     isMissingNewClientAiFieldsError(modernResponse.error) ||
@@ -351,6 +375,7 @@ export async function updateClientSettings(
     welcome_link_url: string;
     welcome_image_urls: string;
     manual_ai_pause_minutes: number;
+    auto_reply_ignore_pattern: string;
   }>
 ) {
   const supabase = getDb();

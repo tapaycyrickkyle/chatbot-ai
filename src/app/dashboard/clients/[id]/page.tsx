@@ -19,6 +19,7 @@ type ClientSettings = {
   welcome_message: string;
   welcome_link_url: string;
   welcome_image_urls: string;
+  auto_reply_ignore_pattern: string;
 };
 
 function getLeadFieldList(value: string) {
@@ -98,12 +99,14 @@ export default function ClientSettingsPage() {
   const [welcomeMessage, setWelcomeMessage] = useState("");
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
+  const [autoReplyIgnorePattern, setAutoReplyIgnorePattern] = useState("");
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [repairingMessengerWebhook, setRepairingMessengerWebhook] = useState(false);
   const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
   const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
+  const [savingAutoReplyIgnorePattern, setSavingAutoReplyIgnorePattern] = useState(false);
   const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
   const leadFields = getLeadFieldList(leadCaptureFields);
   const welcomeAttachmentIds = welcomeImageUrls
@@ -142,6 +145,7 @@ export default function ClientSettingsPage() {
         setWelcomeMessage(data.welcome_message || "");
         setWelcomeLinkUrl(data.welcome_link_url || "");
         setWelcomeImageUrls(data.welcome_image_urls || "");
+        setAutoReplyIgnorePattern(data.auto_reply_ignore_pattern || "");
       } catch (error) {
         console.error(error);
         showToast({
@@ -300,6 +304,39 @@ export default function ClientSettingsPage() {
       });
     } finally {
       setRepairingMessengerWebhook(false);
+    }
+  };
+
+  const saveAutoReplyIgnorePattern = async () => {
+    if (!clientId) {
+      return;
+    }
+
+    setSavingAutoReplyIgnorePattern(true);
+
+    try {
+      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          auto_reply_ignore_pattern: autoReplyIgnorePattern,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save auto-reply ignore pattern");
+      }
+
+      showToast({ tone: "success", message: "Auto-reply ignore pattern saved." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to save auto-reply ignore pattern.",
+      });
+    } finally {
+      setSavingAutoReplyIgnorePattern(false);
     }
   };
 
@@ -707,6 +744,34 @@ export default function ClientSettingsPage() {
               <p className="mt-2 text-[14px] text-[var(--text-primary)]">
                 Pause or resume AI replies when a human owner takes over a conversation.
               </p>
+              <label
+                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
+                htmlFor="auto-reply-ignore-pattern"
+              >
+                Auto-reply message to ignore
+              </label>
+              <input
+                id="auto-reply-ignore-pattern"
+                type="text"
+                value={autoReplyIgnorePattern}
+                onChange={(event) => setAutoReplyIgnorePattern(event.target.value)}
+                maxLength={500}
+                placeholder="Hello {name}, how can we assist you today?"
+                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+              />
+              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                Use {"{name}"} for the changing customer name. Matching Page echoes will not pause AI; other owner replies will pause AI.
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => void saveAutoReplyIgnorePattern()}
+                  disabled={savingAutoReplyIgnorePattern || loading}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                >
+                  {savingAutoReplyIgnorePattern ? "Saving..." : "Save Auto-reply Ignore"}
+                </button>
+              </div>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
@@ -753,7 +818,7 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || repairingMessengerWebhook || savingSheetsUrl || savingWelcomeSequence || uploadingWelcomeImage}
+        isOpen={cleaningStorage || repairingMessengerWebhook || savingSheetsUrl || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
         message={
           repairingMessengerWebhook
             ? "Repairing Messenger webhook..."
@@ -761,6 +826,8 @@ export default function ClientSettingsPage() {
             ? "Uploading image to Messenger..."
             : savingWelcomeSequence
             ? "Saving first reply sequence..."
+            : savingAutoReplyIgnorePattern
+            ? "Saving auto-reply ignore pattern..."
             : savingSheetsUrl
               ? "Saving Google Sheets URL..."
               : "Cleaning old data..."

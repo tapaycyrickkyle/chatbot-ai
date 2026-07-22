@@ -24,6 +24,7 @@ Phone',
   welcome_link_url text not null default '',
   welcome_image_urls text not null default '',
   manual_ai_pause_minutes integer not null default 5,
+  auto_reply_ignore_pattern text not null default '',
   constraint clients_page_id_key unique (page_id)
 );
 
@@ -45,7 +46,8 @@ Phone',
   add column if not exists welcome_message text not null default '',
   add column if not exists welcome_link_url text not null default '',
   add column if not exists welcome_image_urls text not null default '',
-  add column if not exists manual_ai_pause_minutes integer not null default 5;
+  add column if not exists manual_ai_pause_minutes integer not null default 5,
+  add column if not exists auto_reply_ignore_pattern text not null default '';
 
 update public.clients
 set
@@ -65,7 +67,8 @@ Phone'),
   welcome_message = coalesce(welcome_message, ''),
   welcome_link_url = coalesce(welcome_link_url, ''),
   welcome_image_urls = coalesce(welcome_image_urls, ''),
-  manual_ai_pause_minutes = coalesce(manual_ai_pause_minutes, 5);
+  manual_ai_pause_minutes = coalesce(manual_ai_pause_minutes, 5),
+  auto_reply_ignore_pattern = coalesce(auto_reply_ignore_pattern, '');
 
 alter table public.clients
   alter column client_name set not null,
@@ -94,11 +97,13 @@ Phone',
   alter column welcome_link_url set default '',
   alter column welcome_image_urls set default '',
   alter column manual_ai_pause_minutes set default 5,
+  alter column auto_reply_ignore_pattern set default '',
   alter column welcome_sequence_enabled set not null,
   alter column welcome_message set not null,
   alter column welcome_link_url set not null,
   alter column welcome_image_urls set not null,
-  alter column manual_ai_pause_minutes set not null;
+  alter column manual_ai_pause_minutes set not null,
+  alter column auto_reply_ignore_pattern set not null;
 
 do $$
 begin

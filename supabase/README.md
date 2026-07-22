@@ -16,13 +16,17 @@ If you prefer running files individually, run them in this order:
 6. `06-orders.sql`
 7. `07-rls-lockdown.sql`
 8. `08-remove-comment-private-replies.sql`
-9. `10-google-sheets-tab-name.sql`
-10. `11-ai-last-reply-memory.sql`
-11. `12-ai-memory-and-persona.sql`
+9. `09-add-business-owner-template.sql`
+10. `10-google-sheets-tab-name.sql`
+11. `11-ai-last-reply-memory.sql`
+12. `12-ai-memory-and-persona.sql`
+13. `13-welcome-sequence.sql`
+14. `14-timed-ai-pause.sql`
+15. `15-auto-reply-ignore-pattern.sql`
 
 ## Tables Used
 
-- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, and lead capture settings.
+- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, lead capture settings, and per-page auto-reply echo ignore pattern.
 - `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state, compact memory, customer state, and recent short turns.
 - `business_users`: business-owner email allowlist mapped to one client.

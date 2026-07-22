@@ -41,10 +41,10 @@ const HIGH_USAGE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 15000;
 const GET_STARTED_PAYLOAD = "GET_STARTED";
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
-const OWNER_TAKEOVER_TRIGGER = "/ ";
 const HUMAN_REPLY_MIN_DELAY_MS = 4500;
 const HUMAN_REPLY_MAX_DELAY_MS = 12000;
 const HUMAN_REPLY_MS_PER_CHAR = 35;
+const AUTO_REPLY_NAME_TOKEN = "{name}";
 
 type WebhookBody = {
   object?: string;
@@ -128,7 +128,7 @@ function getConversationRecipientId(
   return event.sender.id;
 }
 
-function isOwnerTakeoverTriggerEcho(
+function isManualPageTextEcho(
   event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
   pageId: string
 ) {
@@ -136,8 +136,63 @@ function isOwnerTakeoverTriggerEcho(
     event.message?.is_echo &&
       event.sender.id === pageId &&
       event.recipient?.id &&
-      event.message.text?.startsWith(OWNER_TAKEOVER_TRIGGER)
+      event.message.text
   );
+}
+
+function normalizeEchoText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function patternPartToRegExp(value: string) {
+  return escapeRegExp(normalizeEchoText(value)).replace(/\s+/g, "\\s+");
+}
+
+function matchesAutoReplyIgnorePattern(message: string, pattern = "") {
+  const normalizedPattern = normalizeEchoText(pattern);
+
+  if (!normalizedPattern) {
+    return false;
+  }
+
+  const tokenIndex = normalizedPattern.toLowerCase().indexOf(AUTO_REPLY_NAME_TOKEN);
+
+  if (tokenIndex === -1) {
+    const exactPattern = new RegExp(`^${patternPartToRegExp(normalizedPattern)}$`, "i");
+
+    return exactPattern.test(normalizeEchoText(message));
+  }
+
+  const beforeName = normalizedPattern.slice(0, tokenIndex);
+  const afterName = normalizedPattern.slice(tokenIndex + AUTO_REPLY_NAME_TOKEN.length);
+  const patternRegExp = new RegExp(
+    `^${patternPartToRegExp(beforeName)}[\\s\\S]+?${patternPartToRegExp(afterName)}$`,
+    "i"
+  );
+
+  return patternRegExp.test(normalizeEchoText(message));
+}
+
+function isOwnAppEcho(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
+) {
+  const configuredAppId = process.env.FACEBOOK_APP_ID?.trim();
+  const eventAppId = event.message?.app_id ? String(event.message.app_id).trim() : "";
+
+  return Boolean(configuredAppId && eventAppId && eventAppId === configuredAppId);
+}
+
+function isLastAiReplyEcho(
+  text: string,
+  conversation: Awaited<ReturnType<typeof getAiConversation>>
+) {
+  const lastAiReply = conversation?.last_ai_reply || "";
+
+  return Boolean(lastAiReply && normalizeEchoText(text) === normalizeEchoText(lastAiReply));
 }
 
 function summarizePageEcho(
@@ -632,7 +687,40 @@ export default async function handler(
             });
           }
 
-          if (isOwnerTakeoverTriggerEcho(event, pageId)) {
+          if (isManualPageTextEcho(event, pageId)) {
+            const echoText = event.message?.text || "";
+
+            if (isOwnAppEcho(event)) {
+              console.info("AI webhook ignored own app Page message echo", {
+                clientId: client.id,
+                pageId,
+                userId,
+                ...summarizePageEcho(event),
+              });
+              continue;
+            }
+
+            if (matchesAutoReplyIgnorePattern(echoText, client.auto_reply_ignore_pattern)) {
+              console.info("AI webhook ignored configured Page auto-reply echo", {
+                clientId: client.id,
+                pageId,
+                userId,
+                appId: event.message?.app_id ? String(event.message.app_id) : "",
+              });
+              continue;
+            }
+
+            const existingPageConversation = await safelyGetAiConversation(client.id, userId);
+
+            if (isLastAiReplyEcho(echoText, existingPageConversation)) {
+              console.info("AI webhook ignored last AI reply Page echo", {
+                clientId: client.id,
+                pageId,
+                userId,
+              });
+              continue;
+            }
+
             await safelyPauseAiForOwnerReply({
               clientId: client.id,
               pageId,
@@ -644,7 +732,7 @@ export default async function handler(
               pageId,
               userId,
               appId: event.message?.app_id ? String(event.message.app_id) : "",
-              trigger: OWNER_TAKEOVER_TRIGGER.trim(),
+              ignoredPatternConfigured: Boolean(client.auto_reply_ignore_pattern?.trim()),
               pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
             });
             continue;

@@ -13,6 +13,7 @@ const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_LINK_URL_LENGTH = 2000;
 const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
+const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
 const MAX_WELCOME_ATTACHMENTS = 11;
 const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -64,6 +65,7 @@ function validateClientSettingsPayload(payload: unknown) {
     welcome_message,
     welcome_link_url,
     welcome_image_urls,
+    auto_reply_ignore_pattern,
   } = payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
@@ -78,6 +80,7 @@ function validateClientSettingsPayload(payload: unknown) {
     welcome_message: string;
     welcome_link_url: string;
     welcome_image_urls: string;
+    auto_reply_ignore_pattern: string;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -261,6 +264,18 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.welcome_image_urls = attachmentIds.join("\n");
   }
 
+  if (auto_reply_ignore_pattern !== undefined) {
+    if (typeof auto_reply_ignore_pattern !== "string") {
+      throw new Error("Invalid auto-reply ignore pattern");
+    }
+
+    if (auto_reply_ignore_pattern.length > MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH) {
+      throw new Error("Auto-reply ignore pattern is too long");
+    }
+
+    updates.auto_reply_ignore_pattern = auto_reply_ignore_pattern.trim();
+  }
+
   return updates;
 }
 
@@ -301,6 +316,7 @@ export async function GET(
       welcome_message: client.welcome_message,
       welcome_link_url: client.welcome_link_url,
       welcome_image_urls: client.welcome_image_urls,
+      auto_reply_ignore_pattern: client.auto_reply_ignore_pattern,
     });
   } catch (error) {
     console.error(error);
