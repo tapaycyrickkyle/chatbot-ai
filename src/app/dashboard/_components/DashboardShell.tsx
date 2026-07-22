@@ -28,41 +28,18 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
   const currentPathname = pathname ?? "/dashboard";
   const searchValue = searchParams?.get("q") ?? "";
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
-  const isDesktopSidebarExpanded = isDesktopViewport || isSidebarOpen;
+  const isSidebarExpanded = isSidebarOpen;
   const activeNav = "Pages";
   const searchPlaceholder = currentPathname.includes("/conversations")
     ? "Search conversations..."
     : "Search pages...";
 
   useEffect(() => {
-    const syncViewport = () => {
-      const isDesktop = window.innerWidth >= 1280;
-      setIsDesktopViewport(isDesktop);
-
-      if (isDesktop) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    syncViewport();
-    window.addEventListener("resize", syncViewport);
-
-    return () => window.removeEventListener("resize", syncViewport);
-  }, []);
-
-  useEffect(() => {
     setSearchInputValue(searchValue);
   }, [searchValue]);
-
-  const closeSidebarOnMobile = () => {
-    if (!isDesktopViewport) {
-      setIsSidebarOpen(false);
-    }
-  };
 
   useEffect(() => {
     if (searchInputValue === searchValue) {
@@ -90,60 +67,54 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
 
   return (
     <main className="page-enter flex min-h-screen bg-background text-foreground">
-      {isSidebarOpen && !isDesktopViewport ? (
+      {isSidebarOpen ? (
         <button
           type="button"
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/35 xl:hidden"
+          className="fixed inset-0 z-30 bg-black/35"
           aria-label="Close sidebar overlay"
         />
       ) : null}
 
       <aside
-        className={`panel-enter fixed inset-y-0 right-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-l border-[var(--border)] bg-[var(--surface)] transition-[width,transform] duration-200 xl:left-0 xl:right-auto xl:z-20 xl:w-[274px] xl:max-w-none xl:border-l-0 xl:border-r xl:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "translate-x-full xl:translate-x-0"
+        className={`panel-enter fixed inset-y-0 left-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className={`${isDesktopSidebarExpanded ? "px-5 py-6" : "px-3 py-5 xl:px-3"} `}>
-          <div className={`flex ${isDesktopSidebarExpanded ? "items-start justify-between gap-4" : "flex-col items-center gap-3"}`}>
-            <div className={`flex ${isDesktopSidebarExpanded ? "items-center gap-3" : "flex-col items-center gap-3"}`}>
-              <div className={`${isDesktopSidebarExpanded ? "p-0" : "p-0"}`}>
+        <div className="px-5 py-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div>
                 <Image
                   src={chatbotWebIcon}
                   alt="AI Inbox"
-                  className={`${isDesktopSidebarExpanded ? "h-10 w-10" : "h-11 w-11"} rounded-md object-cover`}
+                  className="h-10 w-10 rounded-md object-cover"
                   priority
                 />
               </div>
-              {isDesktopSidebarExpanded ? (
-                <div>
-                  <h2 className="text-[1.25rem] font-extrabold leading-tight">
-                    AI Inbox
-                  </h2>
-                  <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-                    Admin workspace
-                  </p>
-                </div>
-              ) : null}
+              <div>
+                <h2 className="text-[1.25rem] font-extrabold leading-tight">
+                  AI Inbox
+                </h2>
+                <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+                  Admin workspace
+                </p>
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={() => setIsSidebarOpen((current) => !current)}
-              className={`inline-flex items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden ${
-                isDesktopSidebarExpanded ? "h-9 w-9" : "h-10 w-[calc(100%-14px)]"
-              }`}
-              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              onClick={() => setIsSidebarOpen(false)}
+              className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)]"
+              aria-label="Close sidebar"
             >
-              <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={isDesktopSidebarExpanded ? faXmark : faBars} />
+              <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faXmark} />
             </button>
           </div>
 
-          {isDesktopSidebarExpanded ? (
-            <p className="mt-4 text-[13px] text-[var(--text-muted)]">
-              Manage pages, prompts, handoff, and automation.
-            </p>
-          ) : null}
+          <p className="mt-4 text-[13px] text-[var(--text-muted)]">
+            Manage pages, prompts, handoff, and automation.
+          </p>
         </div>
 
         <nav className="px-4">
@@ -155,24 +126,19 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    className={`flex w-full items-center rounded-md border py-2.5 transition-colors ${
-                      isDesktopSidebarExpanded ? "justify-start gap-3 px-3.5 text-left" : "justify-center px-2.5"
-                    } ${
+                    className={`flex w-full items-center justify-start gap-3 rounded-md border py-2.5 px-3.5 text-left transition-colors ${
                       isActive
                         ? "border-transparent bg-[var(--surface-strong)] text-[var(--text-primary)] shadow-sm"
                         : "border-transparent bg-transparent text-[var(--text-muted)] hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
                     }`}
-                    onClick={closeSidebarOnMobile}
-                    title={!isDesktopSidebarExpanded ? item.label : undefined}
+                    onClick={() => setIsSidebarOpen(false)}
                   >
                     <span className="flex h-5 w-5 items-center justify-center">
                       <DashboardIcon type={item.icon} />
                     </span>
-                    {isDesktopSidebarExpanded ? (
-                      <span className={`text-[13px] ${isActive ? "font-semibold" : "font-medium"}`}>
-                        {item.label}
-                      </span>
-                    ) : null}
+                    <span className={`text-[13px] ${isActive ? "font-semibold" : "font-medium"}`}>
+                      {item.label}
+                    </span>
                   </Link>
                 </li>
               );
@@ -181,11 +147,11 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
         </nav>
 
         <div className="mt-auto px-4 py-6">
-          <SidebarLogoutButton collapsed={!isDesktopSidebarExpanded} />
+          <SidebarLogoutButton collapsed={!isSidebarExpanded} />
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col xl:pl-[274px]">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center justify-between gap-4">
@@ -195,7 +161,7 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen(true)}
-                className="inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)] xl:hidden"
+                className="inline-flex h-10 w-10 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--accent-bright)]"
                 aria-label="Open sidebar"
               >
                 <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faBars} />

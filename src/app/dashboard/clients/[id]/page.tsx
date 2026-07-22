@@ -586,7 +586,7 @@ export default function ClientSettingsPage() {
                         id="manual-ai-pause-minutes"
                         value={manualAiPauseMinutes}
                         onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
-                        className={`${inputClass} mt-2`}
+                        className={`${inputClass} mt-2 max-w-[220px]`}
                       >
                         {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
