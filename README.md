@@ -53,6 +53,18 @@ The workflow in `.github/workflows/process-ai-message-jobs.yml` calls the worker
 
 If `AI_WORKER_SECRET` or `CRON_SECRET` is missing, the webhook falls back to inline processing so messages are not trapped in the queue.
 
+## Storage Retention
+
+The admin storage cleanup endpoint keeps database usage low:
+
+```text
+rate_limit_logs: delete rows older than 7 days
+ai_message_jobs: delete sent jobs older than 1 day
+ai_conversations: delete inactive conversations older than 7 days
+```
+
+Run `supabase/18-ai-retention-cleanup.sql` in Supabase to add cleanup indexes for the AI queue and conversation tables.
+
 ## Google Sheets Lead Capture
 
 The Messenger webhook can send captured leads to a free Google Apps Script Web App. Each connected Facebook Page can have its own URL in:

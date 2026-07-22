@@ -217,6 +217,9 @@ create index if not exists ai_conversations_client_last_message_idx
 create index if not exists ai_conversations_client_paused_idx
   on public.ai_conversations (client_id, ai_paused);
 
+create index if not exists ai_conversations_last_message_at_idx
+  on public.ai_conversations (last_message_at);
+
 -- Durable queue for Messenger webhook deliveries.
 create table if not exists public.ai_message_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -315,6 +318,10 @@ create index if not exists ai_message_jobs_ready_idx
 create index if not exists ai_message_jobs_locked_idx
   on public.ai_message_jobs (locked_at)
   where status = 'processing';
+
+create index if not exists ai_message_jobs_sent_processed_at_idx
+  on public.ai_message_jobs (processed_at)
+  where status = 'sent';
 
 create or replace function public.claim_ai_message_jobs(
   batch_size integer default 5,

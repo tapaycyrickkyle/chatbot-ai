@@ -238,7 +238,11 @@ export default function ClientSettingsPage() {
           | {
             error?: string;
             deletedRateLimitLogs?: number;
+            deletedAiMessageJobs?: number;
+            deletedAiConversations?: number;
             logRetentionDays?: number;
+            aiMessageJobRetentionDays?: number;
+            aiConversationRetentionDays?: number;
             warnings?: string[];
           }
         | null;
@@ -253,8 +257,8 @@ export default function ClientSettingsPage() {
         tone: warnings.length > 0 ? "error" : "success",
         message:
           warnings.length > 0
-            ? `Cleanup finished with ${warnings.length} skipped table${warnings.length === 1 ? "" : "s"}. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows.`
-            : `Cleanup finished. Deleted ${data?.deletedRateLimitLogs ?? 0} old log rows.`,
+            ? `Cleanup finished with ${warnings.length} skipped table${warnings.length === 1 ? "" : "s"}. Deleted ${data?.deletedRateLimitLogs ?? 0} logs, ${data?.deletedAiMessageJobs ?? 0} jobs, and ${data?.deletedAiConversations ?? 0} conversations.`
+            : `Cleanup finished. Deleted ${data?.deletedRateLimitLogs ?? 0} logs, ${data?.deletedAiMessageJobs ?? 0} jobs, and ${data?.deletedAiConversations ?? 0} conversations.`,
       });
     } catch (error) {
       console.error(error);
