@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   }
 
   const workerId = `ai-worker-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const batchSize = getBatchSize();
+  const batchSize = getBatchSize(request);
   const jobs = await claimAiMessageJobs({ batchSize, workerId });
   const results: Array<{
     id: string;
@@ -87,7 +87,17 @@ function getBearerToken(value: string) {
   return value.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
 }
 
-function getBatchSize() {
+function getBatchSize(request: Request) {
+  const requestedBatchSize = Number(new URL(request.url).searchParams.get("batchSize"));
+
+  if (
+    Number.isFinite(requestedBatchSize) &&
+    requestedBatchSize >= 1 &&
+    requestedBatchSize <= MAX_BATCH_SIZE
+  ) {
+    return Math.floor(requestedBatchSize);
+  }
+
   const configuredValue = Number(process.env.AI_MESSAGE_JOB_BATCH_SIZE);
 
   if (

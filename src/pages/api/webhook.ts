@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
   enqueueAiMessageJob,
@@ -1615,16 +1616,12 @@ function triggerAiMessageJobWorker(req: NextApiRequest) {
     return;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1500);
-
-  fetch(`${getRequestOrigin(req)}/api/ai-message-jobs/process`, {
+  const workerPromise = fetch(`${getRequestOrigin(req)}/api/ai-message-jobs/process?batchSize=1`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-ai-worker-secret": workerSecret,
     },
-    signal: controller.signal,
   })
     .then((response) => {
       if (!response.ok) {
@@ -1638,8 +1635,9 @@ function triggerAiMessageJobWorker(req: NextApiRequest) {
       console.warn("AI message job worker self-kick failed", {
         error: error instanceof Error ? error.message : String(error),
       });
-    })
-    .finally(() => clearTimeout(timeoutId));
+    });
+
+  waitUntil(workerPromise);
 }
 
 function getRequestOrigin(req: NextApiRequest) {
