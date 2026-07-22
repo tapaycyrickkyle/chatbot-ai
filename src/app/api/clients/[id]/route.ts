@@ -14,8 +14,7 @@ const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_LINK_URL_LENGTH = 2000;
 const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
 const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
-const MIN_MANUAL_AI_PAUSE_MINUTES = 1;
-const MAX_MANUAL_AI_PAUSE_MINUTES = 1440;
+const MANUAL_AI_PAUSE_MINUTE_OPTIONS = [5, 15, 30, 60, 120, 240, 480, 1440];
 const MAX_WELCOME_ATTACHMENTS = 11;
 const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -273,11 +272,10 @@ function validateClientSettingsPayload(payload: unknown) {
 
     if (
       !Number.isInteger(minutes) ||
-      minutes < MIN_MANUAL_AI_PAUSE_MINUTES ||
-      minutes > MAX_MANUAL_AI_PAUSE_MINUTES
+      !MANUAL_AI_PAUSE_MINUTE_OPTIONS.includes(minutes)
     ) {
       throw new Error(
-        `Manual AI pause duration must be ${MIN_MANUAL_AI_PAUSE_MINUTES}-${MAX_MANUAL_AI_PAUSE_MINUTES} minutes`
+        `Manual AI pause duration must be one of: ${MANUAL_AI_PAUSE_MINUTE_OPTIONS.join(", ")} minutes`
       );
     }
 

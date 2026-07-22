@@ -23,6 +23,25 @@ type ClientSettings = {
   auto_reply_ignore_pattern: string;
 };
 
+const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
+const MANUAL_AI_PAUSE_OPTIONS = [
+  { label: "5 minutes", value: 5 },
+  { label: "15 minutes", value: 15 },
+  { label: "30 minutes", value: 30 },
+  { label: "1 hour", value: 60 },
+  { label: "2 hours", value: 120 },
+  { label: "4 hours", value: 240 },
+  { label: "8 hours", value: 480 },
+  { label: "24 hours", value: 1440 },
+];
+
+function normalizeManualAiPauseMinutes(value: number | null | undefined) {
+  return typeof value === "number" &&
+    MANUAL_AI_PAUSE_OPTIONS.some((option) => option.value === value)
+    ? value
+    : DEFAULT_MANUAL_AI_PAUSE_MINUTES;
+}
+
 function getLeadFieldList(value: string) {
   const fields = value
     .split(/\r?\n|,/)
@@ -100,7 +119,7 @@ export default function ClientSettingsPage() {
   const [welcomeMessage, setWelcomeMessage] = useState("");
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
-  const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(5);
+  const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(DEFAULT_MANUAL_AI_PAUSE_MINUTES);
   const [autoReplyIgnorePattern, setAutoReplyIgnorePattern] = useState("");
   const [newLeadField, setNewLeadField] = useState("");
   const [loading, setLoading] = useState(true);
@@ -147,7 +166,7 @@ export default function ClientSettingsPage() {
         setWelcomeMessage(data.welcome_message || "");
         setWelcomeLinkUrl(data.welcome_link_url || "");
         setWelcomeImageUrls(data.welcome_image_urls || "");
-        setManualAiPauseMinutes(data.manual_ai_pause_minutes || 5);
+        setManualAiPauseMinutes(normalizeManualAiPauseMinutes(data.manual_ai_pause_minutes));
         setAutoReplyIgnorePattern(data.auto_reply_ignore_pattern || "");
       } catch (error) {
         console.error(error);
@@ -754,18 +773,18 @@ export default function ClientSettingsPage() {
               >
                 Manual reply pause duration
               </label>
-              <input
+              <select
                 id="manual-ai-pause-minutes"
-                type="number"
-                min={1}
-                max={1440}
                 value={manualAiPauseMinutes}
-                onChange={(event) => {
-                  const nextValue = Number(event.target.value);
-                  setManualAiPauseMinutes(Number.isFinite(nextValue) ? nextValue : 5);
-                }}
+                onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
                 className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
+              >
+                {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
                 Applies to each customer individually. Other customers continue chatting with AI normally.
               </p>
