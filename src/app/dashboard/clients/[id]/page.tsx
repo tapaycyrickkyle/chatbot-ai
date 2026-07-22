@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
 
@@ -104,6 +104,50 @@ function jsonResponse(payload) {
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
+}
+
+const panelClass =
+  "rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-5 sm:py-5";
+const labelClass = "block text-[13px] font-semibold text-[var(--text-label)]";
+const inputClass =
+  "w-full rounded-md border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20";
+const secondaryButtonClass =
+  "inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-background px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+const primaryButtonClass =
+  "inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70";
+
+function SettingsSection({
+  eyebrow,
+  title,
+  description,
+  children,
+  actions,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <section className={panelClass}>
+      <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+            {eyebrow}
+          </p>
+          <h2 className="mt-2 text-[1rem] font-bold text-[var(--text-primary)]">
+            {title}
+          </h2>
+          <p className="mt-1 max-w-2xl text-[13px] leading-6 text-[var(--text-muted)]">
+            {description}
+          </p>
+        </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
+      </div>
+      <div className="pt-5">{children}</div>
+    </section>
+  );
 }
 
 export default function ClientSettingsPage() {
@@ -468,397 +512,387 @@ export default function ClientSettingsPage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               Page Settings
             </p>
-            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
+            <h1 className="mt-2 break-words text-[1.55rem] font-extrabold text-[var(--text-primary)] sm:text-[2rem]">
               {clientName || "Connected page"}
             </h1>
-            <p className="mt-2 text-[14px] text-[var(--text-muted)]">
-              Manage this page&apos;s AI instructions, handoff controls, and maintenance tools.
+            <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--text-muted)]">
+              Configure AI handoff, lead capture, first replies, and page maintenance from one workspace.
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] sm:w-fit"
-          >
-            Back to Pages
-          </Link>
+          <div className="grid grid-cols-1 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:justify-end">
+            <Link
+              href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
+              className={`${secondaryButtonClass} w-full min-[420px]:w-auto`}
+            >
+              AI Instructions
+            </Link>
+            <Link href="/dashboard" className={`${secondaryButtonClass} w-full min-[420px]:w-auto`}>
+              Back to Pages
+            </Link>
+          </div>
         </div>
 
         {loading ? (
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] px-5 py-5 text-[14px] text-[var(--text-muted)]">
-            Loading page settings...
+          <div className={panelClass}>
+            <p className="text-[14px] text-[var(--text-muted)]">Loading page settings...</p>
           </div>
         ) : (
-          <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                  Page Name
-                </p>
-                <p className="mt-2 break-words text-[15px] font-semibold text-[var(--text-primary)]">
-                  {clientName || "Unknown page"}
-                </p>
-              </div>
-              <div className="rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                  Page ID
-                </p>
-                <p className="mt-2 break-all text-[15px] font-semibold text-[var(--text-primary)]">
-                  {pageId || "Not available"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                    First Reply Sequence
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["Page", clientName || "Unknown page"],
+                ["Page ID", pageId || "Not available"],
+                ["AI Pause", `${manualAiPauseMinutes} min default`],
+                ["Lead Fields", `${leadFields.length} fields`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+                    {label}
                   </p>
-                  <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                    Send this once after a customer first replies in Messenger.
+                  <p className="mt-2 truncate text-[14px] font-semibold text-[var(--text-primary)]" title={value}>
+                    {value}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={welcomeSequenceEnabled}
-                  onClick={() => setWelcomeSequenceEnabled((value) => !value)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 ${
-                    welcomeSequenceEnabled
-                      ? "border-[var(--accent-bright)] bg-[var(--accent)]"
-                      : "border-[var(--border)] bg-[var(--surface-strong)]"
-                  }`}
-                >
-                  <span
-                    className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      welcomeSequenceEnabled ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="welcome-message"
-              >
-                Message
-              </label>
-              <textarea
-                id="welcome-message"
-                value={welcomeMessage}
-                onChange={(event) => setWelcomeMessage(event.target.value)}
-                rows={4}
-                maxLength={1200}
-                placeholder="Welcome! Here are the details you requested..."
-                className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="welcome-link-url"
-              >
-                Link URL
-              </label>
-              <input
-                id="welcome-link-url"
-                type="url"
-                value={welcomeLinkUrl}
-                onChange={(event) => setWelcomeLinkUrl(event.target.value)}
-                placeholder="https://facebook.com/your-page-or-post"
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="welcome-image-urls"
-              >
-                Messenger Image Attachments
-              </label>
-              <input
-                id="welcome-image-upload"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  void uploadWelcomeImage(file);
-                }}
-                disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 11}
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70"
-              />
-              <textarea
-                id="welcome-image-urls"
-                value={welcomeImageUrls}
-                onChange={(event) => setWelcomeImageUrls(event.target.value)}
-                rows={4}
-                maxLength={2000}
-                placeholder={"123456789012345\n987654321098765"}
-                className="mt-2 w-full resize-y rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Upload images here to create reusable Messenger attachment IDs. The image file is stored by Facebook, not Supabase. {welcomeAttachmentIds.length} / 11 used.
-              </p>
-
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => void saveWelcomeSequence()}
-                  disabled={savingWelcomeSequence || loading}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                >
-                  {savingWelcomeSequence ? "Saving..." : "Save First Reply"}
-                </button>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Lead Google Sheet
-              </p>
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="google-sheets-webhook-url"
-              >
-                Google Apps Script Web App URL
-              </label>
-              <input
-                id="google-sheets-webhook-url"
-                type="url"
-                value={googleSheetsWebhookUrl}
-                onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Leads captured from this Facebook Page will be sent to this sheet. Leave it empty to skip Google Sheets for this Page.
-              </p>
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="google-sheets-tab-name"
-              >
-                Sheet Tab Name
-              </label>
-              <input
-                id="google-sheets-tab-name"
-                type="text"
-                value={googleSheetsTabName}
-                onChange={(event) => setGoogleSheetsTabName(event.target.value)}
-                placeholder="Sheet1, Leads, Orders..."
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Leads will be written to this tab inside the client&apos;s spreadsheet. If the tab does not exist, the generated script creates it.
-              </p>
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="new-lead-field"
-              >
-                Lead Fields
-              </label>
-              <div className="mt-2 flex flex-col gap-2">
-                {leadFields.map((field, index) => {
-                  const isRequiredField = field === "Full Name" || field === "Phone";
-
-                  return (
-                    <div
-                      key={`${field}-${index}`}
-                      className="flex flex-col gap-2 min-[480px]:flex-row"
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+              <div className="flex min-w-0 flex-col gap-5">
+                <SettingsSection
+                  eyebrow="AI handoff"
+                  title="Conversation Control"
+                  description="Set how the AI behaves after a human replies from the Page inbox."
+                  actions={
+                    <Link
+                      href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
+                      className={`${secondaryButtonClass} w-full lg:w-auto`}
                     >
-                      <input
-                        type="text"
-                        value={field}
-                        onChange={(event) => updateLeadField(index, event.target.value)}
-                        disabled={isRequiredField}
-                        className="min-w-0 flex-1 rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-80"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeLeadField(index)}
-                        disabled={isRequiredField}
-                        className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      Open Conversations
+                    </Link>
+                  }
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass} htmlFor="manual-ai-pause-minutes">
+                        Manual reply pause duration
+                      </label>
+                      <select
+                        id="manual-ai-pause-minutes"
+                        value={manualAiPauseMinutes}
+                        onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
+                        className={`${inputClass} mt-2`}
                       >
-                        Remove
-                      </button>
+                        {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                        Applies only to the customer where the human replied.
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-              <div className="mt-3 flex flex-col gap-2 min-[480px]:flex-row">
-                <input
-                  id="new-lead-field"
-                  type="text"
-                  value={newLeadField}
-                  onChange={(event) => setNewLeadField(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addLeadField();
-                    }
-                  }}
-                  placeholder="Email, Budget, Preferred Schedule..."
-                  className="min-w-0 flex-1 rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                />
-                <button
-                  type="button"
-                  onClick={addLeadField}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
-                >
-                  Add Field
-                </button>
-              </div>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Full Name and Phone are required before the lead is sent.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => void saveGoogleSheetsWebhookUrl()}
-                  disabled={savingSheetsUrl || loading}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                >
-                  {savingSheetsUrl ? "Saving..." : "Save Lead Settings"}
-                </button>
-              </div>
-
-              <div className="mt-6 rounded border border-[var(--border)] bg-[var(--surface)] p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">
-                    Generated Google Apps Script
-                  </p>
-                  <div className="flex flex-col gap-2 min-[420px]:flex-row">
+                    <div>
+                      <label className={labelClass} htmlFor="auto-reply-ignore-pattern">
+                        Auto-reply message to ignore
+                      </label>
+                      <input
+                        id="auto-reply-ignore-pattern"
+                        type="text"
+                        value={autoReplyIgnorePattern}
+                        onChange={(event) => setAutoReplyIgnorePattern(event.target.value)}
+                        maxLength={500}
+                        placeholder="Hello {name}, how can we assist you today?"
+                        className={`${inputClass} mt-2`}
+                      />
+                      <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                        Use {"{name}"} for customer-specific greetings.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-between">
                     <button
                       type="button"
-                      onClick={() => void copySheetColumns()}
-                      className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)]"
+                      onClick={() => void repairMessengerWebhook()}
+                      disabled={repairingMessengerWebhook || loading}
+                      className={`${secondaryButtonClass} w-full sm:w-auto`}
                     >
-                      Copy Columns
+                      {repairingMessengerWebhook ? "Repairing..." : "Repair Messenger Webhook"}
                     </button>
                     <button
                       type="button"
-                      onClick={() => void copyAppsScript()}
-                      className="inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                      onClick={() => void saveAutoReplyIgnorePattern()}
+                      disabled={savingAutoReplyIgnorePattern || loading}
+                      className={`${primaryButtonClass} w-full sm:w-auto`}
                     >
-                      Copy Script
+                      {savingAutoReplyIgnorePattern ? "Saving..." : "Save AI Controls"}
                     </button>
                   </div>
-                </div>
-                <p className="mt-3 break-words text-[12px] leading-6 text-[var(--text-muted)]">
-                  Columns: {sheetColumns.join(" | ")}
-                </p>
-                <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                  After changing lead fields, copy this script and deploy a new Google Apps Script Web App version.
-                </p>
-                <pre className="mt-3 max-h-[360px] overflow-auto rounded border border-[var(--border)] bg-background px-3 py-3 text-[12px] leading-5 text-[var(--text-primary)]">
-                  <code>{generatedAppsScript}</code>
-                </pre>
-              </div>
-            </div>
+                </SettingsSection>
 
-            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                AI Conversation Control
-              </p>
-              <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                Configure how long AI pauses for one customer after a human replies from the Page inbox.
-              </p>
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="manual-ai-pause-minutes"
-              >
-                Manual reply pause duration
-              </label>
-              <select
-                id="manual-ai-pause-minutes"
-                value={manualAiPauseMinutes}
-                onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              >
-                {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Applies to each customer individually. Other customers continue chatting with AI normally.
-              </p>
-              <label
-                className="mt-4 block text-[13px] font-semibold text-[var(--text-primary)]"
-                htmlFor="auto-reply-ignore-pattern"
-              >
-                Auto-reply message to ignore
-              </label>
-              <input
-                id="auto-reply-ignore-pattern"
-                type="text"
-                value={autoReplyIgnorePattern}
-                onChange={(event) => setAutoReplyIgnorePattern(event.target.value)}
-                maxLength={500}
-                placeholder="Hello {name}, how can we assist you today?"
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Use {"{name}"} for the changing customer name. Matching Page echoes will not pause AI; other manual Page replies will pause AI for that customer.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => void saveAutoReplyIgnorePattern()}
-                  disabled={savingAutoReplyIgnorePattern || loading}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                <SettingsSection
+                  eyebrow="Lead capture"
+                  title="Google Sheets"
+                  description="Choose where captured leads go and which fields the AI must collect before sending them."
                 >
-                  {savingAutoReplyIgnorePattern ? "Saving..." : "Save AI Controls"}
-                </button>
-              </div>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Link
-                  href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] sm:w-auto"
-                >
-                  Open Conversations
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => void repairMessengerWebhook()}
-                  disabled={repairingMessengerWebhook || loading}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                >
-                  {repairingMessengerWebhook ? "Repairing..." : "Repair Messenger Webhook"}
-                </button>
-              </div>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                Use this if manual Page replies are not appearing in Vercel logs. It re-subscribes this Page to messages, postbacks, and message echoes.
-              </p>
-            </div>
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                    <div>
+                      <label className={labelClass} htmlFor="google-sheets-webhook-url">
+                        Apps Script Web App URL
+                      </label>
+                      <input
+                        id="google-sheets-webhook-url"
+                        type="url"
+                        value={googleSheetsWebhookUrl}
+                        onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)}
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        className={`${inputClass} mt-2`}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor="google-sheets-tab-name">
+                        Sheet tab
+                      </label>
+                      <input
+                        id="google-sheets-tab-name"
+                        type="text"
+                        value={googleSheetsTabName}
+                        onChange={(event) => setGoogleSheetsTabName(event.target.value)}
+                        placeholder="Sheet1"
+                        className={`${inputClass} mt-2`}
+                      />
+                    </div>
+                  </div>
 
-            <div className="mt-8 rounded border border-[var(--border)] bg-background/80 px-4 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Storage Cleanup
-              </p>
-              <p className="mt-2 text-[14px] text-[var(--text-primary)]">
-                Delete old temporary data from logs and legacy reply sessions.
-              </p>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                This removes `rate_limit_logs` older than 7 days and any legacy reply sessions older than 24 hours.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => void cleanupStorage()}
-                  disabled={cleaningStorage || loading}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                  <div className="mt-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <label className={labelClass} htmlFor="new-lead-field">
+                          Lead fields
+                        </label>
+                        <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                          Full Name and Phone are required.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2 min-[480px]:flex-row">
+                        <input
+                          id="new-lead-field"
+                          type="text"
+                          value={newLeadField}
+                          onChange={(event) => setNewLeadField(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addLeadField();
+                            }
+                          }}
+                          placeholder="Email, Budget..."
+                          className={`${inputClass} min-w-0 min-[480px]:w-[220px]`}
+                        />
+                        <button type="button" onClick={addLeadField} className={secondaryButtonClass}>
+                          Add Field
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {leadFields.map((field, index) => {
+                        const isRequiredField = field === "Full Name" || field === "Phone";
+
+                        return (
+                          <div key={`${field}-${index}`} className="flex min-w-0 gap-2">
+                            <input
+                              type="text"
+                              value={field}
+                              onChange={(event) => updateLeadField(index, event.target.value)}
+                              disabled={isRequiredField}
+                              className={`${inputClass} min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-80`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeLeadField(index)}
+                              disabled={isRequiredField}
+                              className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <details className="mt-5 border-t border-[var(--border)] pt-4">
+                    <summary className="cursor-pointer text-[13px] font-semibold text-[var(--text-primary)]">
+                      Generated Google Apps Script
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-2 min-[420px]:flex-row">
+                      <button type="button" onClick={() => void copySheetColumns()} className={secondaryButtonClass}>
+                        Copy Columns
+                      </button>
+                      <button type="button" onClick={() => void copyAppsScript()} className={primaryButtonClass}>
+                        Copy Script
+                      </button>
+                    </div>
+                    <p className="mt-3 break-words text-[12px] leading-6 text-[var(--text-muted)]">
+                      Columns: {sheetColumns.join(" | ")}
+                    </p>
+                    <pre className="mt-3 max-h-[320px] overflow-auto rounded-md border border-[var(--border)] bg-background px-3 py-3 text-[12px] leading-5 text-[var(--text-primary)] scrollbar-modern">
+                      <code>{generatedAppsScript}</code>
+                    </pre>
+                  </details>
+
+                  <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-4">
+                    <button
+                      type="button"
+                      onClick={() => void saveGoogleSheetsWebhookUrl()}
+                      disabled={savingSheetsUrl || loading}
+                      className={`${primaryButtonClass} w-full sm:w-auto`}
+                    >
+                      {savingSheetsUrl ? "Saving..." : "Save Lead Settings"}
+                    </button>
+                  </div>
+                </SettingsSection>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-5">
+                <SettingsSection
+                  eyebrow="First reply"
+                  title="Welcome Sequence"
+                  description="Send one prepared response after a customer first replies in Messenger."
+                  actions={
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={welcomeSequenceEnabled}
+                      onClick={() => setWelcomeSequenceEnabled((value) => !value)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 ${
+                        welcomeSequenceEnabled
+                          ? "border-[var(--accent-bright)] bg-[var(--accent)]"
+                          : "border-[var(--border)] bg-background"
+                      }`}
+                    >
+                      <span
+                        className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                          welcomeSequenceEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  }
                 >
-                  {cleaningStorage ? "Cleaning..." : "Clean Old Logs & Sessions"}
-                </button>
+                  <label className={labelClass} htmlFor="welcome-message">
+                    Message
+                  </label>
+                  <textarea
+                    id="welcome-message"
+                    value={welcomeMessage}
+                    onChange={(event) => setWelcomeMessage(event.target.value)}
+                    rows={5}
+                    maxLength={1200}
+                    placeholder="Welcome! Here are the details you requested..."
+                    className={`${inputClass} mt-2 resize-y`}
+                  />
+
+                  <label className={`${labelClass} mt-4`} htmlFor="welcome-link-url">
+                    Link URL
+                  </label>
+                  <input
+                    id="welcome-link-url"
+                    type="url"
+                    value={welcomeLinkUrl}
+                    onChange={(event) => setWelcomeLinkUrl(event.target.value)}
+                    placeholder="https://facebook.com/your-page-or-post"
+                    className={`${inputClass} mt-2`}
+                  />
+
+                  <label className={`${labelClass} mt-4`} htmlFor="welcome-image-urls">
+                    Messenger image attachments
+                  </label>
+                  <input
+                    id="welcome-image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      void uploadWelcomeImage(file);
+                    }}
+                    disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 11}
+                    className={`${inputClass} mt-2 file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70`}
+                  />
+                  <textarea
+                    id="welcome-image-urls"
+                    value={welcomeImageUrls}
+                    onChange={(event) => setWelcomeImageUrls(event.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder={"123456789012345\n987654321098765"}
+                    className={`${inputClass} mt-2 resize-y`}
+                  />
+                  <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                    {welcomeAttachmentIds.length} / 11 Messenger attachments used.
+                  </p>
+
+                  <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-4">
+                    <button
+                      type="button"
+                      onClick={() => void saveWelcomeSequence()}
+                      disabled={savingWelcomeSequence || loading}
+                      className={`${primaryButtonClass} w-full sm:w-auto`}
+                    >
+                      {savingWelcomeSequence ? "Saving..." : "Save First Reply"}
+                    </button>
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection
+                  eyebrow="Maintenance"
+                  title="Page Tools"
+                  description="Run occasional fixes and cleanups for this connected Page."
+                >
+                  <div className="space-y-4">
+                    <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                        Storage cleanup
+                      </p>
+                      <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                        Removes old rate limit logs and legacy reply sessions.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void cleanupStorage()}
+                        disabled={cleaningStorage || loading}
+                        className={`${secondaryButtonClass} mt-3 w-full`}
+                      >
+                        {cleaningStorage ? "Cleaning..." : "Clean Old Logs"}
+                      </button>
+                    </div>
+                    <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                        Messenger webhook
+                      </p>
+                      <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                        Re-subscribes this Page to messages, postbacks, and echoes.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void repairMessengerWebhook()}
+                        disabled={repairingMessengerWebhook || loading}
+                        className={`${secondaryButtonClass} mt-3 w-full`}
+                      >
+                        {repairingMessengerWebhook ? "Repairing..." : "Repair Webhook"}
+                      </button>
+                    </div>
+                  </div>
+                </SettingsSection>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
       <LoadingModal
