@@ -3,6 +3,7 @@ name: Process AI message jobs
 on:
   schedule:
     - cron: "*/5 * * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,4 +16,13 @@ jobs:
             --header "Authorization: Bearer $AI_WORKER_SECRET"
         env:
           AI_WORKER_URL: ${{ secrets.AI_WORKER_URL }}
+          AI_WORKER_SECRET: ${{ secrets.AI_WORKER_SECRET }}
+
+      - name: Clean old AI storage
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 16 * * *'
+        run: |
+          curl --fail --show-error --silent --request POST "$AI_MAINTENANCE_URL" \
+            --header "Authorization: Bearer $AI_WORKER_SECRET"
+        env:
+          AI_MAINTENANCE_URL: ${{ secrets.AI_MAINTENANCE_URL }}
           AI_WORKER_SECRET: ${{ secrets.AI_WORKER_SECRET }}

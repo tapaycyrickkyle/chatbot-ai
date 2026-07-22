@@ -314,6 +314,34 @@ export async function claimAiMessageJobs(input: {
   return ((data ?? []) as AiMessageJobRow[]).map(normalizeAiMessageJob);
 }
 
+export async function cancelPendingAiMessageJobsForConversation(input: {
+  pageId: string;
+  recipientId: string;
+}) {
+  const supabase = getDb();
+  const { data, error } = await supabase.rpc("cancel_pending_ai_message_jobs", {
+    target_page_id: input.pageId,
+    target_recipient_id: input.recipientId,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to cancel pending AI message jobs");
+  }
+
+  return typeof data === "number" ? data : 0;
+}
+
+export async function cleanupAiMessageJobs() {
+  const supabase = getDb();
+  const { data, error } = await supabase.rpc("cleanup_ai_message_jobs");
+
+  if (error) {
+    throw new Error(error.message || "Failed to clean up AI message jobs");
+  }
+
+  return typeof data === "number" ? data : 0;
+}
+
 export async function completeAiMessageJob(jobId: string) {
   const supabase = getDb();
   const now = new Date().toISOString();

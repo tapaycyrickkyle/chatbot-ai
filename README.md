@@ -42,10 +42,11 @@ AI_QUEUE_ENABLED="true"
 AI_MESSAGE_JOB_BATCH_SIZE="5"
 ```
 
-Run `supabase/17-ai-message-jobs.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery. For a free backup, add these GitHub Actions repository secrets:
+Run `supabase/17-ai-message-jobs.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery. For a free backup, add these GitHub Actions repository secrets:
 
 ```text
 AI_WORKER_URL=https://your-vercel-domain.com/api/ai-message-jobs/process
+AI_MAINTENANCE_URL=https://your-vercel-domain.com/api/maintenance/storage-cleanup
 AI_WORKER_SECRET=long-random-secret
 ```
 
@@ -63,7 +64,9 @@ ai_message_jobs: delete sent jobs older than 1 day
 ai_conversations: delete inactive conversations older than 7 days
 ```
 
-Run `supabase/18-ai-retention-cleanup.sql` in Supabase to add cleanup indexes for the AI queue and conversation tables.
+Run `supabase/18-ai-retention-cleanup.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase to add cleanup indexes/functions for the AI queue and conversation tables.
+
+GitHub Actions calls `/api/maintenance/storage-cleanup` once daily using `AI_MAINTENANCE_URL` and `AI_WORKER_SECRET`, so retention cleanup runs automatically after deployment.
 
 ## Google Sheets Lead Capture
 

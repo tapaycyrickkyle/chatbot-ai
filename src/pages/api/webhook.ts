@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
+  cancelPendingAiMessageJobsForConversation,
   enqueueAiMessageJob,
   getClients,
   pauseAiConversation,
@@ -228,6 +229,25 @@ async function safelyPauseAiForManualPageReply(input: {
     });
   } catch (error) {
     console.warn("Failed to pause AI after manual Page reply", error);
+  }
+}
+
+async function safelyCancelPendingAiJobsForManualPageReply(input: {
+  pageId: string;
+  recipientId: string;
+}) {
+  try {
+    const canceledJobs = await cancelPendingAiMessageJobsForConversation(input);
+
+    if (canceledJobs > 0) {
+      console.info("Canceled pending AI jobs after manual Page reply", {
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        canceledJobs,
+      });
+    }
+  } catch (error) {
+    console.warn("Failed to cancel pending AI jobs after manual Page reply", error);
   }
 }
 
@@ -781,6 +801,10 @@ export default async function handler(
               pageId,
               recipientId: userId,
               pauseMinutes: client.manual_ai_pause_minutes || DEFAULT_MANUAL_AI_PAUSE_MINUTES,
+            });
+            await safelyCancelPendingAiJobsForManualPageReply({
+              pageId,
+              recipientId: userId,
             });
             console.info("AI paused after manual page reply", {
               clientId: client.id,
