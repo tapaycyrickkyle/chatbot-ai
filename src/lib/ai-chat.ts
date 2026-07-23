@@ -361,6 +361,27 @@ function createAiHeaders(apiKey: string, apiUrl: string) {
   return headers;
 }
 
+function createAiRequestBody(input: {
+  apiUrl: string;
+  model: string;
+  messages: ChatMessage[];
+  temperature: number;
+  maxTokens: number;
+}) {
+  const body: Record<string, unknown> = {
+    model: input.model,
+    temperature: input.temperature,
+    max_tokens: input.maxTokens,
+    messages: input.messages,
+  };
+
+  if (input.apiUrl.includes("api.deepseek.com")) {
+    body.thinking = { type: "disabled" };
+  }
+
+  return body;
+}
+
 async function requestChatCompletion(input: {
   apiKey: string;
   apiUrl: string;
@@ -373,12 +394,7 @@ async function requestChatCompletion(input: {
   const response = await fetch(input.apiUrl, {
     method: "POST",
     headers: createAiHeaders(input.apiKey, input.apiUrl),
-    body: JSON.stringify({
-      model: input.model,
-      temperature: input.temperature,
-      max_tokens: input.maxTokens,
-      messages: input.messages,
-    }),
+    body: JSON.stringify(createAiRequestBody(input)),
   });
 
   if (!response.ok) {
