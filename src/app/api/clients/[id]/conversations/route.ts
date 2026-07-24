@@ -5,6 +5,7 @@ import {
   getAiConversationsForClient,
   getClientById,
   pauseAiConversation,
+  resumeAllAiConversationsForClient,
   resumeAiConversation,
 } from "@/lib/database";
 
@@ -86,6 +87,11 @@ export async function PATCH(
         ? sanitizeIdentifier(body.recipientId, "recipient ID")
         : "";
     const action = typeof body?.action === "string" ? body.action : "";
+
+    if (action === "resume_all") {
+      await resumeAllAiConversationsForClient(clientId);
+      return NextResponse.json({ success: true });
+    }
 
     if (!recipientId) {
       return NextResponse.json({ error: "Missing recipient ID" }, { status: 400 });

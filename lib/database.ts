@@ -761,3 +761,35 @@ export async function resumeAiConversation(clientId: string, recipientId: string
   }
 }
 
+export async function resumeAllAiConversationsForClient(clientId: string) {
+  const now = new Date().toISOString();
+  const supabase = getDb();
+  const response = await supabase
+    .from("ai_conversations")
+    .update({
+      ai_paused: false,
+      paused_by: null,
+      ai_pause_expires_at: null,
+      resumed_at: now,
+      updated_at: now,
+    })
+    .eq("client_id", clientId)
+    .eq("ai_paused", true);
+  const { error } = isMissingAiPauseExpiresAtError(response.error)
+    ? await supabase
+        .from("ai_conversations")
+        .update({
+          ai_paused: false,
+          paused_by: null,
+          resumed_at: now,
+          updated_at: now,
+        })
+        .eq("client_id", clientId)
+        .eq("ai_paused", true)
+    : response;
+
+  if (error) {
+    throw new Error(error.message || "Failed to resume all AI conversations");
+  }
+}
+

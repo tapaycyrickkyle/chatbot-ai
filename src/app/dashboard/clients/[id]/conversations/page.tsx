@@ -59,6 +59,7 @@ export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingRecipientId, setUpdatingRecipientId] = useState<string | null>(null);
+  const [isResumingAll, setIsResumingAll] = useState(false);
 
   const loadConversations = useCallback(async () => {
     if (!clientId) {
@@ -144,6 +145,53 @@ export default function ConversationsPage() {
     }
   };
 
+  const resumeAllConversations = async () => {
+    setIsResumingAll(true);
+
+    try {
+      const response = await fetch(
+        `/api/clients/${encodeURIComponent(clientId)}/conversations`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "resume_all" }),
+        }
+      );
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to resume conversations");
+      }
+
+      const resumedAt = new Date().toISOString();
+      setConversations((currentConversations) =>
+        currentConversations.map((conversation) =>
+          conversation.ai_paused
+            ? {
+                ...conversation,
+                ai_paused: false,
+                paused_by: "",
+                resumed_at: resumedAt,
+              }
+            : conversation
+        )
+      );
+      showToast({ tone: "success", message: "AI resumed for all paused conversations." });
+    } catch (error) {
+      console.error(error);
+      showToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Failed to resume conversations.",
+      });
+    } finally {
+      setIsResumingAll(false);
+    }
+  };
+
+  const pausedConversationCount = conversations.filter((conversation) => conversation.ai_paused).length;
+
   return (
     <>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -160,6 +208,14 @@ export default function ConversationsPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
+            <button
+              type="button"
+              onClick={() => void resumeAllConversations()}
+              disabled={loading || isResumingAll || pausedConversationCount === 0}
+              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 min-[360px]:w-fit"
+            >
+              {isResumingAll ? "Resuming..." : `Resume All${pausedConversationCount > 0 ? ` (${pausedConversationCount})` : ""}`}
+            </button>
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
               className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
@@ -246,7 +302,10 @@ export default function ConversationsPage() {
             </div>
         )}
       </section>
-        <LoadingModal isOpen={Boolean(updatingRecipientId)} message="Updating AI status..." />
+        <LoadingModal
+          isOpen={Boolean(updatingRecipientId) || isResumingAll}
+          message={isResumingAll ? "Resuming all conversations..." : "Updating AI status..."}
+        />
       </div>
     </>
   );
