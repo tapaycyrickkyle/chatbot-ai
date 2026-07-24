@@ -28,7 +28,7 @@ const sections = [
     content: [
       "You are responsible for making sure you have authority to connect and manage any Facebook Page used with the service.",
       "If you ask the service operator to connect or manage a Facebook Page for you, you confirm that you own, administer, or are authorized by the Page owner to grant that access.",
-      "You are responsible for getting any customer notices, permissions, or consents required for your business use of Messenger automation and customer information requests.",
+      "You are responsible for getting any customer notices, permissions, or consents required for your business use of Messenger automation.",
       "You agree not to use the service for unlawful, misleading, abusive, or harmful activity.",
       "You are responsible for the content, instructions, and responses configured for your chatbot.",
     ],

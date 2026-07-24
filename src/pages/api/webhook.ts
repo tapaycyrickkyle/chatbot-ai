@@ -19,10 +19,6 @@ import {
   inferCustomerState,
   updateConversationSummary,
 } from "@/lib/conversation-memory";
-import {
-  createLeadInformationPrompt,
-  parseLeadFields,
-} from "@/lib/lead-capture";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -332,14 +328,6 @@ async function safelyRecordWelcomeSequenceSent(input: {
   }
 }
 
-type LeadPromptReason =
-  | "order"
-  | "booking"
-  | "human_contact"
-  | "quote"
-  | "reservation"
-  | "generic";
-
 function getFallbackLeadIntent(message: string): LeadCaptureIntent {
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -444,87 +432,6 @@ function shouldUseAiReplyPlanner(
     );
 
   return hasConversationContext && (isShortContextualReply || refersToPreviousMessage);
-}
-
-function shouldAskForLeadFormat(
-  intent: LeadCaptureIntent,
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
-  leadCaptureMessages = ""
-) {
-  void intent;
-  void conversation;
-  void leadCaptureMessages;
-
-  return false;
-}
-
-function getLeadPromptReason(intent: LeadCaptureIntent, message: string): LeadPromptReason {
-  const normalizedMessage = message.toLowerCase();
-
-  if (intent === "WANTS_HUMAN_CONTACT") {
-    return "human_contact";
-  }
-
-  if (/\b(?:reserve|reservation|pa\s*reserve)\b/i.test(normalizedMessage)) {
-    return "reservation";
-  }
-
-  if (/\b(?:book|booking|schedule|appointment|viewing|visit|pa\s*book|magpa\s*book)\b/i.test(normalizedMessage)) {
-    return "booking";
-  }
-
-  if (/\b(?:quote|quotation|estimate|formal quote)\b/i.test(normalizedMessage)) {
-    return "quote";
-  }
-
-  if (/\b(?:order|buy|purchase|checkout|bumili)\b/i.test(normalizedMessage)) {
-    return "order";
-  }
-
-  return "generic";
-}
-
-function getLeadCaptureMessageTemplates(value = "") {
-  return value
-    .split(/\n\s*\n/)
-    .map((message) => message.trim())
-    .filter(Boolean)
-    .slice(0, 2);
-}
-
-function getLeadFieldPromptLines(leadFields: string[]) {
-  return leadFields.map((field) => `${field}:`).join("\n");
-}
-
-function formatLeadCaptureMessageTemplate(template: string, leadFields: string[]) {
-  const fieldLines = getLeadFieldPromptLines(leadFields);
-
-  return template
-    .replace(/\{fields\}/gi, fieldLines)
-    .replace(/\{field_list\}/gi, fieldLines)
-    .trim();
-}
-
-function createLeadFormatReplies(
-  leadFields: string[],
-  intent: LeadCaptureIntent,
-  customerMessage: string,
-  leadCaptureMessages = ""
-) {
-  const customMessages = getLeadCaptureMessageTemplates(leadCaptureMessages).map((message) =>
-    formatLeadCaptureMessageTemplate(message, leadFields)
-  );
-
-  if (customMessages.length > 0) {
-    return customMessages;
-  }
-
-  return [
-    createLeadInformationPrompt(leadFields, {
-      reason: getLeadPromptReason(intent, customerMessage),
-      customerMessage,
-    }),
-  ];
 }
 
 function getWelcomeImageAttachmentIds(value: string) {
@@ -722,7 +629,6 @@ export default async function handler(
         }
 
         const pageAccessToken = client.page_access_token;
-        const leadFields = parseLeadFields(client.lead_capture_fields);
 
         for (const event of entry.messaging ?? []) {
           const userId = getConversationRecipientId(event);
@@ -929,56 +835,6 @@ export default async function handler(
               });
             }
 
-            if (shouldAskForLeadFormat(leadIntent, existingConversation, client.lead_capture_messages)) {
-              const replies = createLeadFormatReplies(
-                leadFields,
-                leadIntent,
-                rawText,
-                client.lead_capture_messages
-              );
-              const reply = replies.join("\n\n");
-              const customerState = inferCustomerState(
-                existingConversation?.customer_state,
-                rawText
-              );
-              const recentMessages = appendRecentConversationMessages(
-                existingConversation?.recent_messages,
-                rawText,
-                reply
-              );
-              const conversationSummary = updateConversationSummary(
-                existingConversation?.conversation_summary || "",
-                rawText,
-                reply
-              );
-
-              await safelyHandleFlowSend(
-                async () => {
-                  for (const leadCaptureReply of replies) {
-                    await safeSendMessage(
-                      userId,
-                      leadCaptureReply,
-                      pageAccessToken,
-                      0,
-                      pageId,
-                      client.id
-                    );
-                  }
-                },
-                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
-              );
-              await safelyRecordAiReply({
-                clientId: client.id,
-                pageId,
-                recipientId: userId,
-                reply,
-                conversationSummary,
-                customerState,
-                recentMessages,
-              });
-              continue;
-            }
-
             await safelyHandleFlowSend(
               async () => {
                 console.info("AI webhook processing text message", {
@@ -987,7 +843,7 @@ export default async function handler(
                   userId,
                   preview: rawText.slice(0, 120),
                 });
-                const aiReply = await askAi(rawText, client.business_info || "", leadFields, {
+                const aiReply = await askAi(rawText, client.business_info || "", {
                   ...aiConversationContext,
                   latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),

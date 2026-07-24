@@ -12,7 +12,6 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
-  lead_capture_messages: string;
   welcome_sequence_enabled: boolean;
   welcome_message: string;
   welcome_link_url: string;
@@ -22,8 +21,6 @@ type ClientSettings = {
 };
 
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
-const MAX_LEAD_CAPTURE_MESSAGES = 2;
-const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_AUTO_REPLY_IGNORE_PATTERNS = 10;
@@ -91,33 +88,6 @@ function serializeAutoReplyIgnorePatterns(patterns: string[]) {
     .join("\n");
 }
 
-function createEmptyLeadCaptureMessages() {
-  return Array.from({ length: MAX_LEAD_CAPTURE_MESSAGES }, () => "");
-}
-
-function parseLeadCaptureMessages(value: string) {
-  const messages = value
-    .split(/\n\s*\n/)
-    .map((message) => message.trim())
-    .filter(Boolean)
-    .slice(0, MAX_LEAD_CAPTURE_MESSAGES);
-  const paddedMessages = createEmptyLeadCaptureMessages();
-
-  messages.forEach((message, index) => {
-    paddedMessages[index] = message;
-  });
-
-  return paddedMessages;
-}
-
-function serializeLeadCaptureMessages(messages: string[]) {
-  return messages
-    .map((message) => message.trim())
-    .filter(Boolean)
-    .slice(0, MAX_LEAD_CAPTURE_MESSAGES)
-    .join("\n\n");
-}
-
 const panelClass =
   "rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-5 sm:py-5";
 const labelClass = "block text-[13px] font-semibold text-[var(--text-label)]";
@@ -168,7 +138,6 @@ export default function ClientSettingsPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
-  const [leadCaptureMessages, setLeadCaptureMessages] = useState(createEmptyLeadCaptureMessages);
   const [welcomeSequenceEnabled, setWelcomeSequenceEnabled] = useState(false);
   const [welcomeMessages, setWelcomeMessages] = useState(createEmptyWelcomeMessages);
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
@@ -178,7 +147,6 @@ export default function ClientSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [repairingMessengerWebhook, setRepairingMessengerWebhook] = useState(false);
-  const [savingLeadCapture, setSavingLeadCapture] = useState(false);
   const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
   const [savingAutoReplyIgnorePattern, setSavingAutoReplyIgnorePattern] = useState(false);
   const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
@@ -209,7 +177,6 @@ export default function ClientSettingsPage() {
 
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
-        setLeadCaptureMessages(parseLeadCaptureMessages(data.lead_capture_messages || ""));
         setWelcomeSequenceEnabled(Boolean(data.welcome_sequence_enabled));
         setWelcomeMessages(parseWelcomeMessages(data.welcome_message || ""));
         setWelcomeLinkUrl(data.welcome_link_url || "");
@@ -272,40 +239,6 @@ export default function ClientSettingsPage() {
       });
     } finally {
       setCleaningStorage(false);
-    }
-  };
-
-  const saveLeadCaptureMessages = async () => {
-    if (!clientId) {
-      return;
-    }
-
-    setSavingLeadCapture(true);
-
-    try {
-      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_capture_messages: serializeLeadCaptureMessages(leadCaptureMessages),
-        }),
-      });
-
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to save lead capture messages");
-      }
-
-      showToast({ tone: "success", message: "Lead capture messages saved." });
-    } catch (error) {
-      console.error(error);
-      showToast({
-        tone: "error",
-        message: error instanceof Error ? error.message : "Failed to save lead capture settings.",
-      });
-    } finally {
-      setSavingLeadCapture(false);
     }
   };
 
@@ -455,14 +388,6 @@ export default function ClientSettingsPage() {
     }
   };
 
-  const updateLeadCaptureMessage = (index: number, value: string) => {
-    setLeadCaptureMessages((currentMessages) =>
-      currentMessages.map((message, messageIndex) =>
-        messageIndex === index ? value : message
-      )
-    );
-  };
-
   const updateWelcomeMessage = (index: number, value: string) => {
     setWelcomeMessages((currentMessages) =>
       currentMessages.map((message, messageIndex) =>
@@ -507,7 +432,7 @@ export default function ClientSettingsPage() {
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[var(--text-muted)]">
-              Configure AI handoff, lead capture, first replies, and page maintenance from one workspace.
+              Configure AI handoff, first replies, and page maintenance from one workspace.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:justify-end">
@@ -529,15 +454,11 @@ export default function ClientSettingsPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3">
               {[
                 ["Page", clientName || "Unknown page"],
                 ["Page ID", pageId || "Not available"],
                 ["AI Pause", `${manualAiPauseMinutes} min default`],
-                [
-                  "Lead Prompt",
-                  `${leadCaptureMessages.filter((message) => message.trim()).length} / ${MAX_LEAD_CAPTURE_MESSAGES} messages`,
-                ],
               ].map(([label, value]) => (
                 <div key={label} className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
@@ -655,53 +576,6 @@ export default function ClientSettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection
-                  eyebrow="Lead capture"
-                  title="Lead Prompt"
-                  description="Send these messages when the AI decides it is the right time to ask for customer information."
-                >
-                  <div>
-                    <label className={labelClass} htmlFor="lead-capture-message-0">
-                      Messages
-                    </label>
-                    <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
-                      Empty messages are skipped. If both are blank, the system uses its default prompt.
-                    </p>
-                    <div className="mt-3 space-y-4">
-                      {leadCaptureMessages.map((message, index) => (
-                        <div key={`lead-capture-message-${index}`}>
-                          <textarea
-                            id={`lead-capture-message-${index}`}
-                            value={message}
-                            onChange={(event) => updateLeadCaptureMessage(index, event.target.value)}
-                            rows={index === 0 ? 4 : 3}
-                            maxLength={MAX_LEAD_CAPTURE_MESSAGE_LENGTH}
-                            placeholder={
-                              index === 0
-                                ? "Sure. Please send your full name and phone number so our team can assist you."
-                                : "You can send it in one message, for example: Juan Dela Cruz, 09171234567."
-                            }
-                            className={`${inputClass} resize-y`}
-                          />
-                          <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
-                            Message {index + 1}: {message.length} / {MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-4">
-                    <button
-                      type="button"
-                      onClick={() => void saveLeadCaptureMessages()}
-                      disabled={savingLeadCapture || loading}
-                      className={`${primaryButtonClass} w-full sm:w-auto`}
-                    >
-                      {savingLeadCapture ? "Saving..." : "Save Lead Messages"}
-                    </button>
-                  </div>
-                </SettingsSection>
               </div>
 
               <div className="flex min-w-0 flex-col gap-5">
@@ -853,7 +727,7 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || repairingMessengerWebhook || savingLeadCapture || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
+        isOpen={cleaningStorage || repairingMessengerWebhook || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
         message={
           repairingMessengerWebhook
             ? "Repairing Messenger webhook..."
@@ -863,9 +737,7 @@ export default function ClientSettingsPage() {
             ? "Saving first reply sequence..."
             : savingAutoReplyIgnorePattern
             ? "Saving AI conversation controls..."
-            : savingLeadCapture
-              ? "Saving lead messages..."
-              : "Cleaning old data..."
+            : "Cleaning old data..."
         }
       />
     </>

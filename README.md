@@ -68,23 +68,9 @@ Run `supabase/18-ai-retention-cleanup.sql` and `supabase/19-ai-job-cancel-and-au
 
 GitHub Actions calls `/api/maintenance/storage-cleanup` once daily using `AI_MAINTENANCE_URL` and `AI_WORKER_SECRET`, so retention cleanup runs automatically after deployment.
 
-## Lead Prompt Messages
+## Customer Information
 
-The Messenger webhook can ask for customer information when the AI detects that the customer is ready to buy, book, or speak with a human.
-
-Each connected Facebook Page can configure up to two customer-facing lead prompt messages in:
-
-```text
-Dashboard -> Page Settings -> Lead Prompt
-```
-
-Run this migration in Supabase to enable custom lead prompt messages:
-
-```text
-supabase/20-lead-capture-messages.sql
-```
-
-The app no longer forwards captured customer information to Google Sheets. Customer-provided details remain part of the Messenger conversation history used to operate the AI workflow.
+The AI is configured to keep helping with the latest customer message instead of asking for customer information forms. Customer-provided details remain part of the Messenger conversation history used to operate the AI workflow.
 
 ## Getting Started
 

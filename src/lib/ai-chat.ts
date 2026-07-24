@@ -479,9 +479,9 @@ Rules:
 - If the customer asks a new question, answer the new question directly.
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to inquiry, viewing, reservation, or sample computation.
-- Do not recommend asking for name/phone unless the latest message clearly wants viewing, reservation, meeting, callback, or follow-up.
-- Classify whether the latest customer message should trigger lead capture. Do not trigger lead capture for ordinary details, price, availability, computation, requirements, or how-to-order questions.
-- Lead intent labels:
+- Do not recommend asking for name/phone or any personal details.
+- Classify the latest customer message for intent only. This classification helps choose the answer style and must not trigger a lead form.
+- Intent labels:
   INFO_ONLY = asks for info, details, price, availability, requirements, photos, location, computation, monthly amortization, or how the process/order works.
   SOFT_INTEREST = interested but not asking to be contacted, scheduled, reserved, quoted, or processed yet.
   READY_TO_BUY_OR_BOOK = clearly wants to buy, reserve, book, schedule, visit, set an appointment, or proceed now.
@@ -588,10 +588,8 @@ export async function planAiReply(
 export async function askAi(
   userMessage: string,
   businessContext: string,
-  _leadFields: string[] = ["Full Name", "Phone"],
   conversationContext: ConversationContext = {}
 ) {
-  void _leadFields;
   const memorySummary = getMemorySummaryForPrompt(conversationContext);
   const customerState = conversationContext.customerState ?? {};
   const customerStateText =

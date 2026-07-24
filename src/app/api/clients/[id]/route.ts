@@ -8,11 +8,6 @@ import {
 } from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
-const MAX_LEAD_CAPTURE_MESSAGES = 2;
-const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 1200;
-const MAX_LEAD_CAPTURE_MESSAGES_TOTAL_LENGTH =
-  MAX_LEAD_CAPTURE_MESSAGES * MAX_LEAD_CAPTURE_MESSAGE_LENGTH +
-  (MAX_LEAD_CAPTURE_MESSAGES - 1) * 2;
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_MESSAGES_TOTAL_LENGTH =
@@ -68,7 +63,6 @@ function validateClientSettingsPayload(payload: unknown) {
     ai_enabled,
     ai_character,
     ai_tone,
-    lead_capture_messages,
     welcome_sequence_enabled,
     welcome_message,
     welcome_link_url,
@@ -82,7 +76,6 @@ function validateClientSettingsPayload(payload: unknown) {
     ai_enabled: boolean;
     ai_character: string;
     ai_tone: string;
-    lead_capture_messages: string;
     welcome_sequence_enabled: boolean;
     welcome_message: string;
     welcome_link_url: string;
@@ -141,33 +134,6 @@ function validateClientSettingsPayload(payload: unknown) {
     }
 
     updates.ai_tone = ai_tone.trim();
-  }
-
-  if (lead_capture_messages !== undefined) {
-    if (typeof lead_capture_messages !== "string") {
-      throw new Error("Invalid lead capture messages");
-    }
-
-    if (lead_capture_messages.length > MAX_LEAD_CAPTURE_MESSAGES_TOTAL_LENGTH) {
-      throw new Error("Lead capture messages are too long");
-    }
-
-    const leadCaptureMessages = lead_capture_messages
-      .split(/\n\s*\n/)
-      .map((message) => message.trim())
-      .filter(Boolean);
-
-    if (leadCaptureMessages.length > MAX_LEAD_CAPTURE_MESSAGES) {
-      throw new Error(`Use ${MAX_LEAD_CAPTURE_MESSAGES} lead capture messages or fewer`);
-    }
-
-    for (const message of leadCaptureMessages) {
-      if (message.length > MAX_LEAD_CAPTURE_MESSAGE_LENGTH) {
-        throw new Error("Each lead capture message must be 1200 characters or fewer");
-      }
-    }
-
-    updates.lead_capture_messages = leadCaptureMessages.join("\n\n");
   }
 
   if (welcome_sequence_enabled !== undefined) {
@@ -335,7 +301,6 @@ export async function GET(
       ai_enabled: client.ai_enabled,
       ai_character: client.ai_character,
       ai_tone: client.ai_tone,
-      lead_capture_messages: client.lead_capture_messages,
       welcome_sequence_enabled: client.welcome_sequence_enabled,
       welcome_message: client.welcome_message,
       welcome_link_url: client.welcome_link_url,

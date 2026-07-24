@@ -16,8 +16,6 @@ type ClientRow = {
   ai_tone?: string | null;
   google_sheets_webhook_url?: string | null;
   google_sheets_tab_name?: string | null;
-  lead_capture_fields?: string | null;
-  lead_capture_messages?: string | null;
   welcome_sequence_enabled?: boolean | null;
   welcome_message?: string | null;
   welcome_link_url?: string | null;
@@ -65,13 +63,13 @@ type AiMessageJobRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, lead_capture_fields, lead_capture_messages, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
   `${CLIENT_COLUMNS}, manual_ai_pause_minutes`;
 const CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE =
   `${CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE}, auto_reply_ignore_pattern`;
 const LEGACY_CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, lead_capture_fields";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url";
 const AI_CONVERSATION_COLUMNS =
   "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, welcome_sequence_sent, last_message_at, ai_paused, paused_at, paused_by, ai_pause_expires_at, resumed_at, created_at, updated_at";
 const LEGACY_AI_CONVERSATION_COLUMNS =
@@ -123,13 +121,6 @@ function isMissingWelcomeSequenceError(error: { message?: string } | null) {
   );
 }
 
-function isMissingLeadCaptureMessagesError(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("lead_capture_messages") &&
-      error.message.includes("does not exist")
-  );
-}
-
 function isMissingManualAiPauseMinutesError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("manual_ai_pause_minutes") &&
@@ -165,8 +156,6 @@ function normalizeClient(row: ClientRow) {
     ai_tone: row.ai_tone ?? "",
     google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
     google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
-    lead_capture_fields: row.lead_capture_fields ?? "Full Name\nPhone",
-    lead_capture_messages: row.lead_capture_messages ?? "",
     welcome_sequence_enabled: row.welcome_sequence_enabled ?? false,
     welcome_message: row.welcome_message ?? "",
     welcome_link_url: row.welcome_link_url ?? "",
@@ -258,7 +247,6 @@ export async function getClients() {
     : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
-    isMissingLeadCaptureMessagesError(modernResponse.error) ||
     isMissingNewClientAiFieldsError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
@@ -458,7 +446,6 @@ export async function getClientById(clientId: string) {
     : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
-    isMissingLeadCaptureMessagesError(modernResponse.error) ||
     isMissingNewClientAiFieldsError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
@@ -489,8 +476,6 @@ export async function updateClientSettings(
     ai_tone: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
-    lead_capture_fields: string;
-    lead_capture_messages: string;
     welcome_sequence_enabled: boolean;
     welcome_message: string;
     welcome_link_url: string;
