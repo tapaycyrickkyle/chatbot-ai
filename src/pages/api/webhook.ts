@@ -567,9 +567,17 @@ function getWelcomeImageAttachmentIds(value: string) {
     .slice(0, 11);
 }
 
+function getWelcomeTextMessages(value: string) {
+  return value
+    .split(/\n\s*\n/)
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
 function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>>[number]) {
   return Boolean(
-    client.welcome_message.trim() ||
+    getWelcomeTextMessages(client.welcome_message).length > 0 ||
       client.welcome_link_url.trim() ||
       getWelcomeImageAttachmentIds(client.welcome_image_urls).length > 0
   );
@@ -592,7 +600,7 @@ async function sendWelcomeSequence(input: {
   recipientId: string;
   pageAccessToken: string;
 }) {
-  const message = input.client.welcome_message.trim();
+  const messages = getWelcomeTextMessages(input.client.welcome_message);
   const linkUrl = input.client.welcome_link_url.trim();
   const imageAttachmentIds = getWelcomeImageAttachmentIds(input.client.welcome_image_urls);
 
@@ -636,7 +644,7 @@ async function sendWelcomeSequence(input: {
     );
   }
 
-  if (message) {
+  for (const message of messages) {
     await safelyHandleFlowSend(
       () =>
         safeSendMessage(

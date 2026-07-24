@@ -14,12 +14,14 @@ const sections = [
     content: [
       "To operate the chatbot service, we may store Facebook Page IDs, Page Access Tokens, and conversation data exchanged with the chatbot.",
       "Conversation data can include message content, timestamps, and other basic metadata needed to respond to users and support the service.",
+      "If lead capture is enabled for a connected Page, we may collect lead details that the customer voluntarily provides in Messenger, such as name, phone number, email address, preferred service, preferred date, or other fields configured for that Page.",
     ],
   },
   {
     title: "How We Use Information",
     content: [
       "We use this information solely to connect the chatbot to your Facebook Page, send and receive messages, maintain chatbot functionality, and support service operations.",
+      "Lead details are used only to help the connected business follow up on the customer's request or inquiry.",
       "We do not use this information for unrelated marketing, profiling, or any purpose outside operating the chatbot service.",
     ],
   },
@@ -28,13 +30,14 @@ const sections = [
     content: [
       "We do not sell or rent your data to third parties.",
       "We may process information through Meta and trusted service providers, such as hosting and database providers, only as needed to operate, maintain, and secure the chatbot service.",
+      "If a connected Page enables Google Sheets lead capture, lead details may be sent to a Google Apps Script Web App or Google Sheet controlled by the service operator or connected business for follow-up and recordkeeping.",
     ],
   },
   {
     title: "User Rights and Data Deletion",
     content: [
       "If you want your data deleted, you can request deletion by contacting the service operator associated with this chatbot and providing enough information to identify the relevant Facebook Page or conversation.",
-      "Upon receiving and verifying a deletion request, we will remove the connected Facebook Page data and related chatbot records stored in our system within a reasonable timeframe, subject to any legal or security obligations.",
+      "Upon receiving and verifying a deletion request, we will remove the connected Facebook Page data and related chatbot records stored in our system within 30 days, subject to any legal or security obligations.",
       "Detailed deletion instructions are available on our Data Deletion Instructions page.",
     ],
   },

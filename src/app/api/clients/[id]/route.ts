@@ -10,7 +10,10 @@ import { getClientById, updateClientSettings } from "@/lib/database";
 
 const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
 const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
+const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
+const MAX_WELCOME_MESSAGES_TOTAL_LENGTH =
+  MAX_WELCOME_MESSAGES * MAX_WELCOME_MESSAGE_LENGTH + (MAX_WELCOME_MESSAGES - 1) * 2;
 const MAX_WELCOME_LINK_URL_LENGTH = 2000;
 const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
 const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
@@ -205,11 +208,26 @@ function validateClientSettingsPayload(payload: unknown) {
       throw new Error("Invalid welcome message");
     }
 
-    if (welcome_message.length > MAX_WELCOME_MESSAGE_LENGTH) {
-      throw new Error("Welcome message is too long");
+    if (welcome_message.length > MAX_WELCOME_MESSAGES_TOTAL_LENGTH) {
+      throw new Error("Welcome messages are too long");
     }
 
-    updates.welcome_message = welcome_message.trim();
+    const welcomeMessages = welcome_message
+      .split(/\n\s*\n/)
+      .map((message) => message.trim())
+      .filter(Boolean);
+
+    if (welcomeMessages.length > MAX_WELCOME_MESSAGES) {
+      throw new Error(`Use ${MAX_WELCOME_MESSAGES} welcome messages or fewer`);
+    }
+
+    for (const message of welcomeMessages) {
+      if (message.length > MAX_WELCOME_MESSAGE_LENGTH) {
+        throw new Error("Each welcome message must be 1200 characters or fewer");
+      }
+    }
+
+    updates.welcome_message = welcomeMessages.join("\n\n");
   }
 
   if (welcome_link_url !== undefined) {

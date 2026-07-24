@@ -24,6 +24,8 @@ type ClientSettings = {
 };
 
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
+const MAX_WELCOME_MESSAGES = 5;
+const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MANUAL_AI_PAUSE_OPTIONS = [
   { label: "5 minutes", value: 5 },
   { label: "15 minutes", value: 15 },
@@ -54,6 +56,33 @@ function getLeadFieldList(value: string) {
     "Phone",
     ...uniqueFields.filter((field) => !["Full Name", "Phone"].includes(field)),
   ];
+}
+
+function createEmptyWelcomeMessages() {
+  return Array.from({ length: MAX_WELCOME_MESSAGES }, () => "");
+}
+
+function parseWelcomeMessages(value: string) {
+  const messages = value
+    .split(/\n\s*\n/)
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, MAX_WELCOME_MESSAGES);
+  const paddedMessages = createEmptyWelcomeMessages();
+
+  messages.forEach((message, index) => {
+    paddedMessages[index] = message;
+  });
+
+  return paddedMessages;
+}
+
+function serializeWelcomeMessages(messages: string[]) {
+  return messages
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, MAX_WELCOME_MESSAGES)
+    .join("\n\n");
 }
 
 function buildAppsScript(leadFields: string[], defaultSheetName: string) {
@@ -160,7 +189,7 @@ export default function ClientSettingsPage() {
   const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
   const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
   const [welcomeSequenceEnabled, setWelcomeSequenceEnabled] = useState(false);
-  const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [welcomeMessages, setWelcomeMessages] = useState(createEmptyWelcomeMessages);
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
   const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(DEFAULT_MANUAL_AI_PAUSE_MINUTES);
@@ -207,7 +236,7 @@ export default function ClientSettingsPage() {
         setGoogleSheetsTabName(data.google_sheets_tab_name || "Sheet1");
         setLeadCaptureFields(data.lead_capture_fields || "Full Name\nPhone");
         setWelcomeSequenceEnabled(Boolean(data.welcome_sequence_enabled));
-        setWelcomeMessage(data.welcome_message || "");
+        setWelcomeMessages(parseWelcomeMessages(data.welcome_message || ""));
         setWelcomeLinkUrl(data.welcome_link_url || "");
         setWelcomeImageUrls(data.welcome_image_urls || "");
         setManualAiPauseMinutes(normalizeManualAiPauseMinutes(data.manual_ai_pause_minutes));
@@ -320,7 +349,7 @@ export default function ClientSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           welcome_sequence_enabled: welcomeSequenceEnabled,
-          welcome_message: welcomeMessage,
+          welcome_message: serializeWelcomeMessages(welcomeMessages),
           welcome_link_url: welcomeLinkUrl,
           welcome_image_urls: welcomeImageUrls,
         }),
@@ -512,6 +541,14 @@ export default function ClientSettingsPage() {
 
     setLeadCaptureFields([...leadFields, nextField].join("\n"));
     setNewLeadField("");
+  };
+
+  const updateWelcomeMessage = (index: number, value: string) => {
+    setWelcomeMessages((currentMessages) =>
+      currentMessages.map((message, messageIndex) =>
+        messageIndex === index ? value : message
+      )
+    );
   };
 
   return (
@@ -768,7 +805,7 @@ export default function ClientSettingsPage() {
                 <SettingsSection
                   eyebrow="First reply"
                   title="Welcome Sequence"
-                  description="Send one prepared response after a customer first replies in Messenger."
+                  description="Send up to five prepared responses after a customer first replies in Messenger."
                   actions={
                     <button
                       type="button"
@@ -789,18 +826,31 @@ export default function ClientSettingsPage() {
                     </button>
                   }
                 >
-                  <label className={labelClass} htmlFor="welcome-message">
-                    Message
-                  </label>
-                  <textarea
-                    id="welcome-message"
-                    value={welcomeMessage}
-                    onChange={(event) => setWelcomeMessage(event.target.value)}
-                    rows={5}
-                    maxLength={1200}
-                    placeholder="Welcome! Here are the details you requested..."
-                    className={`${inputClass} mt-2 resize-y`}
-                  />
+                  <div className="space-y-4">
+                    {welcomeMessages.map((message, index) => (
+                      <div key={`welcome-message-${index}`}>
+                        <label className={labelClass} htmlFor={`welcome-message-${index}`}>
+                          Message {index + 1}
+                        </label>
+                        <textarea
+                          id={`welcome-message-${index}`}
+                          value={message}
+                          onChange={(event) => updateWelcomeMessage(index, event.target.value)}
+                          rows={index === 0 ? 4 : 3}
+                          maxLength={MAX_WELCOME_MESSAGE_LENGTH}
+                          placeholder={
+                            index === 0
+                              ? "Welcome! Here are the details you requested..."
+                              : "Optional follow-up message..."
+                          }
+                          className={`${inputClass} mt-2 resize-y`}
+                        />
+                        <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+                          {message.length} / {MAX_WELCOME_MESSAGE_LENGTH} characters
+                        </p>
+                      </div>
+                    ))}
+                  </div>
 
                   <label className={`${labelClass} mt-4`} htmlFor="welcome-link-url">
                     Link URL
