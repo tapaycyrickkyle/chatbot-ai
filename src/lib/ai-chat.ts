@@ -5,6 +5,7 @@ import {
   getMissingInfoReply,
   type CustomerLanguageStyle,
 } from "@/lib/language-style";
+import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
 
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
   "Thanks for your message. Our team will check this and get back to you shortly.";
@@ -73,7 +74,7 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 120;
 const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
-const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = 6000;
+const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = MAX_BUSINESS_INFO_LENGTH;
 const DEFAULT_REPLY_SENTENCE_LIMIT = 2;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
@@ -314,8 +315,8 @@ function getMaxOutputTokens() {
 function getMaxBusinessContextChars() {
   const configuredValue = Number(process.env.AI_MAX_BUSINESS_CONTEXT_CHARS);
 
-  if (Number.isFinite(configuredValue) && configuredValue >= 1000 && configuredValue <= 20000) {
-    return Math.floor(configuredValue);
+  if (Number.isFinite(configuredValue) && configuredValue >= 1000) {
+    return Math.min(Math.floor(configuredValue), MAX_BUSINESS_INFO_LENGTH);
   }
 
   return DEFAULT_MAX_BUSINESS_CONTEXT_CHARS;

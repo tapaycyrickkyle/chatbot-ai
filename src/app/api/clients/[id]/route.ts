@@ -105,7 +105,7 @@ function validateClientSettingsPayload(payload: unknown) {
     }
 
     if (business_info.length > MAX_BUSINESS_INFO_LENGTH) {
-      throw new Error("Business information is too long");
+      throw new Error(`Business information must be ${MAX_BUSINESS_INFO_LENGTH} characters or fewer`);
     }
 
     updates.business_info = business_info.trim();

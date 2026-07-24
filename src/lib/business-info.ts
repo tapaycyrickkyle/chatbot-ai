@@ -1,4 +1,4 @@
-export const MAX_BUSINESS_INFO_LENGTH = 4000;
+export const MAX_BUSINESS_INFO_LENGTH = 5000;
 export const MAX_AI_CHARACTER_LENGTH = 600;
 export const MAX_AI_TONE_LENGTH = 600;
 
