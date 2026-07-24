@@ -340,32 +340,6 @@ type LeadPromptReason =
   | "reservation"
   | "generic";
 
-function wasLeadFormatRecentlyRequested(
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
-  leadCaptureMessages = ""
-) {
-  const lastReply = conversation?.last_ai_reply?.toLowerCase() ?? "";
-  const recentAssistantReplies =
-    conversation?.recent_messages
-      ?.filter((message) => message.role === "assistant")
-      .map((message) => message.content.toLowerCase())
-      .join(" ") ?? "";
-  const recentText = `${lastReply} ${recentAssistantReplies}`;
-  const customLeadMessages = getLeadCaptureMessageTemplates(leadCaptureMessages);
-  const recentlyRequestedByCustomMessage = customLeadMessages.some((message) => {
-    const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
-    const meaningfulPrefix = normalizedMessage.slice(0, 80);
-
-    return meaningfulPrefix.length >= 12 && recentText.includes(meaningfulPrefix);
-  });
-
-  return (
-    recentlyRequestedByCustomMessage ||
-    (recentText.includes("full name:") &&
-      (recentText.includes("phone:") || recentText.includes("contact number:")))
-  );
-}
-
 function getFallbackLeadIntent(message: string): LeadCaptureIntent {
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -477,11 +451,11 @@ function shouldAskForLeadFormat(
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
   leadCaptureMessages = ""
 ) {
-  if (wasLeadFormatRecentlyRequested(conversation, leadCaptureMessages)) {
-    return false;
-  }
+  void intent;
+  void conversation;
+  void leadCaptureMessages;
 
-  return intent === "READY_TO_BUY_OR_BOOK" || intent === "WANTS_HUMAN_CONTACT";
+  return false;
 }
 
 function getLeadPromptReason(intent: LeadCaptureIntent, message: string): LeadPromptReason {

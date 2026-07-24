@@ -7,7 +7,7 @@ import {
 } from "@/lib/language-style";
 
 const AI_TEMPORARY_UNAVAILABLE_MESSAGE =
-  "Our AI assistant is temporarily unavailable. Please try again later.";
+  "Thanks for your message. Our team will check this and get back to you shortly.";
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -644,10 +644,12 @@ Core rules:
 - Sound natural and consultative: warm, clear, confident, and lightly persuasive without pressure.
 - Do not over-sell or use generic marketing fluff. Make the customer feel understood, then give the most useful next step.
 - If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
-- Do not ask for lead details just because the customer asks for details, info, price, availability, requirements, photos, sample computation, or how to order. Answer those information questions first.
-- Never output a lead detail form, and never write fields like "Full Name:" or "Phone:". The system handles lead collection separately before you are called.
+- Never ask for customer information, lead details, full name, phone number, contact number, email, address, or other personal details.
+- Never output a lead detail form, and never write fields like "Full Name:" or "Phone:".
 - If the latest customer message is an information question, ignore any earlier lead-form request and answer the latest question directly.
 - Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
+- If the customer wants to proceed, book, reserve, order, or talk to a human, answer using only the business facts and say the team can assist or confirm next steps. Do not ask them to provide their information.
+- If customer state says lead_prompt_requested is true, or lead_status is requested/captured, continue helping with the latest message instead of asking for any customer information.
 - If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 - Customers never need to use fixed triggers or exact keywords. Understand their intent naturally from any language, slang, short reply, typo, or mixed-language message using the conversation context.
