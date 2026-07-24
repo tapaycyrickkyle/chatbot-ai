@@ -21,6 +21,7 @@ If you prefer running files individually, run them in this order:
 11. `14-timed-ai-pause.sql`
 12. `15-auto-reply-ignore-pattern.sql`
 13. `16-remove-owner-portal-tables.sql`
+14. `20-lead-capture-messages.sql`
 
 ## Tables Used
 

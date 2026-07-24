@@ -12,9 +12,7 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
-  google_sheets_webhook_url: string;
-  google_sheets_tab_name: string;
-  lead_capture_fields: string;
+  lead_capture_messages: string;
   welcome_sequence_enabled: boolean;
   welcome_message: string;
   welcome_link_url: string;
@@ -24,8 +22,12 @@ type ClientSettings = {
 };
 
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
+const MAX_LEAD_CAPTURE_MESSAGES = 2;
+const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
+const MAX_AUTO_REPLY_IGNORE_PATTERNS = 10;
+const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
 const MANUAL_AI_PAUSE_OPTIONS = [
   { label: "5 minutes", value: 5 },
   { label: "15 minutes", value: 15 },
@@ -42,20 +44,6 @@ function normalizeManualAiPauseMinutes(value: number | null | undefined) {
     MANUAL_AI_PAUSE_OPTIONS.some((option) => option.value === value)
     ? value
     : DEFAULT_MANUAL_AI_PAUSE_MINUTES;
-}
-
-function getLeadFieldList(value: string) {
-  const fields = value
-    .split(/\r?\n|,/)
-    .map((field) => field.trim())
-    .filter(Boolean);
-  const uniqueFields = Array.from(new Set(fields));
-
-  return [
-    "Full Name",
-    "Phone",
-    ...uniqueFields.filter((field) => !["Full Name", "Phone"].includes(field)),
-  ];
 }
 
 function createEmptyWelcomeMessages() {
@@ -85,54 +73,49 @@ function serializeWelcomeMessages(messages: string[]) {
     .join("\n\n");
 }
 
-function buildAppsScript(leadFields: string[], defaultSheetName: string) {
-  return `const COLUMNS = ${JSON.stringify(leadFields, null, 2)};
-const DEFAULT_SHEET_NAME = ${JSON.stringify(defaultSheetName || "Sheet1")};
+function parseAutoReplyIgnorePatterns(value: string) {
+  const patterns = value
+    .split(/\r?\n/)
+    .map((pattern) => pattern.trim())
+    .filter(Boolean)
+    .slice(0, MAX_AUTO_REPLY_IGNORE_PATTERNS);
 
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const sheet = getLeadSheet(data.sheetName || DEFAULT_SHEET_NAME);
-  appendLeadRow(sheet, data.fields || {});
-
-  return jsonResponse({ success: true });
+  return patterns.length > 0 ? patterns : [""];
 }
 
-function getLeadSheet(sheetName) {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const normalizedSheetName = String(sheetName || DEFAULT_SHEET_NAME).trim() || DEFAULT_SHEET_NAME;
-
-  return spreadsheet.getSheetByName(normalizedSheetName) || spreadsheet.insertSheet(normalizedSheetName);
+function serializeAutoReplyIgnorePatterns(patterns: string[]) {
+  return patterns
+    .map((pattern) => pattern.trim())
+    .filter(Boolean)
+    .slice(0, MAX_AUTO_REPLY_IGNORE_PATTERNS)
+    .join("\n");
 }
 
-function appendLeadRow(sheet, fields) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(COLUMNS);
-  }
+function createEmptyLeadCaptureMessages() {
+  return Array.from({ length: MAX_LEAD_CAPTURE_MESSAGES }, () => "");
+}
 
-  const row = COLUMNS.map(function(column) {
-    return formatSheetValue(column, fields[column] || "");
+function parseLeadCaptureMessages(value: string) {
+  const messages = value
+    .split(/\n\s*\n/)
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LEAD_CAPTURE_MESSAGES);
+  const paddedMessages = createEmptyLeadCaptureMessages();
+
+  messages.forEach((message, index) => {
+    paddedMessages[index] = message;
   });
 
-  sheet.appendRow(row);
+  return paddedMessages;
 }
 
-function formatSheetValue(column, value) {
-  if (!value) {
-    return "";
-  }
-
-  if (/phone|mobile|contact/i.test(column)) {
-    return "'" + String(value);
-  }
-
-  return value;
-}
-
-function jsonResponse(payload) {
-  return ContentService
-    .createTextOutput(JSON.stringify(payload))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
+function serializeLeadCaptureMessages(messages: string[]) {
+  return messages
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LEAD_CAPTURE_MESSAGES)
+    .join("\n\n");
 }
 
 const panelClass =
@@ -185,30 +168,24 @@ export default function ClientSettingsPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [pageId, setPageId] = useState("");
-  const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
-  const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
-  const [leadCaptureFields, setLeadCaptureFields] = useState("Full Name\nPhone");
+  const [leadCaptureMessages, setLeadCaptureMessages] = useState(createEmptyLeadCaptureMessages);
   const [welcomeSequenceEnabled, setWelcomeSequenceEnabled] = useState(false);
   const [welcomeMessages, setWelcomeMessages] = useState(createEmptyWelcomeMessages);
   const [welcomeLinkUrl, setWelcomeLinkUrl] = useState("");
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
   const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(DEFAULT_MANUAL_AI_PAUSE_MINUTES);
-  const [autoReplyIgnorePattern, setAutoReplyIgnorePattern] = useState("");
-  const [newLeadField, setNewLeadField] = useState("");
+  const [autoReplyIgnorePatterns, setAutoReplyIgnorePatterns] = useState<string[]>([""]);
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [repairingMessengerWebhook, setRepairingMessengerWebhook] = useState(false);
-  const [savingSheetsUrl, setSavingSheetsUrl] = useState(false);
+  const [savingLeadCapture, setSavingLeadCapture] = useState(false);
   const [savingWelcomeSequence, setSavingWelcomeSequence] = useState(false);
   const [savingAutoReplyIgnorePattern, setSavingAutoReplyIgnorePattern] = useState(false);
   const [uploadingWelcomeImage, setUploadingWelcomeImage] = useState(false);
-  const leadFields = getLeadFieldList(leadCaptureFields);
   const welcomeAttachmentIds = welcomeImageUrls
     .split(/\r?\n/)
     .map((value) => value.trim())
     .filter(Boolean);
-  const sheetColumns = leadFields;
-  const generatedAppsScript = buildAppsScript(leadFields, googleSheetsTabName.trim() || "Sheet1");
 
   useEffect(() => {
     if (!clientId) {
@@ -232,15 +209,13 @@ export default function ClientSettingsPage() {
 
         setClientName(data.client_name || "");
         setPageId(data.page_id || "");
-        setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
-        setGoogleSheetsTabName(data.google_sheets_tab_name || "Sheet1");
-        setLeadCaptureFields(data.lead_capture_fields || "Full Name\nPhone");
+        setLeadCaptureMessages(parseLeadCaptureMessages(data.lead_capture_messages || ""));
         setWelcomeSequenceEnabled(Boolean(data.welcome_sequence_enabled));
         setWelcomeMessages(parseWelcomeMessages(data.welcome_message || ""));
         setWelcomeLinkUrl(data.welcome_link_url || "");
         setWelcomeImageUrls(data.welcome_image_urls || "");
         setManualAiPauseMinutes(normalizeManualAiPauseMinutes(data.manual_ai_pause_minutes));
-        setAutoReplyIgnorePattern(data.auto_reply_ignore_pattern || "");
+        setAutoReplyIgnorePatterns(parseAutoReplyIgnorePatterns(data.auto_reply_ignore_pattern || ""));
       } catch (error) {
         console.error(error);
         showToast({
@@ -300,31 +275,29 @@ export default function ClientSettingsPage() {
     }
   };
 
-  const saveGoogleSheetsWebhookUrl = async () => {
+  const saveLeadCaptureMessages = async () => {
     if (!clientId) {
       return;
     }
 
-    setSavingSheetsUrl(true);
+    setSavingLeadCapture(true);
 
     try {
       const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          google_sheets_webhook_url: googleSheetsWebhookUrl,
-          google_sheets_tab_name: googleSheetsTabName,
-          lead_capture_fields: leadCaptureFields,
+          lead_capture_messages: serializeLeadCaptureMessages(leadCaptureMessages),
         }),
       });
 
       const data = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to save Google Sheets URL");
+        throw new Error(data?.error || "Failed to save lead capture messages");
       }
 
-      showToast({ tone: "success", message: "Lead capture settings saved." });
+      showToast({ tone: "success", message: "Lead capture messages saved." });
     } catch (error) {
       console.error(error);
       showToast({
@@ -332,7 +305,7 @@ export default function ClientSettingsPage() {
         message: error instanceof Error ? error.message : "Failed to save lead capture settings.",
       });
     } finally {
-      setSavingSheetsUrl(false);
+      setSavingLeadCapture(false);
     }
   };
 
@@ -419,7 +392,7 @@ export default function ClientSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           manual_ai_pause_minutes: manualAiPauseMinutes,
-          auto_reply_ignore_pattern: autoReplyIgnorePattern,
+          auto_reply_ignore_pattern: serializeAutoReplyIgnorePatterns(autoReplyIgnorePatterns),
         }),
       });
       const data = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -482,65 +455,12 @@ export default function ClientSettingsPage() {
     }
   };
 
-  const copyAppsScript = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedAppsScript);
-      showToast({ tone: "success", message: "Apps Script copied." });
-    } catch (error) {
-      console.error(error);
-      showToast({ tone: "error", message: "Unable to copy Apps Script." });
-    }
-  };
-
-  const copySheetColumns = async () => {
-    try {
-      await navigator.clipboard.writeText(sheetColumns.join("\t"));
-      showToast({ tone: "success", message: "Sheet columns copied." });
-    } catch (error) {
-      console.error(error);
-      showToast({ tone: "error", message: "Unable to copy Sheet columns." });
-    }
-  };
-
-  const updateLeadField = (index: number, value: string) => {
-    const nextFields = [...leadFields];
-    nextFields[index] = value;
-    setLeadCaptureFields(nextFields.join("\n"));
-  };
-
-  const removeLeadField = (index: number) => {
-    const field = leadFields[index];
-
-    if (field === "Full Name" || field === "Phone") {
-      showToast({
-        tone: "error",
-        message: "Full Name and Phone are required fields.",
-      });
-      return;
-    }
-
-    const nextFields = leadFields.filter((_, fieldIndex) => fieldIndex !== index);
-    setLeadCaptureFields(nextFields.join("\n"));
-  };
-
-  const addLeadField = () => {
-    const nextField = newLeadField.trim();
-
-    if (!nextField) {
-      return;
-    }
-
-    if (
-      leadFields.some(
-        (field) => field.toLowerCase() === nextField.toLowerCase()
+  const updateLeadCaptureMessage = (index: number, value: string) => {
+    setLeadCaptureMessages((currentMessages) =>
+      currentMessages.map((message, messageIndex) =>
+        messageIndex === index ? value : message
       )
-    ) {
-      showToast({ tone: "error", message: "That lead field already exists." });
-      return;
-    }
-
-    setLeadCaptureFields([...leadFields, nextField].join("\n"));
-    setNewLeadField("");
+    );
   };
 
   const updateWelcomeMessage = (index: number, value: string) => {
@@ -549,6 +469,30 @@ export default function ClientSettingsPage() {
         messageIndex === index ? value : message
       )
     );
+  };
+
+  const updateAutoReplyIgnorePattern = (index: number, value: string) => {
+    setAutoReplyIgnorePatterns((currentPatterns) =>
+      currentPatterns.map((pattern, patternIndex) =>
+        patternIndex === index ? value : pattern
+      )
+    );
+  };
+
+  const addAutoReplyIgnorePattern = () => {
+    setAutoReplyIgnorePatterns((currentPatterns) =>
+      currentPatterns.length >= MAX_AUTO_REPLY_IGNORE_PATTERNS
+        ? currentPatterns
+        : [...currentPatterns, ""]
+    );
+  };
+
+  const removeAutoReplyIgnorePattern = (index: number) => {
+    setAutoReplyIgnorePatterns((currentPatterns) => {
+      const nextPatterns = currentPatterns.filter((_, patternIndex) => patternIndex !== index);
+
+      return nextPatterns.length > 0 ? nextPatterns : [""];
+    });
   };
 
   return (
@@ -590,7 +534,10 @@ export default function ClientSettingsPage() {
                 ["Page", clientName || "Unknown page"],
                 ["Page ID", pageId || "Not available"],
                 ["AI Pause", `${manualAiPauseMinutes} min default`],
-                ["Lead Fields", `${leadFields.length} fields`],
+                [
+                  "Lead Prompt",
+                  `${leadCaptureMessages.filter((message) => message.trim()).length} / ${MAX_LEAD_CAPTURE_MESSAGES} messages`,
+                ],
               ].map(([label, value]) => (
                 <div key={label} className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
@@ -640,21 +587,52 @@ export default function ClientSettingsPage() {
                       </p>
                     </div>
                     <div>
-                      <label className={labelClass} htmlFor="auto-reply-ignore-pattern">
-                        Auto-reply message to ignore
-                      </label>
-                      <input
-                        id="auto-reply-ignore-pattern"
-                        type="text"
-                        value={autoReplyIgnorePattern}
-                        onChange={(event) => setAutoReplyIgnorePattern(event.target.value)}
-                        maxLength={500}
-                        placeholder="Hello {name}, how can we assist you today?"
-                        className={`${inputClass} mt-2`}
-                      />
-                      <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                        Use {"{name}"} for customer-specific greetings.
-                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <label className={labelClass} htmlFor="auto-reply-ignore-pattern-0">
+                            Auto-reply messages to ignore
+                          </label>
+                          <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                            Use {"{name}"} for customer-specific greetings.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addAutoReplyIgnorePattern}
+                          disabled={autoReplyIgnorePatterns.length >= MAX_AUTO_REPLY_IGNORE_PATTERNS}
+                          className={`${secondaryButtonClass} w-full sm:w-auto`}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {autoReplyIgnorePatterns.map((pattern, index) => (
+                          <div key={`auto-reply-ignore-pattern-${index}`} className="flex min-w-0 gap-2">
+                            <input
+                              id={`auto-reply-ignore-pattern-${index}`}
+                              type="text"
+                              value={pattern}
+                              onChange={(event) =>
+                                updateAutoReplyIgnorePattern(index, event.target.value)
+                              }
+                              maxLength={MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH}
+                              placeholder={
+                                index === 0
+                                  ? "Hello {name}, how can we assist you today?"
+                                  : "Call now to get faster service."
+                              }
+                              className={`${inputClass} min-w-0 flex-1`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeAutoReplyIgnorePattern(index)}
+                              className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="mt-5 flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-between">
@@ -679,123 +657,48 @@ export default function ClientSettingsPage() {
 
                 <SettingsSection
                   eyebrow="Lead capture"
-                  title="Google Sheets"
-                  description="Choose where captured leads go and which fields the AI must collect before sending them."
+                  title="Lead Prompt"
+                  description="Send these messages when the AI decides it is the right time to ask for customer information."
                 >
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-                    <div>
-                      <label className={labelClass} htmlFor="google-sheets-webhook-url">
-                        Apps Script Web App URL
-                      </label>
-                      <input
-                        id="google-sheets-webhook-url"
-                        type="url"
-                        value={googleSheetsWebhookUrl}
-                        onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)}
-                        placeholder="https://script.google.com/macros/s/.../exec"
-                        className={`${inputClass} mt-2`}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass} htmlFor="google-sheets-tab-name">
-                        Sheet tab
-                      </label>
-                      <input
-                        id="google-sheets-tab-name"
-                        type="text"
-                        value={googleSheetsTabName}
-                        onChange={(event) => setGoogleSheetsTabName(event.target.value)}
-                        placeholder="Sheet1"
-                        className={`${inputClass} mt-2`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <label className={labelClass} htmlFor="new-lead-field">
-                          Lead fields
-                        </label>
-                        <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
-                          Full Name and Phone are required.
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 min-[480px]:flex-row">
-                        <input
-                          id="new-lead-field"
-                          type="text"
-                          value={newLeadField}
-                          onChange={(event) => setNewLeadField(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              addLeadField();
-                            }
-                          }}
-                          placeholder="Email, Budget..."
-                          className={`${inputClass} min-w-0 min-[480px]:w-[220px]`}
-                        />
-                        <button type="button" onClick={addLeadField} className={secondaryButtonClass}>
-                          Add Field
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {leadFields.map((field, index) => {
-                        const isRequiredField = field === "Full Name" || field === "Phone";
-
-                        return (
-                          <div key={`${field}-${index}`} className="flex min-w-0 gap-2">
-                            <input
-                              type="text"
-                              value={field}
-                              onChange={(event) => updateLeadField(index, event.target.value)}
-                              disabled={isRequiredField}
-                              className={`${inputClass} min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-80`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeLeadField(index)}
-                              disabled={isRequiredField}
-                              className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <details className="mt-5 border-t border-[var(--border)] pt-4">
-                    <summary className="cursor-pointer text-[13px] font-semibold text-[var(--text-primary)]">
-                      Generated Google Apps Script
-                    </summary>
-                    <div className="mt-3 flex flex-col gap-2 min-[420px]:flex-row">
-                      <button type="button" onClick={() => void copySheetColumns()} className={secondaryButtonClass}>
-                        Copy Columns
-                      </button>
-                      <button type="button" onClick={() => void copyAppsScript()} className={primaryButtonClass}>
-                        Copy Script
-                      </button>
-                    </div>
-                    <p className="mt-3 break-words text-[12px] leading-6 text-[var(--text-muted)]">
-                      Columns: {sheetColumns.join(" | ")}
+                  <div>
+                    <label className={labelClass} htmlFor="lead-capture-message-0">
+                      Messages
+                    </label>
+                    <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                      Empty messages are skipped. If both are blank, the system uses its default prompt.
                     </p>
-                    <pre className="mt-3 max-h-[320px] overflow-auto rounded-md border border-[var(--border)] bg-background px-3 py-3 text-[12px] leading-5 text-[var(--text-primary)] scrollbar-modern">
-                      <code>{generatedAppsScript}</code>
-                    </pre>
-                  </details>
+                    <div className="mt-3 space-y-4">
+                      {leadCaptureMessages.map((message, index) => (
+                        <div key={`lead-capture-message-${index}`}>
+                          <textarea
+                            id={`lead-capture-message-${index}`}
+                            value={message}
+                            onChange={(event) => updateLeadCaptureMessage(index, event.target.value)}
+                            rows={index === 0 ? 4 : 3}
+                            maxLength={MAX_LEAD_CAPTURE_MESSAGE_LENGTH}
+                            placeholder={
+                              index === 0
+                                ? "Sure. Please send your full name and phone number so our team can assist you."
+                                : "You can send it in one message, for example: Juan Dela Cruz, 09171234567."
+                            }
+                            className={`${inputClass} resize-y`}
+                          />
+                          <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+                            Message {index + 1}: {message.length} / {MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-4">
                     <button
                       type="button"
-                      onClick={() => void saveGoogleSheetsWebhookUrl()}
-                      disabled={savingSheetsUrl || loading}
+                      onClick={() => void saveLeadCaptureMessages()}
+                      disabled={savingLeadCapture || loading}
                       className={`${primaryButtonClass} w-full sm:w-auto`}
                     >
-                      {savingSheetsUrl ? "Saving..." : "Save Lead Settings"}
+                      {savingLeadCapture ? "Saving..." : "Save Lead Messages"}
                     </button>
                   </div>
                 </SettingsSection>
@@ -950,7 +853,7 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || repairingMessengerWebhook || savingSheetsUrl || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
+        isOpen={cleaningStorage || repairingMessengerWebhook || savingLeadCapture || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
         message={
           repairingMessengerWebhook
             ? "Repairing Messenger webhook..."
@@ -960,8 +863,8 @@ export default function ClientSettingsPage() {
             ? "Saving first reply sequence..."
             : savingAutoReplyIgnorePattern
             ? "Saving AI conversation controls..."
-            : savingSheetsUrl
-              ? "Saving Google Sheets URL..."
+            : savingLeadCapture
+              ? "Saving lead messages..."
               : "Cleaning old data..."
         }
       />

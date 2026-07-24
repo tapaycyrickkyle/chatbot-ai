@@ -68,49 +68,23 @@ Run `supabase/18-ai-retention-cleanup.sql` and `supabase/19-ai-job-cancel-and-au
 
 GitHub Actions calls `/api/maintenance/storage-cleanup` once daily using `AI_MAINTENANCE_URL` and `AI_WORKER_SECRET`, so retention cleanup runs automatically after deployment.
 
-## Google Sheets Lead Capture
+## Lead Prompt Messages
 
-The Messenger webhook can send captured leads to a free Google Apps Script Web App. Each connected Facebook Page can have its own URL in:
+The Messenger webhook can ask for customer information when the AI detects that the customer is ready to buy, book, or speak with a human.
 
-```text
-Dashboard -> Page Settings -> Lead Google Sheet
-```
-
-Each Page can also define dynamic lead fields in that same settings area, one field per line.
-
-As an optional fallback for pages without their own saved URL, set this environment variable in Vercel:
-
-```env
-GOOGLE_SHEETS_WEBHOOK_URL="https://script.google.com/macros/s/your-deployment-id/exec"
-```
-
-When a customer message includes a full name and phone number, the app posts:
-
-```json
-{
-  "fullName": "Juan Dela Cruz",
-  "phone": "09171234567",
-  "pageId": "123456789",
-  "pageName": "Business Page",
-  "recipientId": "messenger-user-id",
-  "message": "My name is Juan Dela Cruz, phone is 09171234567",
-  "capturedAt": "2026-07-20T00:00:00.000Z",
-  "fields": {
-    "Full Name": "Juan Dela Cruz",
-    "Phone": "09171234567",
-    "Email": "juan@example.com",
-    "Budget": "20000"
-  }
-}
-```
-
-Recommended base Google Sheet columns:
+Each connected Facebook Page can configure up to two customer-facing lead prompt messages in:
 
 ```text
-Captured At | Page Name | Page ID | Messenger User ID | Full Name | Phone | Message
+Dashboard -> Page Settings -> Lead Prompt
 ```
 
-Your Apps Script can append any extra dynamic fields after those base columns.
+Run this migration in Supabase to enable custom lead prompt messages:
+
+```text
+supabase/20-lead-capture-messages.sql
+```
+
+The app no longer forwards captured customer information to Google Sheets. Customer-provided details remain part of the Messenger conversation history used to operate the AI workflow.
 
 ## Getting Started
 

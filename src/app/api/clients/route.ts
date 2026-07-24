@@ -100,9 +100,6 @@ export async function GET(req: NextRequest) {
       picture_url: client.picture_url,
       bot_type: client.bot_type,
       ai_enabled: client.ai_enabled,
-      google_sheets_webhook_url: client.google_sheets_webhook_url,
-      google_sheets_tab_name: client.google_sheets_tab_name,
-      lead_capture_fields: client.lead_capture_fields,
     }));
 
     return NextResponse.json(safeClients);

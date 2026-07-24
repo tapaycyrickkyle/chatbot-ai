@@ -28,7 +28,7 @@ const sections = [
     content: [
       "You are responsible for making sure you have authority to connect and manage any Facebook Page used with the service.",
       "If you ask the service operator to connect or manage a Facebook Page for you, you confirm that you own, administer, or are authorized by the Page owner to grant that access.",
-      "You are responsible for getting any customer notices, permissions, or consents required for your business use of Messenger automation and lead capture.",
+      "You are responsible for getting any customer notices, permissions, or consents required for your business use of Messenger automation and customer information requests.",
       "You agree not to use the service for unlawful, misleading, abusive, or harmful activity.",
       "You are responsible for the content, instructions, and responses configured for your chatbot.",
     ],
@@ -44,7 +44,7 @@ const sections = [
     title: "Data and Privacy",
     content: [
       "Your use of the service is also subject to our Privacy Policy and Data Deletion Instructions pages.",
-      "If lead capture or Google Sheets forwarding is enabled, you are responsible for using captured lead information only for legitimate follow-up related to the customer's request.",
+      "If customers provide contact details or other information through Messenger, you are responsible for using that information only for legitimate follow-up related to the customer's request.",
       "You are responsible for using the service in a way that complies with applicable privacy, data protection, and platform requirements, including Meta platform requirements.",
     ],
   },

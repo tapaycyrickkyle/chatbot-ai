@@ -19,6 +19,7 @@ create table if not exists public.clients (
   google_sheets_tab_name text not null default 'Sheet1',
   lead_capture_fields text not null default 'Full Name
 Phone',
+  lead_capture_messages text not null default '',
   welcome_sequence_enabled boolean not null default false,
   welcome_message text not null default '',
   welcome_link_url text not null default '',
@@ -42,6 +43,7 @@ alter table public.clients
   add column if not exists google_sheets_tab_name text not null default 'Sheet1',
   add column if not exists lead_capture_fields text not null default 'Full Name
 Phone',
+  add column if not exists lead_capture_messages text not null default '',
   add column if not exists welcome_sequence_enabled boolean not null default false,
   add column if not exists welcome_message text not null default '',
   add column if not exists welcome_link_url text not null default '',
@@ -63,6 +65,7 @@ set
   google_sheets_tab_name = coalesce(nullif(google_sheets_tab_name, ''), 'Sheet1'),
   lead_capture_fields = coalesce(nullif(lead_capture_fields, ''), 'Full Name
 Phone'),
+  lead_capture_messages = coalesce(lead_capture_messages, ''),
   welcome_sequence_enabled = coalesce(welcome_sequence_enabled, false),
   welcome_message = coalesce(welcome_message, ''),
   welcome_link_url = coalesce(welcome_link_url, ''),
@@ -84,6 +87,7 @@ alter table public.clients
   alter column google_sheets_tab_name set default 'Sheet1',
   alter column lead_capture_fields set default 'Full Name
 Phone',
+  alter column lead_capture_messages set default '',
   alter column bot_type set not null,
   alter column business_info set not null,
   alter column ai_enabled set not null,
@@ -92,6 +96,7 @@ Phone',
   alter column google_sheets_webhook_url set not null,
   alter column google_sheets_tab_name set not null,
   alter column lead_capture_fields set not null,
+  alter column lead_capture_messages set not null,
   alter column welcome_sequence_enabled set default false,
   alter column welcome_message set default '',
   alter column welcome_link_url set default '',

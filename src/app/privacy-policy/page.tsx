@@ -14,14 +14,14 @@ const sections = [
     content: [
       "To operate the chatbot service, we may store Facebook Page IDs, Page Access Tokens, and conversation data exchanged with the chatbot.",
       "Conversation data can include message content, timestamps, and other basic metadata needed to respond to users and support the service.",
-      "If lead capture is enabled for a connected Page, we may collect lead details that the customer voluntarily provides in Messenger, such as name, phone number, email address, preferred service, preferred date, or other fields configured for that Page.",
+      "Conversation messages may include details that a customer voluntarily provides in Messenger, such as name, phone number, email address, preferred service, preferred date, or other information related to the inquiry.",
     ],
   },
   {
     title: "How We Use Information",
     content: [
       "We use this information solely to connect the chatbot to your Facebook Page, send and receive messages, maintain chatbot functionality, and support service operations.",
-      "Lead details are used only to help the connected business follow up on the customer's request or inquiry.",
+      "Customer-provided details are used only to help the connected business follow up on the customer's request or inquiry.",
       "We do not use this information for unrelated marketing, profiling, or any purpose outside operating the chatbot service.",
     ],
   },
@@ -30,7 +30,6 @@ const sections = [
     content: [
       "We do not sell or rent your data to third parties.",
       "We may process information through Meta and trusted service providers, such as hosting and database providers, only as needed to operate, maintain, and secure the chatbot service.",
-      "If a connected Page enables Google Sheets lead capture, lead details may be sent to a Google Apps Script Web App or Google Sheet controlled by the service operator or connected business for follow-up and recordkeeping.",
     ],
   },
   {

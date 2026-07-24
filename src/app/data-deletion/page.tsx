@@ -14,7 +14,6 @@ const steps = [
   "Include the Facebook Page name or Page ID connected to the chatbot, plus any details that help identify the conversation or account you want removed.",
   "If needed, we may ask for additional information to verify the request before deleting data.",
   "Once verified, we will process the request by removing the connected Facebook Page data and related chatbot records from our system within 30 days, unless we must keep limited information for legal or security reasons.",
-  "If lead capture was forwarded to Google Sheets, we will also delete or ask the connected business or service operator to delete the matching lead records from the relevant Google Sheet when we control or can reasonably identify those records.",
 ];
 
 export default function DataDeletionPage() {

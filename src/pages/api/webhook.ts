@@ -19,14 +19,10 @@ import {
   inferCustomerState,
   updateConversationSummary,
 } from "@/lib/conversation-memory";
-import { sendLeadToGoogleSheet } from "@/lib/google-sheets";
 import {
   createLeadInformationPrompt,
-  extractFormattedLeadFromMessage,
-  extractLeadFromMessage,
   parseLeadFields,
 } from "@/lib/lead-capture";
-import { getLeadCapturedReply } from "@/lib/language-style";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const config = {
@@ -180,6 +176,19 @@ function matchesAutoReplyIgnorePattern(message: string, pattern = "") {
   return patternRegExp.test(normalizeEchoText(message));
 }
 
+function getAutoReplyIgnorePatterns(value = "") {
+  return value
+    .split(/\r?\n/)
+    .map((pattern) => pattern.trim())
+    .filter(Boolean);
+}
+
+function matchesAnyAutoReplyIgnorePattern(message: string, patterns = "") {
+  return getAutoReplyIgnorePatterns(patterns).some((pattern) =>
+    matchesAutoReplyIgnorePattern(message, pattern)
+  );
+}
+
 function isOwnAppEcho(
   event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
 ) {
@@ -323,57 +332,6 @@ async function safelyRecordWelcomeSequenceSent(input: {
   }
 }
 
-async function safelyCaptureLead(input: {
-  clientName: string;
-  pageId: string;
-  recipientId: string;
-  message: string;
-  googleSheetsWebhookUrl: string;
-  googleSheetsTabName: string;
-  leadFields: string[];
-}) {
-  const lead =
-    extractFormattedLeadFromMessage(input.message, input.leadFields) ??
-    extractLeadFromMessage(input.message, input.leadFields);
-
-  if (!lead) {
-    console.info("Google Sheets lead capture skipped: lead details not detected", {
-      pageId: input.pageId,
-      recipientId: input.recipientId,
-      requiredFields: input.leadFields,
-      preview: input.message.slice(0, 120),
-    });
-    return false;
-  }
-
-  try {
-    const sent = await sendLeadToGoogleSheet({
-      fullName: lead.fullName,
-      phone: lead.phone,
-      pageId: input.pageId,
-      pageName: input.clientName,
-      sheetName: input.googleSheetsTabName,
-      recipientId: input.recipientId,
-      message: input.message,
-      capturedAt: new Date().toISOString(),
-      fields: lead.fields,
-    }, { webhookUrl: input.googleSheetsWebhookUrl });
-
-    if (sent) {
-      console.info("Google Sheets lead captured", {
-        pageId: input.pageId,
-        recipientId: input.recipientId,
-        fields: Object.keys(lead.fields),
-      });
-      return true;
-    }
-  } catch (error) {
-    console.warn("Failed to send lead to Google Sheet", error);
-  }
-
-  return false;
-}
-
 type LeadPromptReason =
   | "order"
   | "booking"
@@ -383,7 +341,8 @@ type LeadPromptReason =
   | "generic";
 
 function wasLeadFormatRecentlyRequested(
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
+  leadCaptureMessages = ""
 ) {
   const lastReply = conversation?.last_ai_reply?.toLowerCase() ?? "";
   const recentAssistantReplies =
@@ -392,17 +351,19 @@ function wasLeadFormatRecentlyRequested(
       .map((message) => message.content.toLowerCase())
       .join(" ") ?? "";
   const recentText = `${lastReply} ${recentAssistantReplies}`;
+  const customLeadMessages = getLeadCaptureMessageTemplates(leadCaptureMessages);
+  const recentlyRequestedByCustomMessage = customLeadMessages.some((message) => {
+    const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
+    const meaningfulPrefix = normalizedMessage.slice(0, 80);
+
+    return meaningfulPrefix.length >= 12 && recentText.includes(meaningfulPrefix);
+  });
 
   return (
-    recentText.includes("full name:") &&
-    (recentText.includes("phone:") || recentText.includes("contact number:"))
+    recentlyRequestedByCustomMessage ||
+    (recentText.includes("full name:") &&
+      (recentText.includes("phone:") || recentText.includes("contact number:")))
   );
-}
-
-function wasLeadAlreadyCaptured(
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
-) {
-  return conversation?.customer_state?.lead_status === "captured";
 }
 
 function getFallbackLeadIntent(message: string): LeadCaptureIntent {
@@ -513,9 +474,10 @@ function shouldUseAiReplyPlanner(
 
 function shouldAskForLeadFormat(
   intent: LeadCaptureIntent,
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
+  leadCaptureMessages = ""
 ) {
-  if (wasLeadFormatRecentlyRequested(conversation)) {
+  if (wasLeadFormatRecentlyRequested(conversation, leadCaptureMessages)) {
     return false;
   }
 
@@ -548,15 +510,47 @@ function getLeadPromptReason(intent: LeadCaptureIntent, message: string): LeadPr
   return "generic";
 }
 
-function createLeadFormatReply(
+function getLeadCaptureMessageTemplates(value = "") {
+  return value
+    .split(/\n\s*\n/)
+    .map((message) => message.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+}
+
+function getLeadFieldPromptLines(leadFields: string[]) {
+  return leadFields.map((field) => `${field}:`).join("\n");
+}
+
+function formatLeadCaptureMessageTemplate(template: string, leadFields: string[]) {
+  const fieldLines = getLeadFieldPromptLines(leadFields);
+
+  return template
+    .replace(/\{fields\}/gi, fieldLines)
+    .replace(/\{field_list\}/gi, fieldLines)
+    .trim();
+}
+
+function createLeadFormatReplies(
   leadFields: string[],
   intent: LeadCaptureIntent,
-  customerMessage: string
+  customerMessage: string,
+  leadCaptureMessages = ""
 ) {
-  return createLeadInformationPrompt(leadFields, {
-    reason: getLeadPromptReason(intent, customerMessage),
-    customerMessage,
-  });
+  const customMessages = getLeadCaptureMessageTemplates(leadCaptureMessages).map((message) =>
+    formatLeadCaptureMessageTemplate(message, leadFields)
+  );
+
+  if (customMessages.length > 0) {
+    return customMessages;
+  }
+
+  return [
+    createLeadInformationPrompt(leadFields, {
+      reason: getLeadPromptReason(intent, customerMessage),
+      customerMessage,
+    }),
+  ];
 }
 
 function getWelcomeImageAttachmentIds(value: string) {
@@ -783,7 +777,7 @@ export default async function handler(
               continue;
             }
 
-            if (matchesAutoReplyIgnorePattern(echoText, client.auto_reply_ignore_pattern)) {
+            if (matchesAnyAutoReplyIgnorePattern(echoText, client.auto_reply_ignore_pattern)) {
               console.info("AI webhook ignored configured Page auto-reply echo", {
                 clientId: client.id,
                 pageId,
@@ -854,60 +848,6 @@ export default async function handler(
               recipientId: userId,
               message: rawText,
             });
-
-            const capturedLead = wasLeadAlreadyCaptured(existingConversation)
-              ? false
-              : await safelyCaptureLead({
-                  clientName: client.client_name,
-                  pageId,
-                  recipientId: userId,
-                  message: rawText,
-                  googleSheetsWebhookUrl: client.google_sheets_webhook_url,
-                  googleSheetsTabName: client.google_sheets_tab_name,
-                  leadFields,
-                });
-
-            if (capturedLead) {
-              const reply = getLeadCapturedReply(rawText);
-              const customerState = inferCustomerState(
-                existingConversation?.customer_state,
-                rawText,
-                true
-              );
-              const recentMessages = appendRecentConversationMessages(
-                existingConversation?.recent_messages,
-                rawText,
-                reply
-              );
-              const conversationSummary = updateConversationSummary(
-                existingConversation?.conversation_summary || "",
-                rawText,
-                reply
-              );
-
-              await safelyHandleFlowSend(
-                () =>
-                  safeSendHumanTextReply(
-                    userId,
-                    reply,
-                    pageAccessToken,
-                    pageId,
-                    client.id
-                  ).then(() => undefined),
-                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
-              );
-              await safelyRecordAiReply({
-                clientId: client.id,
-                pageId,
-                recipientId: userId,
-                reply,
-                conversationSummary,
-                customerState,
-                recentMessages,
-              });
-              continue;
-            }
-
           }
 
           if (!client.ai_enabled) {
@@ -1015,8 +955,14 @@ export default async function handler(
               });
             }
 
-            if (shouldAskForLeadFormat(leadIntent, existingConversation)) {
-              const reply = createLeadFormatReply(leadFields, leadIntent, rawText);
+            if (shouldAskForLeadFormat(leadIntent, existingConversation, client.lead_capture_messages)) {
+              const replies = createLeadFormatReplies(
+                leadFields,
+                leadIntent,
+                rawText,
+                client.lead_capture_messages
+              );
+              const reply = replies.join("\n\n");
               const customerState = inferCustomerState(
                 existingConversation?.customer_state,
                 rawText
@@ -1033,15 +979,18 @@ export default async function handler(
               );
 
               await safelyHandleFlowSend(
-                () =>
-                  safeSendMessage(
-                    userId,
-                    reply,
-                    pageAccessToken,
-                    0,
-                    pageId,
-                    client.id
-                  ).then(() => undefined),
+                async () => {
+                  for (const leadCaptureReply of replies) {
+                    await safeSendMessage(
+                      userId,
+                      leadCaptureReply,
+                      pageAccessToken,
+                      0,
+                      pageId,
+                      client.id
+                    );
+                  }
+                },
                 { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
               );
               await safelyRecordAiReply({

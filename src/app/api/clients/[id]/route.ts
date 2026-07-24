@@ -8,18 +8,24 @@ import {
 } from "@/lib/business-info";
 import { getClientById, updateClientSettings } from "@/lib/database";
 
-const MAX_LEAD_CAPTURE_FIELDS_LENGTH = 2000;
-const MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH = 100;
+const MAX_LEAD_CAPTURE_MESSAGES = 2;
+const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 1200;
+const MAX_LEAD_CAPTURE_MESSAGES_TOTAL_LENGTH =
+  MAX_LEAD_CAPTURE_MESSAGES * MAX_LEAD_CAPTURE_MESSAGE_LENGTH +
+  (MAX_LEAD_CAPTURE_MESSAGES - 1) * 2;
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_WELCOME_MESSAGES_TOTAL_LENGTH =
   MAX_WELCOME_MESSAGES * MAX_WELCOME_MESSAGE_LENGTH + (MAX_WELCOME_MESSAGES - 1) * 2;
 const MAX_WELCOME_LINK_URL_LENGTH = 2000;
 const MAX_WELCOME_ATTACHMENT_IDS_LENGTH = 2000;
+const MAX_AUTO_REPLY_IGNORE_PATTERNS = 10;
 const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
+const MAX_AUTO_REPLY_IGNORE_PATTERNS_TOTAL_LENGTH =
+  MAX_AUTO_REPLY_IGNORE_PATTERNS * MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH +
+  (MAX_AUTO_REPLY_IGNORE_PATTERNS - 1);
 const MANUAL_AI_PAUSE_MINUTE_OPTIONS = [5, 15, 30, 60, 120, 240, 480, 1440];
 const MAX_WELCOME_ATTACHMENTS = 11;
-const INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN = /[:\\/?*\[\]]/;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MESSENGER_WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes"];
 
@@ -62,9 +68,7 @@ function validateClientSettingsPayload(payload: unknown) {
     ai_enabled,
     ai_character,
     ai_tone,
-    google_sheets_webhook_url,
-    google_sheets_tab_name,
-    lead_capture_fields,
+    lead_capture_messages,
     welcome_sequence_enabled,
     welcome_message,
     welcome_link_url,
@@ -78,9 +82,7 @@ function validateClientSettingsPayload(payload: unknown) {
     ai_enabled: boolean;
     ai_character: string;
     ai_tone: string;
-    google_sheets_webhook_url: string;
-    google_sheets_tab_name: string;
-    lead_capture_fields: string;
+    lead_capture_messages: string;
     welcome_sequence_enabled: boolean;
     welcome_message: string;
     welcome_link_url: string;
@@ -141,58 +143,31 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.ai_tone = ai_tone.trim();
   }
 
-  if (google_sheets_webhook_url !== undefined) {
-    if (typeof google_sheets_webhook_url !== "string") {
-      throw new Error("Invalid Google Sheets webhook URL");
+  if (lead_capture_messages !== undefined) {
+    if (typeof lead_capture_messages !== "string") {
+      throw new Error("Invalid lead capture messages");
     }
 
-    const trimmedUrl = google_sheets_webhook_url.trim();
+    if (lead_capture_messages.length > MAX_LEAD_CAPTURE_MESSAGES_TOTAL_LENGTH) {
+      throw new Error("Lead capture messages are too long");
+    }
 
-    if (trimmedUrl) {
-      let parsedUrl: URL;
+    const leadCaptureMessages = lead_capture_messages
+      .split(/\n\s*\n/)
+      .map((message) => message.trim())
+      .filter(Boolean);
 
-      try {
-        parsedUrl = new URL(trimmedUrl);
-      } catch {
-        throw new Error("Invalid Google Sheets webhook URL");
+    if (leadCaptureMessages.length > MAX_LEAD_CAPTURE_MESSAGES) {
+      throw new Error(`Use ${MAX_LEAD_CAPTURE_MESSAGES} lead capture messages or fewer`);
+    }
+
+    for (const message of leadCaptureMessages) {
+      if (message.length > MAX_LEAD_CAPTURE_MESSAGE_LENGTH) {
+        throw new Error("Each lead capture message must be 1200 characters or fewer");
       }
-
-      if (parsedUrl.protocol !== "https:") {
-        throw new Error("Google Sheets webhook URL must use HTTPS");
-      }
     }
 
-    updates.google_sheets_webhook_url = trimmedUrl;
-  }
-
-  if (google_sheets_tab_name !== undefined) {
-    if (typeof google_sheets_tab_name !== "string") {
-      throw new Error("Invalid Google Sheets tab name");
-    }
-
-    const trimmedTabName = google_sheets_tab_name.trim() || "Sheet1";
-
-    if (trimmedTabName.length > MAX_GOOGLE_SHEETS_TAB_NAME_LENGTH) {
-      throw new Error("Google Sheets tab name is too long");
-    }
-
-    if (INVALID_GOOGLE_SHEETS_TAB_NAME_PATTERN.test(trimmedTabName)) {
-      throw new Error("Google Sheets tab name cannot contain: : \\ / ? * [ ]");
-    }
-
-    updates.google_sheets_tab_name = trimmedTabName;
-  }
-
-  if (lead_capture_fields !== undefined) {
-    if (typeof lead_capture_fields !== "string") {
-      throw new Error("Invalid lead capture fields");
-    }
-
-    if (lead_capture_fields.length > MAX_LEAD_CAPTURE_FIELDS_LENGTH) {
-      throw new Error("Lead capture fields are too long");
-    }
-
-    updates.lead_capture_fields = lead_capture_fields.trim();
+    updates.lead_capture_messages = leadCaptureMessages.join("\n\n");
   }
 
   if (welcome_sequence_enabled !== undefined) {
@@ -305,11 +280,26 @@ function validateClientSettingsPayload(payload: unknown) {
       throw new Error("Invalid auto-reply ignore pattern");
     }
 
-    if (auto_reply_ignore_pattern.length > MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH) {
-      throw new Error("Auto-reply ignore pattern is too long");
+    if (auto_reply_ignore_pattern.length > MAX_AUTO_REPLY_IGNORE_PATTERNS_TOTAL_LENGTH) {
+      throw new Error("Auto-reply ignore patterns are too long");
     }
 
-    updates.auto_reply_ignore_pattern = auto_reply_ignore_pattern.trim();
+    const autoReplyIgnorePatterns = auto_reply_ignore_pattern
+      .split(/\r?\n/)
+      .map((pattern) => pattern.trim())
+      .filter(Boolean);
+
+    if (autoReplyIgnorePatterns.length > MAX_AUTO_REPLY_IGNORE_PATTERNS) {
+      throw new Error(`Use ${MAX_AUTO_REPLY_IGNORE_PATTERNS} auto-reply ignore messages or fewer`);
+    }
+
+    for (const pattern of autoReplyIgnorePatterns) {
+      if (pattern.length > MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH) {
+        throw new Error("Each auto-reply ignore message must be 500 characters or fewer");
+      }
+    }
+
+    updates.auto_reply_ignore_pattern = autoReplyIgnorePatterns.join("\n");
   }
 
   return updates;
@@ -345,9 +335,7 @@ export async function GET(
       ai_enabled: client.ai_enabled,
       ai_character: client.ai_character,
       ai_tone: client.ai_tone,
-      google_sheets_webhook_url: client.google_sheets_webhook_url,
-      google_sheets_tab_name: client.google_sheets_tab_name,
-      lead_capture_fields: client.lead_capture_fields,
+      lead_capture_messages: client.lead_capture_messages,
       welcome_sequence_enabled: client.welcome_sequence_enabled,
       welcome_message: client.welcome_message,
       welcome_link_url: client.welcome_link_url,
