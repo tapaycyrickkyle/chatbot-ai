@@ -784,7 +784,6 @@ export default async function handler(
               recipientId: userId,
               pageAccessToken,
             });
-            continue;
           }
 
           if (rawText) {
