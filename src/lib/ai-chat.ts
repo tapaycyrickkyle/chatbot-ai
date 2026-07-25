@@ -92,6 +92,8 @@ const CEBUANO_REPLY_TAGALOG_PATTERN =
   /\b(?:talagang|mayroon|meron|nakatayo|kami|natin|iyong|lokasyon|mas maraming|sa loob mismo|tungkol diyan)\b/i;
 const TAGALOG_REPLY_CEBUANO_PATTERN =
   /\b(?:unsa|pila|naa|ug|diri|adto|ari|palihug|imong|imoha|among|koy|tabangan)\b/i;
+const MISSING_INFO_REPLY_PATTERN =
+  /\b(?:i|we|our team|the team)\s+(?:do not|don't|does not|doesn't|did not|didn't|cannot|can't)\s+(?:have|know|confirm|check)\b|\b(?:not available|unavailable|available yet|no exact|exact info|exact details|not listed|not provided|not in the business facts|team can confirm|team will confirm|team will check|will message you shortly)\b/i;
 
 function isLeadCollectionText(value = "") {
   const normalizedValue = value.toLowerCase();
@@ -274,6 +276,16 @@ function mentionsUnsupportedContactChannel(reply: string, businessContext: strin
     (channel) =>
       normalizedReply.includes(channel) && !normalizedBusinessContext.includes(channel)
   );
+}
+
+function isMissingInfoReply(reply: string, requiredFallback: string) {
+  const normalizedReply = normalizeForFactCheck(reply);
+
+  if (!normalizedReply || normalizedReply === normalizeForFactCheck(requiredFallback)) {
+    return false;
+  }
+
+  return MISSING_INFO_REPLY_PATTERN.test(normalizedReply);
 }
 
 function getErrorSummary(error: unknown) {
@@ -624,7 +636,7 @@ Core rules:
 - Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum unless the customer explicitly asks for a list or detailed explanation.
 - Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop or ask one useful next-step question.
 - Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
-- If a detail is not in the business facts, use the missing-info reply provided in the dynamic instructions. Do not guess and do not create an alternative process.
+- If a detail is not in the business facts, reply with the exact missing-info fallback from the dynamic instructions and nothing else. Do not guess, do not create an alternative process, and do not suggest a different unit, computation, package, or option.
 - Act like a helpful real estate agent, not a passive FAQ bot. Understand what the customer is trying to decide: price, unit fit, location, availability, parking, payment, viewing, reservation, or next step.
 - Answer the latest customer question directly first. After answering, add one natural follow-up only when it helps move the buyer forward.
 - Sell softly using only business facts: highlight location, unit options, amenities, payment options, or buyer fit only when relevant to the customer's question.
@@ -664,7 +676,8 @@ ${aiTone ? `\nTone/style:\n${aiTone}` : ""}`;
 - AI-detected latest customer language/style: ${salesPlan.languageName}.
 - Mandatory reply language instruction: ${salesPlan.replyInstruction}
 - Use this latest detected language/style for this reply only.
-- If the answer is missing, reply exactly in the customer's language: "${missingInfoReply}"
+- Required missing-info fallback: "${missingInfoReply}"
+- If the answer is missing, reply with the required missing-info fallback exactly as written. Do not add, remove, or rewrite any words.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
 
 Private sales plan:
@@ -750,6 +763,13 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
 
     if (reply && mentionsUnsupportedContactChannel(reply, businessContext)) {
       console.warn("AI reply blocked because it mentioned an unsupported contact channel", {
+        preview: reply.slice(0, 160),
+      });
+      return missingInfoReply;
+    }
+
+    if (reply && isMissingInfoReply(reply, missingInfoReply)) {
+      console.warn("AI reply replaced with required missing-info fallback", {
         preview: reply.slice(0, 160),
       });
       return missingInfoReply;
