@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
@@ -40,6 +40,7 @@ const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
 const DEFAULT_HUMAN_REPLY_MIN_DELAY_MS = 800;
 const DEFAULT_HUMAN_REPLY_MAX_DELAY_MS = 2500;
 const DEFAULT_HUMAN_REPLY_MS_PER_CHAR = 10;
+const FALLBACK_MESSAGE_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 const AUTO_REPLY_NAME_TOKEN = "{name}";
 
 type WebhookBody = {
@@ -50,6 +51,7 @@ type WebhookBody = {
     messaging?: Array<{
       sender: { id: string };
       recipient?: { id?: string };
+      timestamp?: number;
       message?: {
         mid?: string;
         text?: string;
@@ -116,6 +118,36 @@ function summarizeWebhookEvent(
   };
 }
 
+function createStableHash(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function getMessengerMessageDedupeId(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number],
+  pageId: string,
+  recipientId: string
+) {
+  const messengerMessageId = event.message?.mid?.trim();
+
+  if (messengerMessageId) {
+    return messengerMessageId;
+  }
+
+  const text = event.message?.text?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+
+  if (!text) {
+    return "";
+  }
+
+  const timestamp =
+    typeof event.timestamp === "number" && Number.isFinite(event.timestamp)
+      ? String(event.timestamp)
+      : `bucket:${Math.floor(Date.now() / FALLBACK_MESSAGE_DEDUPE_WINDOW_MS)}`;
+  const fingerprint = createStableHash(`${pageId}:${recipientId}:${timestamp}:${text}`).slice(0, 40);
+
+  return `fallback:${fingerprint}`;
+}
+
 function getConversationRecipientId(
   event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
 ) {
@@ -140,6 +172,28 @@ function isManualPageTextEcho(
 
 function normalizeEchoText(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeDuplicateText(value = "") {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function shouldSkipRecentlyAnsweredCustomerMessage(
+  message: string,
+  conversation: Awaited<ReturnType<typeof getAiConversation>>
+) {
+  if (!conversation?.last_ai_reply || !conversation.last_customer_message) {
+    return false;
+  }
+
+  if (normalizeDuplicateText(message) !== normalizeDuplicateText(conversation.last_customer_message)) {
+    return false;
+  }
+
+  const lastMessageAt = new Date(conversation.last_message_at).getTime();
+
+  return Number.isFinite(lastMessageAt) &&
+    Date.now() - lastMessageAt <= FALLBACK_MESSAGE_DEDUPE_WINDOW_MS;
 }
 
 function escapeRegExp(value: string) {
@@ -635,7 +689,7 @@ export default async function handler(
 
         for (const event of entry.messaging ?? []) {
           const userId = getConversationRecipientId(event);
-          const messageId = event.message?.mid?.trim() || "";
+          const messageId = getMessengerMessageDedupeId(event, pageId, userId);
           const rawText = event.message?.text;
           const postbackPayload = event.postback?.payload;
 
@@ -742,6 +796,16 @@ export default async function handler(
                 });
                 continue;
               }
+            }
+
+            if (shouldSkipRecentlyAnsweredCustomerMessage(rawText, existingConversation)) {
+              console.info("AI webhook skipped recently answered duplicate text", {
+                clientId: client.id,
+                pageId,
+                userId,
+                preview: rawText.slice(0, 120),
+              });
+              continue;
             }
 
             await safelyRecordCustomerMessage({
