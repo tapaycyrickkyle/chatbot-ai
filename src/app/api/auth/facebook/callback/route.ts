@@ -17,6 +17,16 @@ function clearTransientCookies(response: NextResponse) {
   });
 }
 
+function clearReconnectCookie(response: NextResponse) {
+  response.cookies.set("fb_reconnect_client_id", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
+}
+
 async function exchangeFacebookToken(
   params: Record<string, string>
 ) {
@@ -126,9 +136,14 @@ export async function GET(req: NextRequest) {
       return response;
     }
 
-    const response = NextResponse.redirect(
-      new URL("/dashboard?fb_connected=true", req.url)
-    );
+    const reconnectClientId = req.cookies.get("fb_reconnect_client_id")?.value?.trim() || "";
+    const redirectUrl = new URL("/dashboard?fb_connected=true", req.url);
+
+    if (reconnectClientId) {
+      redirectUrl.searchParams.set("reconnect_client_id", reconnectClientId);
+    }
+
+    const response = NextResponse.redirect(redirectUrl);
 
     response.cookies.set("fb_user_token", longLived.data.access_token, {
       httpOnly: true,
@@ -156,6 +171,7 @@ export async function GET(req: NextRequest) {
       sameSite: "lax",
     });
     clearTransientCookies(response);
+    clearReconnectCookie(response);
 
     return response;
   } catch (error) {

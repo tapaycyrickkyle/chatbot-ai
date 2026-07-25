@@ -34,6 +34,7 @@ const DashboardPage = () => {
   const [isDisconnectingClientId, setIsDisconnectingClientId] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<ClientRow | null>(null);
   const [disconnectConfirmation, setDisconnectConfirmation] = useState("");
+  const [pendingReconnectClientId, setPendingReconnectClientId] = useState("");
   const { showToast } = useToast();
 
   const loadClients = async () => {
@@ -60,6 +61,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const fbConnectedFromQuery = searchParams?.get("fb_connected") === "true";
+    const reconnectClientIdFromQuery = searchParams?.get("reconnect_client_id") ?? "";
     const fbConnectedFromCookie = document.cookie
       .split("; ")
       .some((row) => row === "fb_connected=true");
@@ -69,6 +71,8 @@ const DashboardPage = () => {
     }
 
     const openFacebookPagesModal = async () => {
+      setPendingReconnectClientId(reconnectClientIdFromQuery);
+
       try {
         const response = await fetch("/api/auth/facebook/pages", {
           cache: "no-store",
@@ -119,6 +123,7 @@ const DashboardPage = () => {
     setShowModal(false);
     setPages([]);
     setIsConnectingPageId(null);
+    setPendingReconnectClientId("");
     clearFacebookPagesCookie();
   };
 
@@ -148,6 +153,9 @@ const DashboardPage = () => {
         body: JSON.stringify({
           client_name: page.name,
           facebook_page_id: page.id,
+          ...(pendingReconnectClientId
+            ? { reconnect_client_id: pendingReconnectClientId }
+            : {}),
         }),
       });
 
@@ -180,7 +188,12 @@ const DashboardPage = () => {
 
       await loadClients();
       closeModal();
-      showToast({ tone: "success", message: "Page connected successfully." });
+      showToast({
+        tone: "success",
+        message: pendingReconnectClientId
+          ? "Page token reconnected successfully."
+          : "Page connected successfully.",
+      });
     } catch (error) {
       console.error(error);
       const message =
@@ -295,6 +308,9 @@ const DashboardPage = () => {
   };
 
   const canConfirmDisconnect = disconnectConfirmation.trim().toLowerCase() === "disconnect";
+  const reconnectTarget = pendingReconnectClientId
+    ? clients.find((client) => client.id === pendingReconnectClientId)
+    : null;
 
   return (
     <>
@@ -416,6 +432,12 @@ const DashboardPage = () => {
 
                     <div className="grid w-full grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
                       <Link
+                        href={`/api/auth/facebook/login?reconnect_client_id=${encodeURIComponent(client.id)}`}
+                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
+                      >
+                        Reconnect
+                      </Link>
+                      <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
                         className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
                       >
@@ -525,7 +547,9 @@ const DashboardPage = () => {
 
             <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
               <p className="max-w-[460px] text-[15px] leading-7 text-[var(--text-label)]">
-                Select the Facebook Page that should use this AI workspace.
+                {reconnectTarget
+                  ? `Select ${reconnectTarget.client_name} to refresh its Facebook token.`
+                  : "Select the Facebook Page that should use this AI workspace."}
               </p>
               {pages.length > 0 ? (
                 <p className="mt-2 text-[13px] text-[var(--text-subtle)]">
@@ -545,6 +569,11 @@ const DashboardPage = () => {
                   const isAlreadyConnected = clients.some(
                     (client) => client.page_id === page.id
                   );
+                  const isReconnectTarget = reconnectTarget?.page_id === page.id;
+                  const isDisabled =
+                    (Boolean(reconnectTarget) && !isReconnectTarget) ||
+                    (isAlreadyConnected && !isReconnectTarget) ||
+                    isConnectingPageId === page.id;
 
                   return (
                     <div
@@ -585,15 +614,19 @@ const DashboardPage = () => {
 
                       <button
                         type="button"
-                        onClick={isAlreadyConnected ? undefined : () => void connectPage(page)}
-                        disabled={isAlreadyConnected || isConnectingPageId === page.id}
+                        onClick={isDisabled ? undefined : () => void connectPage(page)}
+                        disabled={isDisabled}
                         className={`w-full rounded-md px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed sm:w-auto ${
-                          isAlreadyConnected
+                          isAlreadyConnected && !isReconnectTarget
                             ? "border border-[#2f5f49] bg-[#173126] text-[#9ce3c1] opacity-80"
                             : "border border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-70"
                         }`}
                       >
-                        {isAlreadyConnected
+                        {isReconnectTarget
+                          ? isConnectingPageId === page.id
+                            ? "Reconnecting..."
+                            : "Reconnect"
+                          : isAlreadyConnected
                           ? "Connected"
                           : isConnectingPageId === page.id
                             ? "Connecting..."
@@ -609,7 +642,13 @@ const DashboardPage = () => {
       ) : null}
       <LoadingModal
         isOpen={Boolean(isConnectingPageId || isDisconnectingClientId)}
-        message={isDisconnectingClientId ? "Disconnecting page..." : "Connecting page..."}
+        message={
+          isDisconnectingClientId
+            ? "Disconnecting page..."
+            : reconnectTarget
+              ? "Reconnecting page..."
+              : "Connecting page..."
+        }
       />
     </>
   );

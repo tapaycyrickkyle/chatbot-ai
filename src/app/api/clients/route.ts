@@ -5,6 +5,7 @@ import {
   deleteClientByPageId,
   getClientById,
   getClients,
+  refreshClientPageToken,
 } from "@/lib/database";
 import { assertSameOrigin, sanitizeIdentifier, validateClientPayload } from "@/lib/api-security";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
@@ -142,6 +143,47 @@ export async function POST(req: NextRequest) {
 
       if (!matchedPage?.access_token) {
         return NextResponse.json({ error: "Unable to resolve page token" }, { status: 400 });
+      }
+
+      const reconnectClientId =
+        typeof body?.reconnect_client_id === "string"
+          ? sanitizeIdentifier(body.reconnect_client_id, "client ID")
+          : "";
+
+      if (reconnectClientId) {
+        const reconnectClient = await getClientById(reconnectClientId);
+
+        if (!reconnectClient) {
+          return NextResponse.json({ error: "Client not found" }, { status: 404 });
+        }
+
+        if (reconnectClient.page_id !== body.facebook_page_id) {
+          return NextResponse.json(
+            { error: "Selected Facebook Page does not match this connection" },
+            { status: 400 }
+          );
+        }
+
+        try {
+          await finalizeClientConnection(
+            reconnectClient.client_name,
+            reconnectClient.page_id,
+            matchedPage.access_token
+          );
+          await refreshClientPageToken({
+            clientId: reconnectClient.id,
+            pageAccessToken: matchedPage.access_token,
+          });
+        } catch (error) {
+          return NextResponse.json(
+            {
+              error: error instanceof Error ? error.message : "Facebook page reconnect failed",
+            },
+            { status: 400 }
+          );
+        }
+
+        return NextResponse.json({ success: true, reconnected: true });
       }
 
       const validatedPayload = validateClientPayload({

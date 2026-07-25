@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   const state = generateFacebookOAuthState();
+  const reconnectClientId = new URL(req.url).searchParams.get("reconnect_client_id")?.trim() || "";
   const scope = ["pages_messaging", "pages_manage_metadata", "pages_show_list"].join(",");
   const facebookLoginUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&scope=${scope}&response_type=code&state=${state}`;
   const response = NextResponse.redirect(facebookLoginUrl);
@@ -27,6 +28,24 @@ export async function GET(req: NextRequest) {
     maxAge: 60 * 10,
     path: "/",
   });
+
+  if (reconnectClientId) {
+    response.cookies.set("fb_reconnect_client_id", reconnectClientId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 10,
+      path: "/",
+    });
+  } else {
+    response.cookies.set("fb_reconnect_client_id", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    });
+  }
 
   return response;
 }

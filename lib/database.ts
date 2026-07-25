@@ -470,6 +470,25 @@ export async function addClient(clientData: {
   return data.id;
 }
 
+export async function refreshClientPageToken(input: {
+  clientId: string;
+  pageAccessToken: string;
+}) {
+  const supabase = getDb();
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      page_access_token: input.pageAccessToken,
+      created_at: now,
+    })
+    .eq("id", input.clientId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to refresh page token");
+  }
+}
+
 export async function deleteClientByPageId(pageId: string) {
   const supabase = getDb();
   const { error } = await supabase.from("clients").delete().eq("page_id", pageId);
