@@ -9,6 +9,7 @@ import {
   pauseAiConversation,
   recordAiConversationReply,
   recordCustomerConversationMessage,
+  recordWelcomeSequenceCandidate,
   recordWelcomeSequenceSent,
   tryClaimMessengerMessage,
   resumeAiConversation,
@@ -98,18 +99,6 @@ type MessengerApiError = {
 };
 
 type MessengerApiErrorPayload = {
-  error?: MessengerApiError;
-};
-
-type MessengerConversationHistoryResponse = {
-  data?: Array<{
-    id?: string;
-    messages?: {
-      data?: Array<{
-        created_time?: string;
-      }>;
-    };
-  }>;
   error?: MessengerApiError;
 };
 
@@ -360,6 +349,18 @@ async function safelyRecordCustomerMessage(input: {
   }
 }
 
+async function safelyRecordWelcomeSequenceCandidate(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+}) {
+  try {
+    await recordWelcomeSequenceCandidate(input);
+  } catch (error) {
+    console.warn("Failed to record welcome sequence candidate", error);
+  }
+}
+
 async function safelyGetAiConversation(clientId: string, recipientId: string) {
   try {
     return await getAiConversation(clientId, recipientId);
@@ -531,74 +532,19 @@ function shouldSendWelcomeSequence(
   client: Awaited<ReturnType<typeof getClients>>[number],
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
 ) {
+  const hasIgnoredIntroMarker = Boolean(
+    conversation &&
+      !conversation.last_customer_message &&
+      !conversation.last_ai_reply &&
+      conversation.recent_messages.length === 0
+  );
+
   return (
     client.welcome_sequence_enabled &&
+    hasIgnoredIntroMarker &&
     !conversation?.welcome_sequence_sent &&
     hasWelcomeSequenceContent(client)
   );
-}
-
-async function hasMessengerMessagesBeforeConnection(input: {
-  pageId: string;
-  recipientId: string;
-  pageAccessToken: string;
-  connectedAt: string;
-}) {
-  const connectedAtMs = new Date(input.connectedAt).getTime();
-
-  if (!Number.isFinite(connectedAtMs)) {
-    return false;
-  }
-
-  const url = new URL(`${GRAPH_API_BASE_URL}/${encodeURIComponent(input.pageId)}/conversations`);
-  url.search = new URLSearchParams({
-    platform: "messenger",
-    user_id: input.recipientId,
-    fields: "messages.limit(10){created_time}",
-    access_token: input.pageAccessToken,
-  }).toString();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      signal: controller.signal,
-    });
-    const data = (await response.json().catch(() => null)) as
-      | MessengerConversationHistoryResponse
-      | null;
-
-    if (!response.ok) {
-      console.warn("Messenger conversation history lookup failed", {
-        pageId: input.pageId,
-        recipientId: input.recipientId,
-        status: response.status,
-        errorCode: data?.error?.code,
-        errorMessage: data?.error?.message,
-      });
-      return false;
-    }
-
-    return Boolean(
-      data?.data?.some((conversation) =>
-        conversation.messages?.data?.some((message) => {
-          const messageTimeMs = new Date(message.created_time || "").getTime();
-
-          return Number.isFinite(messageTimeMs) && messageTimeMs < connectedAtMs;
-        })
-      )
-    );
-  } catch (error) {
-    console.warn("Messenger conversation history lookup failed", {
-      pageId: input.pageId,
-      recipientId: input.recipientId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }
 
 async function sendWelcomeSequence(input: {
@@ -797,6 +743,11 @@ export default async function handler(
                 userId,
                 appId: event.message?.app_id ? String(event.message.app_id) : "",
               });
+              await safelyRecordWelcomeSequenceCandidate({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+              });
               continue;
             }
 
@@ -917,33 +868,12 @@ export default async function handler(
             rawText &&
             shouldSendWelcomeSequence(client, existingConversation)
           ) {
-            const hasPreConnectionConversation =
-              await hasMessengerMessagesBeforeConnection({
-                pageId,
-                recipientId: userId,
-                pageAccessToken,
-                connectedAt: client.created_at,
-              });
-
-            if (hasPreConnectionConversation) {
-              console.info("AI webhook skipped welcome sequence for pre-existing Messenger conversation", {
-                clientId: client.id,
-                pageId,
-                userId,
-              });
-              await safelyRecordWelcomeSequenceSent({
-                clientId: client.id,
-                pageId,
-                recipientId: userId,
-              });
-            } else {
-              await sendWelcomeSequence({
-                client,
-                pageId,
-                recipientId: userId,
-                pageAccessToken,
-              });
-            }
+            await sendWelcomeSequence({
+              client,
+              pageId,
+              recipientId: userId,
+              pageAccessToken,
+            });
           }
 
           if (rawText) {

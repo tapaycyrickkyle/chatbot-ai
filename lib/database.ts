@@ -655,6 +655,29 @@ export async function recordCustomerConversationMessage(input: {
   }
 }
 
+export async function recordWelcomeSequenceCandidate(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+}) {
+  const now = new Date().toISOString();
+  const supabase = getDb();
+  const { error } = await supabase.from("ai_conversations").upsert(
+    {
+      client_id: input.clientId,
+      page_id: input.pageId,
+      recipient_id: input.recipientId,
+      last_message_at: now,
+      updated_at: now,
+    },
+    { onConflict: "client_id,recipient_id" }
+  );
+
+  if (error) {
+    throw new Error(error.message || "Failed to record welcome sequence candidate");
+  }
+}
+
 export async function recordWelcomeSequenceSent(input: {
   clientId: string;
   pageId: string;
