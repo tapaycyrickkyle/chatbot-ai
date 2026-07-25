@@ -101,6 +101,18 @@ type MessengerApiErrorPayload = {
   error?: MessengerApiError;
 };
 
+type MessengerConversationHistoryResponse = {
+  data?: Array<{
+    id?: string;
+    messages?: {
+      data?: Array<{
+        created_time?: string;
+      }>;
+    };
+  }>;
+  error?: MessengerApiError;
+};
+
 type SafeSendContext = {
   clientId: string;
   pageId: string;
@@ -526,6 +538,69 @@ function shouldSendWelcomeSequence(
   );
 }
 
+async function hasMessengerMessagesBeforeConnection(input: {
+  pageId: string;
+  recipientId: string;
+  pageAccessToken: string;
+  connectedAt: string;
+}) {
+  const connectedAtMs = new Date(input.connectedAt).getTime();
+
+  if (!Number.isFinite(connectedAtMs)) {
+    return false;
+  }
+
+  const url = new URL(`${GRAPH_API_BASE_URL}/${encodeURIComponent(input.pageId)}/conversations`);
+  url.search = new URLSearchParams({
+    platform: "messenger",
+    user_id: input.recipientId,
+    fields: "messages.limit(10){created_time}",
+    access_token: input.pageAccessToken,
+  }).toString();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    const data = (await response.json().catch(() => null)) as
+      | MessengerConversationHistoryResponse
+      | null;
+
+    if (!response.ok) {
+      console.warn("Messenger conversation history lookup failed", {
+        pageId: input.pageId,
+        recipientId: input.recipientId,
+        status: response.status,
+        errorCode: data?.error?.code,
+        errorMessage: data?.error?.message,
+      });
+      return false;
+    }
+
+    return Boolean(
+      data?.data?.some((conversation) =>
+        conversation.messages?.data?.some((message) => {
+          const messageTimeMs = new Date(message.created_time || "").getTime();
+
+          return Number.isFinite(messageTimeMs) && messageTimeMs < connectedAtMs;
+        })
+      )
+    );
+  } catch (error) {
+    console.warn("Messenger conversation history lookup failed", {
+      pageId: input.pageId,
+      recipientId: input.recipientId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function sendWelcomeSequence(input: {
   client: Awaited<ReturnType<typeof getClients>>[number];
   pageId: string;
@@ -842,12 +917,33 @@ export default async function handler(
             rawText &&
             shouldSendWelcomeSequence(client, existingConversation)
           ) {
-            await sendWelcomeSequence({
-              client,
-              pageId,
-              recipientId: userId,
-              pageAccessToken,
-            });
+            const hasPreConnectionConversation =
+              await hasMessengerMessagesBeforeConnection({
+                pageId,
+                recipientId: userId,
+                pageAccessToken,
+                connectedAt: client.created_at,
+              });
+
+            if (hasPreConnectionConversation) {
+              console.info("AI webhook skipped welcome sequence for pre-existing Messenger conversation", {
+                clientId: client.id,
+                pageId,
+                userId,
+              });
+              await safelyRecordWelcomeSequenceSent({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+              });
+            } else {
+              await sendWelcomeSequence({
+                client,
+                pageId,
+                recipientId: userId,
+                pageAccessToken,
+              });
+            }
           }
 
           if (rawText) {
