@@ -69,7 +69,7 @@ export function getMissingInfoReply(customerMessage = "") {
     case "taglish":
       return "Wala pa akong exact info about that po. I can still help with other questions, or we can forward this to our team if needed.";
     default:
-      return "I do not have that exact info yet. I can still help with other questions, or we can forward this to our team if needed.";
+      return "I don't have the exact info on that yet, but our team will check and message you shortly. In the meantime, do you have any other questions?";
   }
 }
 
