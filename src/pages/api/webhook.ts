@@ -10,6 +10,7 @@ import {
   recordAiConversationReply,
   recordCustomerConversationMessage,
   recordWelcomeSequenceSent,
+  tryClaimMessengerMessage,
   resumeAiConversation,
 } from "@/lib/database";
 import { askAi, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
@@ -50,6 +51,7 @@ type WebhookBody = {
       sender: { id: string };
       recipient?: { id?: string };
       message?: {
+        mid?: string;
         text?: string;
         is_echo?: boolean;
         app_id?: string | number;
@@ -108,6 +110,7 @@ function summarizeWebhookEvent(
   event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
 ) {
   return {
+    messageId: event.message?.mid || "",
     hasText: Boolean(event.message?.text),
     hasPostback: Boolean(event.postback?.payload),
   };
@@ -632,6 +635,7 @@ export default async function handler(
 
         for (const event of entry.messaging ?? []) {
           const userId = getConversationRecipientId(event);
+          const messageId = event.message?.mid?.trim() || "";
           const rawText = event.message?.text;
           const postbackPayload = event.postback?.payload;
 
@@ -722,6 +726,24 @@ export default async function handler(
           const existingConversation = await safelyGetAiConversation(client.id, userId);
 
           if (rawText) {
+            if (messageId) {
+              const shouldProcessMessage = await tryClaimMessengerMessage({
+                pageId,
+                recipientId: userId,
+                messageId,
+              });
+
+              if (!shouldProcessMessage) {
+                console.info("AI webhook skipped duplicate Messenger message", {
+                  clientId: client.id,
+                  pageId,
+                  userId,
+                  messageId,
+                });
+                continue;
+              }
+            }
+
             await safelyRecordCustomerMessage({
               clientId: client.id,
               pageId,
@@ -762,6 +784,7 @@ export default async function handler(
               recipientId: userId,
               pageAccessToken,
             });
+            continue;
           }
 
           if (rawText) {

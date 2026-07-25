@@ -21,13 +21,18 @@ If you prefer running files individually, run them in this order:
 11. `14-timed-ai-pause.sql`
 12. `15-auto-reply-ignore-pattern.sql`
 13. `16-remove-owner-portal-tables.sql`
-14. `20-lead-capture-messages.sql`
+14. `17-ai-message-jobs.sql`
+15. `18-ai-retention-cleanup.sql`
+16. `19-ai-job-cancel-and-auto-cleanup.sql`
+17. `21-messenger-message-dedupe.sql`
 
 ## Tables Used
 
-- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, lead capture settings, and per-page auto-reply echo ignore pattern.
+- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, welcome sequence settings, and per-page auto-reply echo ignore pattern.
 - `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state, compact memory, customer state, and recent short turns.
+- `ai_message_jobs`: queued Messenger webhook deliveries for async AI processing.
+- `processed_messenger_messages`: Messenger message IDs already claimed by the webhook, used to prevent duplicate replies.
 
 ## No Longer Used
 

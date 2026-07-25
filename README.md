@@ -62,9 +62,10 @@ The admin storage cleanup endpoint keeps database usage low:
 rate_limit_logs: delete rows older than 7 days
 ai_message_jobs: delete sent jobs older than 1 day
 ai_conversations: delete inactive conversations older than 7 days
+processed_messenger_messages: delete dedupe keys older than 7 days
 ```
 
-Run `supabase/18-ai-retention-cleanup.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase to add cleanup indexes/functions for the AI queue and conversation tables.
+Run `supabase/18-ai-retention-cleanup.sql`, `supabase/19-ai-job-cancel-and-auto-cleanup.sql`, and `supabase/21-messenger-message-dedupe.sql` in Supabase to add cleanup indexes/functions and Messenger message dedupe.
 
 GitHub Actions calls `/api/maintenance/storage-cleanup` once daily using `AI_MAINTENANCE_URL` and `AI_WORKER_SECRET`, so retention cleanup runs automatically after deployment.
 

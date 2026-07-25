@@ -329,6 +329,23 @@ create index if not exists ai_message_jobs_terminal_processed_at_idx
   on public.ai_message_jobs (status, processed_at)
   where status in ('sent', 'failed', 'canceled');
 
+-- Message-level dedupe for Messenger webhook retries.
+create table if not exists public.processed_messenger_messages (
+  id uuid primary key default gen_random_uuid(),
+  event_key text not null,
+  page_id text not null,
+  recipient_id text not null,
+  message_id text not null,
+  created_at timestamptz not null default now(),
+  constraint processed_messenger_messages_event_key_key unique (event_key)
+);
+
+create index if not exists processed_messenger_messages_created_at_idx
+  on public.processed_messenger_messages (created_at);
+
+create index if not exists processed_messenger_messages_page_recipient_idx
+  on public.processed_messenger_messages (page_id, recipient_id, created_at desc);
+
 create or replace function public.claim_ai_message_jobs(
   batch_size integer default 5,
   worker_id text default 'worker'
@@ -448,11 +465,13 @@ alter table public.clients enable row level security;
 alter table public.rate_limit_logs enable row level security;
 alter table public.ai_conversations enable row level security;
 alter table public.ai_message_jobs enable row level security;
+alter table public.processed_messenger_messages enable row level security;
 
 revoke all on table public.clients from anon, authenticated;
 revoke all on table public.rate_limit_logs from anon, authenticated;
 revoke all on table public.ai_conversations from anon, authenticated;
 revoke all on table public.ai_message_jobs from anon, authenticated;
+revoke all on table public.processed_messenger_messages from anon, authenticated;
 revoke execute on function public.claim_ai_message_jobs(integer, text) from anon, authenticated;
 revoke execute on function public.cancel_pending_ai_message_jobs(text, text) from anon, authenticated;
 revoke execute on function public.cleanup_ai_message_jobs() from anon, authenticated;

@@ -1,19 +1,25 @@
 import "server-only";
 
-import { cleanupAiMessageJobs } from "@/lib/database";
+import {
+  cleanupAiMessageJobs,
+  cleanupProcessedMessengerMessages,
+} from "@/lib/database";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const RATE_LIMIT_LOG_RETENTION_DAYS = 7;
 const AI_MESSAGE_JOB_RETENTION_DAYS = 1;
 const AI_CONVERSATION_RETENTION_DAYS = 7;
+const PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS = 7;
 
 type CleanupResult = {
   deletedRateLimitLogs: number;
   deletedAiMessageJobs: number;
   deletedAiConversations: number;
+  deletedProcessedMessengerMessages: number;
   logRetentionDays: number;
   aiMessageJobRetentionDays: number;
   aiConversationRetentionDays: number;
+  processedMessengerMessageRetentionDays: number;
   warnings: string[];
 };
 
@@ -88,6 +94,9 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
   const aiConversationCutoffIso = new Date(
     now - AI_CONVERSATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
+  const processedMessengerMessageCutoffIso = new Date(
+    now - PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
   const rateLimitLogsResult = await cleanupRowsOlderThan(
     "rate_limit_logs",
     "created_at",
@@ -108,10 +117,22 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
     "last_message_at",
     aiConversationCutoffIso
   );
+  const processedMessengerMessagesResult: CleanupTargetResult =
+    await cleanupProcessedMessengerMessages(processedMessengerMessageCutoffIso)
+      .then((deletedRows) => ({ deletedRows }))
+      .catch((error) => ({
+        deletedRows: 0,
+        warning: formatCleanupWarning(
+          "processed_messenger_messages",
+          "delete",
+          error instanceof Error ? error.message : String(error)
+        ),
+      }));
   const warnings = [
     rateLimitLogsResult.warning,
     aiMessageJobsResult.warning,
     aiConversationsResult.warning,
+    processedMessengerMessagesResult.warning,
   ].filter(
     (warning): warning is string => Boolean(warning)
   );
@@ -120,9 +141,11 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
     deletedRateLimitLogs: rateLimitLogsResult.deletedRows,
     deletedAiMessageJobs: aiMessageJobsResult.deletedRows,
     deletedAiConversations: aiConversationsResult.deletedRows,
+    deletedProcessedMessengerMessages: processedMessengerMessagesResult.deletedRows,
     logRetentionDays: RATE_LIMIT_LOG_RETENTION_DAYS,
     aiMessageJobRetentionDays: AI_MESSAGE_JOB_RETENTION_DAYS,
     aiConversationRetentionDays: AI_CONVERSATION_RETENTION_DAYS,
+    processedMessengerMessageRetentionDays: PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS,
     warnings,
   };
 }

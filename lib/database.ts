@@ -142,6 +142,13 @@ function isMissingAiPauseExpiresAtError(error: { message?: string } | null) {
   );
 }
 
+function isMissingProcessedMessengerMessagesError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("processed_messenger_messages") &&
+      error.message.includes("does not exist")
+  );
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -295,6 +302,41 @@ export async function enqueueAiMessageJob(input: {
   };
 }
 
+export async function tryClaimMessengerMessage(input: {
+  pageId: string;
+  recipientId: string;
+  messageId: string;
+}) {
+  const supabase = getDb();
+  const eventKey = `${input.pageId}:${input.recipientId}:${input.messageId}`;
+  const { data, error } = await supabase
+    .from("processed_messenger_messages")
+    .upsert(
+      {
+        event_key: eventKey,
+        page_id: input.pageId,
+        recipient_id: input.recipientId,
+        message_id: input.messageId,
+      },
+      { onConflict: "event_key", ignoreDuplicates: true }
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingProcessedMessengerMessagesError(error)) {
+      console.warn(
+        "processed_messenger_messages table is missing; Messenger message dedupe is inactive until the migration is run"
+      );
+      return true;
+    }
+
+    throw new Error(error.message || "Failed to claim Messenger message");
+  }
+
+  return Boolean(data?.id);
+}
+
 export async function claimAiMessageJobs(input: {
   batchSize: number;
   workerId: string;
@@ -338,6 +380,29 @@ export async function cleanupAiMessageJobs() {
   }
 
   return typeof data === "number" ? data : 0;
+}
+
+export async function cleanupProcessedMessengerMessages(cutoffIso: string) {
+  const supabase = getDb();
+  const { count, error: countError } = await supabase
+    .from("processed_messenger_messages")
+    .select("*", { count: "exact", head: true })
+    .lt("created_at", cutoffIso);
+
+  if (countError) {
+    throw new Error(countError.message || "Failed to count processed Messenger messages");
+  }
+
+  const { error } = await supabase
+    .from("processed_messenger_messages")
+    .delete()
+    .lt("created_at", cutoffIso);
+
+  if (error) {
+    throw new Error(error.message || "Failed to clean up processed Messenger messages");
+  }
+
+  return count ?? 0;
 }
 
 export async function completeAiMessageJob(jobId: string) {
