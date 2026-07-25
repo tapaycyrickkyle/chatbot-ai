@@ -546,16 +546,15 @@ function shouldSendWelcomeSequence(
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
   hasWelcomeReceipt: boolean
 ) {
-  const hasIgnoredIntroMarker = Boolean(
-    conversation &&
-      !conversation.last_customer_message &&
-      !conversation.last_ai_reply &&
-      conversation.recent_messages.length === 0
+  const hasTrackedConversationHistory = Boolean(
+    conversation?.last_customer_message ||
+      conversation?.last_ai_reply ||
+      conversation?.recent_messages.length
   );
 
   return (
     client.welcome_sequence_enabled &&
-    hasIgnoredIntroMarker &&
+    !hasTrackedConversationHistory &&
     !hasWelcomeReceipt &&
     !conversation?.welcome_sequence_sent &&
     hasWelcomeSequenceContent(client)
