@@ -25,12 +25,14 @@ If you prefer running files individually, run them in this order:
 15. `18-ai-retention-cleanup.sql`
 16. `19-ai-job-cancel-and-auto-cleanup.sql`
 17. `21-messenger-message-dedupe.sql`
+18. `22-welcome-sequence-recipients.sql`
 
 ## Tables Used
 
 - `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, welcome sequence settings, and per-page auto-reply echo ignore pattern.
 - `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state, compact memory, customer state, and recent short turns.
+- `welcome_sequence_recipients`: permanent minimal record of customers who already received the welcome sequence.
 - `ai_message_jobs`: queued Messenger webhook deliveries for async AI processing.
 - `processed_messenger_messages`: Messenger message IDs already claimed by the webhook, used to prevent duplicate replies.
 

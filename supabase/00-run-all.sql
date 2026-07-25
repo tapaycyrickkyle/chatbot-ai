@@ -225,6 +225,40 @@ create index if not exists ai_conversations_client_paused_idx
 create index if not exists ai_conversations_last_message_at_idx
   on public.ai_conversations (last_message_at);
 
+-- Permanent minimal welcome receipt state.
+create table if not exists public.welcome_sequence_recipients (
+  id uuid primary key default gen_random_uuid(),
+  client_id integer not null references public.clients(id) on delete cascade,
+  page_id text not null,
+  recipient_id text not null,
+  first_sent_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint welcome_sequence_recipients_client_recipient_key unique (client_id, recipient_id)
+);
+
+create index if not exists welcome_sequence_recipients_client_idx
+  on public.welcome_sequence_recipients (client_id, updated_at desc);
+
+insert into public.welcome_sequence_recipients (
+  client_id,
+  page_id,
+  recipient_id,
+  first_sent_at,
+  updated_at
+)
+select
+  client_id,
+  page_id,
+  recipient_id,
+  coalesce(last_message_at, created_at, now()),
+  coalesce(updated_at, last_message_at, now())
+from public.ai_conversations
+where welcome_sequence_sent = true
+on conflict (client_id, recipient_id) do update
+set
+  page_id = excluded.page_id,
+  updated_at = greatest(public.welcome_sequence_recipients.updated_at, excluded.updated_at);
+
 -- Durable queue for Messenger webhook deliveries.
 create table if not exists public.ai_message_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -464,12 +498,14 @@ drop table if exists public.replied_comments;
 alter table public.clients enable row level security;
 alter table public.rate_limit_logs enable row level security;
 alter table public.ai_conversations enable row level security;
+alter table public.welcome_sequence_recipients enable row level security;
 alter table public.ai_message_jobs enable row level security;
 alter table public.processed_messenger_messages enable row level security;
 
 revoke all on table public.clients from anon, authenticated;
 revoke all on table public.rate_limit_logs from anon, authenticated;
 revoke all on table public.ai_conversations from anon, authenticated;
+revoke all on table public.welcome_sequence_recipients from anon, authenticated;
 revoke all on table public.ai_message_jobs from anon, authenticated;
 revoke all on table public.processed_messenger_messages from anon, authenticated;
 revoke execute on function public.claim_ai_message_jobs(integer, text) from anon, authenticated;

@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
+  hasWelcomeSequenceReceipt,
   cancelPendingAiMessageJobsForConversation,
   enqueueAiMessageJob,
   getClients,
@@ -361,6 +362,18 @@ async function safelyRecordWelcomeSequenceCandidate(input: {
   }
 }
 
+async function safelyHasWelcomeSequenceReceipt(input: {
+  clientId: string;
+  recipientId: string;
+}) {
+  try {
+    return await hasWelcomeSequenceReceipt(input);
+  } catch (error) {
+    console.warn("Failed to load welcome sequence receipt", error);
+    return false;
+  }
+}
+
 async function safelyGetAiConversation(clientId: string, recipientId: string) {
   try {
     return await getAiConversation(clientId, recipientId);
@@ -530,7 +543,8 @@ function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>
 
 function shouldSendWelcomeSequence(
   client: Awaited<ReturnType<typeof getClients>>[number],
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
+  hasWelcomeReceipt: boolean
 ) {
   const hasIgnoredIntroMarker = Boolean(
     conversation &&
@@ -542,6 +556,7 @@ function shouldSendWelcomeSequence(
   return (
     client.welcome_sequence_enabled &&
     hasIgnoredIntroMarker &&
+    !hasWelcomeReceipt &&
     !conversation?.welcome_sequence_sent &&
     hasWelcomeSequenceContent(client)
   );
@@ -804,6 +819,12 @@ export default async function handler(
           });
 
           const existingConversation = await safelyGetAiConversation(client.id, userId);
+          const hasWelcomeReceipt = rawText
+            ? await safelyHasWelcomeSequenceReceipt({
+                clientId: client.id,
+                recipientId: userId,
+              })
+            : false;
 
           if (rawText) {
             if (messageId) {
@@ -866,7 +887,7 @@ export default async function handler(
 
           if (
             rawText &&
-            shouldSendWelcomeSequence(client, existingConversation)
+            shouldSendWelcomeSequence(client, existingConversation, hasWelcomeReceipt)
           ) {
             await sendWelcomeSequence({
               client,

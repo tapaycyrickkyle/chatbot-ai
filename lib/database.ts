@@ -149,6 +149,14 @@ function isMissingProcessedMessengerMessagesError(error: { message?: string } | 
   );
 }
 
+function isMissingWelcomeSequenceRecipientsError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("welcome_sequence_recipients") &&
+      (error.message.includes("does not exist") ||
+        error.message.includes("schema cache"))
+  );
+}
+
 function normalizeClient(row: ClientRow) {
   return {
     id: String(row.id),
@@ -678,6 +686,29 @@ export async function recordWelcomeSequenceCandidate(input: {
   }
 }
 
+export async function hasWelcomeSequenceReceipt(input: {
+  clientId: string;
+  recipientId: string;
+}) {
+  const supabase = getDb();
+  const { data, error } = await supabase
+    .from("welcome_sequence_recipients")
+    .select("recipient_id")
+    .eq("client_id", input.clientId)
+    .eq("recipient_id", input.recipientId)
+    .maybeSingle();
+
+  if (isMissingWelcomeSequenceRecipientsError(error)) {
+    return false;
+  }
+
+  if (error) {
+    throw new Error(error.message || "Failed to load welcome sequence receipt");
+  }
+
+  return Boolean(data);
+}
+
 export async function recordWelcomeSequenceSent(input: {
   clientId: string;
   pageId: string;
@@ -711,6 +742,25 @@ export async function recordWelcomeSequenceSent(input: {
 
   if (error) {
     throw new Error(error.message || "Failed to record welcome sequence");
+  }
+
+  const receiptResponse = await supabase.from("welcome_sequence_recipients").upsert(
+    {
+      client_id: input.clientId,
+      page_id: input.pageId,
+      recipient_id: input.recipientId,
+      updated_at: now,
+    },
+    { onConflict: "client_id,recipient_id" }
+  );
+
+  if (
+    receiptResponse.error &&
+    !isMissingWelcomeSequenceRecipientsError(receiptResponse.error)
+  ) {
+    throw new Error(
+      receiptResponse.error.message || "Failed to record welcome sequence receipt"
+    );
   }
 }
 
