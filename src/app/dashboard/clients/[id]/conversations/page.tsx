@@ -16,6 +16,7 @@ type Conversation = {
   ai_paused: boolean;
   paused_at: string;
   paused_by: string;
+  ai_pause_expires_at: string;
   resumed_at: string;
   created_at: string;
   updated_at: string;
@@ -125,6 +126,7 @@ export default function ConversationsPage() {
                 ai_paused: action === "pause",
                 paused_by: action === "pause" ? "admin" : "",
                 paused_at: action === "pause" ? new Date().toISOString() : conversation.paused_at,
+                ai_pause_expires_at: action === "pause" ? "" : conversation.ai_pause_expires_at,
                 resumed_at: action === "resume" ? new Date().toISOString() : conversation.resumed_at,
               }
             : conversation
@@ -173,6 +175,7 @@ export default function ConversationsPage() {
                 ...conversation,
                 ai_paused: false,
                 paused_by: "",
+                ai_pause_expires_at: "",
                 resumed_at: resumedAt,
               }
             : conversation
@@ -272,19 +275,34 @@ export default function ConversationsPage() {
                       {conversation.ai_paused ? (
                         <p className="mt-1 break-words text-[12px] text-[var(--text-subtle)]">
                           Paused by {conversation.paused_by === "owner" ? "manual Page reply" : conversation.paused_by || "manual Page reply"} at {formatTimestamp(conversation.paused_at)}
+                          {conversation.ai_pause_expires_at
+                            ? ` until ${formatTimestamp(conversation.ai_pause_expires_at)}`
+                            : ""}
                         </p>
                       ) : null}
                     </div>
                     <div className="flex w-full flex-wrap gap-2 lg:w-auto">
                       {conversation.ai_paused ? (
-                        <button
-                          type="button"
-                          onClick={() => void updateAiStatus(conversation.recipient_id, "resume")}
-                          disabled={updatingRecipientId === conversation.recipient_id}
-                          className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                        >
-                          {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Resume AI"}
-                        </button>
+                        <>
+                          {conversation.ai_pause_expires_at ? (
+                            <button
+                              type="button"
+                              onClick={() => void updateAiStatus(conversation.recipient_id, "pause")}
+                              disabled={updatingRecipientId === conversation.recipient_id}
+                              className="inline-flex w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                            >
+                              {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Stop Until Resume"}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void updateAiStatus(conversation.recipient_id, "resume")}
+                            disabled={updatingRecipientId === conversation.recipient_id}
+                            className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                          >
+                            {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Resume AI"}
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
