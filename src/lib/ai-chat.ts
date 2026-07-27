@@ -70,12 +70,12 @@ type ConversationContext = {
   replyPlan?: SalesPlan;
 };
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 120;
+const DEFAULT_MAX_OUTPUT_TOKENS = 160;
 const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
 const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = MAX_BUSINESS_INFO_LENGTH;
-const DEFAULT_REPLY_SENTENCE_LIMIT = 2;
+const DEFAULT_REPLY_SENTENCE_LIMIT = 3;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
   "SOFT_INTEREST",
@@ -115,6 +115,9 @@ function createFallbackSalesPlan(
   languageStyle: CustomerLanguageStyle,
   latestLeadIntent?: LeadCaptureIntent
 ): SalesPlan {
+  const shouldAskFollowUp =
+    latestLeadIntent !== "PROVIDED_LEAD_DETAILS" && latestLeadIntent !== "WANTS_HUMAN_CONTACT";
+
   return {
     ...parseSalesPlan("", languageStyle),
     leadCaptureIntent: latestLeadIntent ?? "UNCLEAR",
@@ -125,8 +128,11 @@ function createFallbackSalesPlan(
     buyerStage: "unknown",
     likelyConcern: "none",
     bestAnswerAngle: "answer_directly_using_business_facts",
-    bestNextStep: "answer_only",
-    shouldAskFollowUp: false,
+    bestNextStep:
+      latestLeadIntent === "READY_TO_BUY_OR_BOOK"
+        ? "collect one useful next detail and say the team will confirm"
+        : "ask one relevant qualifying question after the answer",
+    shouldAskFollowUp,
   };
 }
 
