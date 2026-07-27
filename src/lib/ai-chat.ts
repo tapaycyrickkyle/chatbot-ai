@@ -93,7 +93,7 @@ const CEBUANO_REPLY_TAGALOG_PATTERN =
 const TAGALOG_REPLY_CEBUANO_PATTERN =
   /\b(?:unsa|pila|naa|ug|diri|adto|ari|palihug|imong|imoha|among|koy|tabangan)\b/i;
 const MISSING_INFO_REPLY_PATTERN =
-  /\b(?:i|we|our team|the team)\s+(?:do not|don't|does not|doesn't|did not|didn't|cannot|can't)\s+(?:have|know|confirm|check)\b|\b(?:not available|unavailable|available yet|no exact|exact info|exact details|not listed|not provided|not in the business facts|team can confirm|team will confirm|team will check|will message you shortly)\b/i;
+  /\b(?:i|we|our team|the team)\s+(?:do not|don't|does not|doesn't|did not|didn't|cannot|can't)\s+(?:have|know)\b|\b(?:no exact info|no exact details|not listed|not provided|not in the business facts)\b/i;
 
 function isLeadCollectionText(value = "") {
   const normalizedValue = value.toLowerCase();
@@ -495,6 +495,8 @@ Rules:
 - If the previous assistant asked a choice question and the customer answers with one option, continue with that option.
 - If the customer refuses or hesitates in any language, answer gently and offer a lower-pressure next step.
 - If the customer asks a new question, answer the new question directly.
+- If the customer asks a broad info request such as "details", "info", "more info", "tell me more", "explain", "interested", "unsa ni", "ano ito", or any equivalent, plan a short overview from the available business facts instead of treating it as missing information.
+- If the business facts include a script or FAQ matching the customer's intent, use that script's facts naturally without copying labels like "Details:".
 - Identify what the buyer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the buyer closer to a qualified inquiry, viewing request, reservation discussion, or sample computation.
 - Prefer a single useful qualifying question after the answer when it helps identify fit: unit/service/package needed, budget range, preferred date or timing, location, quantity, purpose, payment preference, or main concern.
@@ -645,6 +647,8 @@ Core rules:
 - Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop or ask one useful next-step question.
 - Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
 - If a detail is not in the business facts, reply with the exact missing-info fallback from the dynamic instructions and nothing else. Do not guess, do not create an alternative process, and do not suggest a different unit, computation, package, or option.
+- For broad requests like details, info, more info, tell me more, explain, interested, "unsa ni", or "ano ito", do not require one exact field. Give the best short overview from available business facts, then ask one useful qualifying question.
+- If the business facts contain matching scripts, FAQs, named answers, or labeled sections, use those facts naturally. Do not say information is missing when a relevant overview, script, price, location, project, package, or process is present.
 - Act like a helpful real estate agent, not a passive FAQ bot. Understand what the customer is trying to decide: price, unit fit, location, availability, parking, payment, viewing, reservation, or next step.
 - Answer the latest customer question directly first. After answering, add one natural follow-up only when it helps move the buyer forward.
 - Make the conversation lead-oriented without sounding pushy: after a useful answer, choose one next question that helps qualify the customer or keep the chat alive.
@@ -691,6 +695,7 @@ ${aiTone ? `\nTone/style:\n${aiTone}` : ""}`;
 - Use this latest detected language/style for this reply only.
 - Required missing-info fallback: "${missingInfoReply}"
 - If the answer is missing, reply with the required missing-info fallback exactly as written. Do not add, remove, or rewrite any words.
+- Missing-info fallback is only for truly absent specific facts. For broad info requests, use any relevant business facts or matching script first.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
 
 Private sales plan:
