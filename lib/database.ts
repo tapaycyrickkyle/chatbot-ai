@@ -277,6 +277,45 @@ export async function getClients() {
   return (data ?? []).map((row) => normalizeClient(row as ClientRow));
 }
 
+export async function getClientByPageId(pageId: string) {
+  const supabase = getDb();
+  const response = await supabase
+    .from("clients")
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
+    .eq("page_id", pageId)
+    .maybeSingle();
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
+        .eq("page_id", pageId)
+        .maybeSingle()
+    : response;
+  const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS)
+        .eq("page_id", pageId)
+        .maybeSingle()
+    : currentResponse;
+  const { data, error } =
+    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
+    isMissingNewClientAiFieldsError(modernResponse.error) ||
+    isMissingWelcomeSequenceError(modernResponse.error)
+    ? await supabase
+        .from("clients")
+        .select(LEGACY_CLIENT_COLUMNS)
+        .eq("page_id", pageId)
+        .maybeSingle()
+    : modernResponse;
+
+  if (error) {
+    throw new Error(error.message || "Failed to load client by page ID");
+  }
+
+  return data ? normalizeClient(data as ClientRow) : null;
+}
+
 export async function enqueueAiMessageJob(input: {
   rawBody: string;
   payload: unknown;

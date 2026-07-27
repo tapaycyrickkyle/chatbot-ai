@@ -6,7 +6,7 @@ import {
   hasWelcomeSequenceReceipt,
   cancelPendingAiMessageJobsForConversation,
   enqueueAiMessageJob,
-  getClients,
+  getClientByPageId,
   pauseAiConversation,
   recordAiConversationReply,
   recordCustomerConversationMessage,
@@ -23,6 +23,8 @@ import {
   updateConversationSummary,
 } from "@/lib/conversation-memory";
 import { supabaseAdmin } from "@/lib/supabase";
+
+type ConnectedPageClient = NonNullable<Awaited<ReturnType<typeof getClientByPageId>>>;
 
 export const config = {
   api: {
@@ -533,7 +535,7 @@ function getWelcomeTextMessages(value: string) {
     .slice(0, 5);
 }
 
-function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>>[number]) {
+function hasWelcomeSequenceContent(client: ConnectedPageClient) {
   return Boolean(
     getWelcomeTextMessages(client.welcome_message).length > 0 ||
       client.welcome_link_url.trim() ||
@@ -542,7 +544,7 @@ function hasWelcomeSequenceContent(client: Awaited<ReturnType<typeof getClients>
 }
 
 function shouldSendWelcomeSequence(
-  client: Awaited<ReturnType<typeof getClients>>[number],
+  client: ConnectedPageClient,
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
   hasWelcomeReceipt: boolean
 ) {
@@ -562,7 +564,7 @@ function shouldSendWelcomeSequence(
 }
 
 async function sendWelcomeSequence(input: {
-  client: Awaited<ReturnType<typeof getClients>>[number];
+  client: ConnectedPageClient;
   pageId: string;
   recipientId: string;
   pageAccessToken: string;
@@ -710,11 +712,9 @@ export default async function handler(
     }
 
     if (body.object === "page") {
-      const clients = await getClients();
-
       for (const entry of body.entry ?? []) {
         const pageId = entry.id;
-        const client = clients.find((row) => row.page_id === pageId);
+        const client = await getClientByPageId(pageId);
 
         if (!client) {
           continue;
