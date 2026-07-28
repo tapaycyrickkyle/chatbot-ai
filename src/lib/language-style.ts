@@ -23,7 +23,7 @@ const MISSING_INFO_REPLIES: Record<CustomerLanguageStyle, string[]> = {
   cebuano: [
     "Ipa-forward nato ni sa team para matabangan ka nila sa sakto nga detalye.",
     "Ipa-check nato ni sa team para mahatagan ka nila sa klaro nga tubag.",
-    "Ako ni ipa-forward sa team para matabangan ka nila ug tarong.",
+    "Ako ni ipasa sa team para matabangan ka nila ug tarong.",
   ],
   tagalog: [
     "Ipa-forward natin ito sa team para matulungan ka nila sa exact details.",
@@ -99,7 +99,7 @@ export function getMissingInfoReply(customerMessage = "") {
 export function getLeadCapturedReply(customerMessage = "") {
   switch (detectCustomerLanguageStyle(customerMessage)) {
     case "cebuano":
-      return "Salamat, nadawat na nako imong details. Mo-follow up ang among team sa imoha soon.";
+      return "Salamat, nadawat na nako imong detalye. Mo-follow up ang among team nimo soon.";
     case "tagalog":
       return "Salamat, nakuha ko na ang details mo. Magfo-follow up ang team namin sa iyo soon.";
     case "taglish":

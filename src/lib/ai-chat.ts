@@ -177,7 +177,7 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
     case "english":
       return "Write the next assistant reply in English only. Do not use Bisaya/Cebuano, Tagalog, or Taglish, even if previous messages used them.";
     case "cebuano":
-      return "Write the next assistant reply in simple everyday Bisaya/Cebuano. Do not use Tagalog. Use English only for unavoidable product names or common business terms.";
+      return "Write the next assistant reply in natural everyday Bisaya/Cebuano, like a friendly local sales agent. Use Bisaya words first. Do not use Tagalog. Use English only for product names, prices, brand names, or words that sound awkward in Bisaya.";
     case "tagalog":
       return "Write the next assistant reply in Tagalog only. Do not use Bisaya/Cebuano or English except for unavoidable product names.";
     case "taglish":
@@ -674,7 +674,7 @@ Core rules:
 - If exact price, availability, custom quote, delivery fee, terms, requirements, schedule, or final offer details are missing from the business facts, say the team can confirm instead of inventing.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
 - Do not keep using a previous customer's language if the latest message switches languages.
-- If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in simple everyday Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
+- If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in natural everyday Bisaya/Cebuano, like a friendly local sales agent. Prefer Bisaya words such as "sakto nga detalye", "klaro nga tubag", "tabangan tika", "unsa imong ganahan", and "asa ka dapit". Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
 - Keep replies brief. Never use more than ${replySentenceLimit} sentence${replySentenceLimit === 1 ? "" : "s"} unless the customer explicitly asks for a list or detailed explanation.
