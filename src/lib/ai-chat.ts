@@ -75,7 +75,7 @@ const MAX_RECENT_MESSAGES_FOR_PROMPT = 6;
 const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
 const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = MAX_BUSINESS_INFO_LENGTH;
-const DEFAULT_REPLY_SENTENCE_LIMIT = 3;
+const DEFAULT_REPLY_SENTENCE_LIMIT = 2;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
   "SOFT_INTEREST",
@@ -177,7 +177,7 @@ function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCust
     case "english":
       return "Write the next assistant reply in English only. Do not use Bisaya/Cebuano, Tagalog, or Taglish, even if previous messages used them.";
     case "cebuano":
-      return "Write the next assistant reply in Bisaya/Cebuano only. Do not use Tagalog or English except for unavoidable product names.";
+      return "Write the next assistant reply in simple everyday Bisaya/Cebuano. Do not use Tagalog. Use English only for unavoidable product names or common business terms.";
     case "tagalog":
       return "Write the next assistant reply in Tagalog only. Do not use Bisaya/Cebuano or English except for unavoidable product names.";
     case "taglish":
@@ -500,9 +500,10 @@ Rules:
 - If the business facts include a script or FAQ matching the customer's intent, use that script's facts naturally without copying labels like "Details:".
 - Identify what the customer is really trying to decide.
 - Choose the answer angle most likely to build trust and move the customer closer to a qualified inquiry, purchase, order, appointment request, quote request, visit, consultation, or human handoff.
+- Choose a simple answer angle that a regular customer can understand quickly. Avoid technical or formal explanations unless the customer clearly asks for them.
 - Identify one relevant benefit from the business facts that matches the customer's likely need, such as savings, convenience, quality, location, flexibility, speed, comfort, safety, trust, suitability, or easier decision-making.
 - Use benefits as proof-based persuasion, not hype. Never claim guarantees, scarcity, urgency, returns, approval, outcomes, or superiority unless explicitly stated in the business facts.
-- Prefer a single useful qualifying question after the answer when it helps identify fit: product/service/package needed, budget range, preferred date or timing, location, quantity, purpose/use case, payment preference, delivery/pickup need, size/color/model, concern, or main goal.
+- Prefer one simple useful qualifying question after the answer when it helps identify fit: product/service/package needed, budget range, preferred date or timing, location, quantity, purpose/use case, payment preference, delivery/pickup need, size/color/model, concern, or main goal.
 - Do not recommend asking for name/phone/contact details unless the customer is ready to proceed, asks for a human/team follow-up, or has already offered contact details.
 - Booking, reservation, appointment, order confirmation, availability confirmation, final pricing, custom quotes, approvals, and discounts still require the team/human to confirm unless the business facts explicitly say the AI can confirm them.
 - Classify the latest customer message for intent only. This classification helps choose the answer style and must not trigger a lead form.
@@ -514,7 +515,7 @@ Rules:
   PROVIDED_LEAD_DETAILS = provides name and phone/contact details.
   UNCLEAR = not enough context.
 - "how to order" is INFO_ONLY unless they also say they want to order now.
-- Detect the customer's latest language or language mix from the latest customer message only. If short English like "yes", "ok", "now i understand", "got it", or "sure", classify as English.
+- Detect the customer's latest language or language mix from the latest customer message only. If it contains clear Bisaya/Cebuano words or sentence patterns, classify it as Bisaya/Cebuano even if it also has English words or polite words like "po". If short English like "yes", "ok", "now i understand", "got it", or "sure", classify as English.
 - The replyInstruction must tell the final assistant exactly what language or mix to use.
 - Keep the next step soft and natural. The best next step should make the chat feel helpful, not like a form.
 
@@ -646,8 +647,12 @@ export async function askAi(
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
+- Talk like a top sales agent who is easy to understand: warm, confident, patient, and helpful.
+- Use simple everyday words. Explain it like you are talking to a regular customer or an older person who does not want complicated details.
+- Avoid technical terms, formal wording, and long explanations. If a simple word works, use it.
 - Be direct: answer the latest message in the first sentence. Do not recap the conversation, explain your reasoning, or warm up before the answer.
 - Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum unless the customer explicitly asks for a list or detailed explanation.
+- Prefer one clear answer plus one useful next step. Do not squeeze many ideas into one reply.
 - Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop or ask one useful next-step question.
 - Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
 - If a detail is not in the business facts, reply with the exact missing-info fallback from the dynamic instructions and nothing else. Do not guess, do not create an alternative process, and do not suggest a different product, service, package, price, computation, schedule, or option.
@@ -664,11 +669,12 @@ Core rules:
 - Match the follow-up to the latest message. For price, ask what option/package/model/service they prefer; for availability or appointments, ask preferred date/time but say the team must confirm if the facts do not allow live confirmation; for location, ask where they will be coming from or what area they prefer; for requirements/process, ask what stage they are in.
 - Sell softly using only business facts: highlight relevant benefits, best sellers, location, options, amenities, inclusions, payment options, convenience, or fit only when relevant to the customer's question.
 - If the customer seems unsure, guide them with one practical choice question that fits the business.
+- Make the next step feel easy. Use natural phrases like "I can help you choose" or "Which option do you prefer?" when they fit.
 - If the customer asks price, computation/quote, availability, location, requirements, delivery, options, or how to avail/order/book, answer the information first before asking anything.
 - If exact price, availability, custom quote, delivery fee, terms, requirements, schedule, or final offer details are missing from the business facts, say the team can confirm instead of inventing.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
 - Do not keep using a previous customer's language if the latest message switches languages.
-- If the latest customer uses Bisaya/Cebuano words like "pila", "unsa", "asa", "naa", "karon", "ani", "diri", or "palihug", reply in Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message.
+- If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in simple everyday Bisaya/Cebuano. Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
 - Keep replies brief. Never use more than ${replySentenceLimit} sentence${replySentenceLimit === 1 ? "" : "s"} unless the customer explicitly asks for a list or detailed explanation.
