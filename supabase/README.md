@@ -26,10 +26,11 @@ If you prefer running files individually, run them in this order:
 16. `19-ai-job-cancel-and-auto-cleanup.sql`
 17. `21-messenger-message-dedupe.sql`
 18. `22-welcome-sequence-recipients.sql`
+19. `23-remove-ai-character-tone.sql`
 
 ## Tables Used
 
-- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, AI character/tone, welcome sequence settings, and per-page auto-reply echo ignore pattern.
+- `clients`: connected Facebook Pages, page tokens, page-level AI on/off state, business prompt knowledge, welcome sequence settings, and per-page auto-reply echo ignore pattern.
 - `rate_limit_logs`: Messenger send failures, usage snapshots, and cleanup logs.
 - `ai_conversations`: customer-level AI pause/resume state, compact memory, customer state, and recent short turns.
 - `welcome_sequence_recipients`: permanent minimal record of customers who already received the welcome sequence.

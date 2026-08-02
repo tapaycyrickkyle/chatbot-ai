@@ -1,6 +1,4 @@
 export const MAX_BUSINESS_INFO_LENGTH = 5000;
-export const MAX_AI_CHARACTER_LENGTH = 600;
-export const MAX_AI_TONE_LENGTH = 600;
 
 export const COMPACT_BUSINESS_INFO_TEMPLATE = `Business: ABC Burger
 Type: Burger shop
@@ -17,9 +15,3 @@ Policies: No cancellation after confirmation
 FAQs:
 - Delivery fee depends on location.
 Upsell: Offer fries and drinks with burgers`;
-
-export const AI_CHARACTER_TEMPLATE =
-  "Helpful sales assistant named Mika. Warm, attentive, and good at guiding customers without pressure.";
-
-export const AI_TONE_TEMPLATE =
-  "Friendly English-heavy Taglish. Short replies. Use po naturally when the customer uses Filipino or Taglish.";

@@ -64,8 +64,6 @@ type ConversationContext = {
     role?: string;
     content: string;
   }>;
-  aiCharacter?: string;
-  aiTone?: string;
   latestLeadIntent?: LeadCaptureIntent;
   replyPlan?: SalesPlan;
 };
@@ -622,8 +620,6 @@ export async function askAi(
     Object.keys(customerState).length > 0
       ? JSON.stringify(customerState).slice(0, MAX_MEMORY_CHARS)
       : "";
-  const aiCharacter = conversationContext.aiCharacter?.trim();
-  const aiTone = conversationContext.aiTone?.trim();
   const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const missingInfoReply = getMissingInfoReply(userMessage);
   const fallbackPlan = createFallbackSalesPlan(
@@ -700,9 +696,7 @@ Core rules:
 - If dynamic instructions include a private sales plan, use it to choose the best customer-facing answer, but never reveal the plan or mention that you made one.
 
 Business facts:
-${businessContextForPrompt || "No business facts provided."}
-${aiCharacter ? `\nAssistant character:\n${aiCharacter}` : ""}
-${aiTone ? `\nTone/style:\n${aiTone}` : ""}`;
+${businessContextForPrompt || "No business facts provided."}`;
     const dynamicInstructionPrompt = `Dynamic reply instructions:
 - AI-detected latest customer language/style: ${salesPlan.languageName}.
 - Mandatory reply language instruction: ${salesPlan.replyInstruction}

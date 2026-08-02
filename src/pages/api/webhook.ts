@@ -941,8 +941,6 @@ export default async function handler(
               conversationSummary: existingConversation?.conversation_summary,
               customerState: existingConversation?.customer_state,
               recentMessages: existingConversation?.recent_messages,
-              aiCharacter: client.ai_character,
-              aiTone: client.ai_tone,
             };
             const fallbackLeadIntent = getFallbackLeadIntent(rawText);
             const shouldPlanReply = shouldUseAiReplyPlanner(

@@ -6,11 +6,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/app/_components/ToastProvider";
 import LoadingModal from "@/app/_components/LoadingModal";
 import {
-  AI_CHARACTER_TEMPLATE,
-  AI_TONE_TEMPLATE,
   COMPACT_BUSINESS_INFO_TEMPLATE,
-  MAX_AI_CHARACTER_LENGTH,
-  MAX_AI_TONE_LENGTH,
   MAX_BUSINESS_INFO_LENGTH,
 } from "@/lib/business-info";
 
@@ -20,8 +16,6 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
-  ai_character: string;
-  ai_tone: string;
   ai_enabled: boolean;
 };
 
@@ -31,8 +25,6 @@ export default function PromptBuilderPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [aiCharacter, setAiCharacter] = useState("");
-  const [aiTone, setAiTone] = useState("");
   const [aiEnabled, setAiEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,8 +52,6 @@ export default function PromptBuilderPage() {
 
         setClientName(data.client_name || "");
         setPrompt(data.business_info || "");
-        setAiCharacter(data.ai_character || "");
-        setAiTone(data.ai_tone || "");
         setAiEnabled(data.ai_enabled ?? true);
       } catch (error) {
         console.error(error);
@@ -90,8 +80,6 @@ export default function PromptBuilderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           business_info: prompt,
-          ai_character: aiCharacter,
-          ai_tone: aiTone,
         }),
       });
 
@@ -151,8 +139,6 @@ export default function PromptBuilderPage() {
   };
 
   const remainingCharacters = MAX_BUSINESS_INFO_LENGTH - prompt.length;
-  const remainingCharacterPersona = MAX_AI_CHARACTER_LENGTH - aiCharacter.length;
-  const remainingToneCharacters = MAX_AI_TONE_LENGTH - aiTone.length;
 
   return (
     <>
@@ -250,56 +236,8 @@ export default function PromptBuilderPage() {
                   Use short labeled lines for products, pricing, payment, delivery, and policies.
                 </p>
               </div>
-            </div>
 
-            <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label
-                    className="block text-[13px] font-semibold text-[var(--text-primary)]"
-                    htmlFor="ai-character"
-                  >
-                    Character
-                  </label>
-                  <textarea
-                    id="ai-character"
-                    rows={7}
-                    value={aiCharacter}
-                    onChange={(event) => setAiCharacter(event.target.value)}
-                    maxLength={MAX_AI_CHARACTER_LENGTH}
-                    placeholder={AI_CHARACTER_TEMPLATE}
-                    className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
-                  />
-                  <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                    {aiCharacter.length} / {MAX_AI_CHARACTER_LENGTH} characters used
-                    {remainingCharacterPersona >= 0 ? `, ${remainingCharacterPersona} left.` : "."}
-                  </p>
-                </div>
-
-                <div>
-                  <label
-                    className="block text-[13px] font-semibold text-[var(--text-primary)]"
-                    htmlFor="ai-tone"
-                  >
-                    Tone
-                  </label>
-                  <textarea
-                    id="ai-tone"
-                    rows={7}
-                    value={aiTone}
-                    onChange={(event) => setAiTone(event.target.value)}
-                    maxLength={MAX_AI_TONE_LENGTH}
-                    placeholder={AI_TONE_TEMPLATE}
-                    className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
-                  />
-                  <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                    {aiTone.length} / {MAX_AI_TONE_LENGTH} characters used
-                    {remainingToneCharacters >= 0 ? `, ${remainingToneCharacters} left.` : "."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => void savePrompt()}

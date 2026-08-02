@@ -12,8 +12,6 @@ type ClientRow = {
   bot_type?: string | null;
   business_info?: string | null;
   ai_enabled?: boolean | null;
-  ai_character?: string | null;
-  ai_tone?: string | null;
   google_sheets_webhook_url?: string | null;
   google_sheets_tab_name?: string | null;
   welcome_sequence_enabled?: boolean | null;
@@ -63,7 +61,7 @@ type AiMessageJobRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, ai_character, ai_tone, google_sheets_webhook_url, google_sheets_tab_name, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, google_sheets_tab_name, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
   `${CLIENT_COLUMNS}, manual_ai_pause_minutes`;
 const CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE =
@@ -89,14 +87,6 @@ function isMissingGoogleSheetsTabNameError(error: { message?: string } | null) {
 function isMissingLastAiReplyError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("last_ai_reply") &&
-      error.message.includes("does not exist")
-  );
-}
-
-function isMissingNewClientAiFieldsError(error: { message?: string } | null) {
-  return Boolean(
-    (error?.message?.includes("ai_character") ||
-      error?.message?.includes("ai_tone")) &&
       error.message.includes("does not exist")
   );
 }
@@ -167,8 +157,6 @@ function normalizeClient(row: ClientRow) {
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     ai_enabled: row.ai_enabled ?? true,
-    ai_character: row.ai_character ?? "",
-    ai_tone: row.ai_tone ?? "",
     google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
     google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
     welcome_sequence_enabled: row.welcome_sequence_enabled ?? false,
@@ -262,7 +250,6 @@ export async function getClients() {
     : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
-    isMissingNewClientAiFieldsError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -300,7 +287,6 @@ export async function getClientByPageId(pageId: string) {
     : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
-    isMissingNewClientAiFieldsError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -577,7 +563,6 @@ export async function getClientById(clientId: string) {
     : currentResponse;
   const { data, error } =
     isMissingGoogleSheetsTabNameError(modernResponse.error) ||
-    isMissingNewClientAiFieldsError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -603,8 +588,6 @@ export async function updateClientSettings(
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
-    ai_character: string;
-    ai_tone: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
     welcome_sequence_enabled: boolean;

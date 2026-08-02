@@ -11,8 +11,6 @@ create table if not exists public.clients (
   bot_type text not null default 'ai',
   business_info text not null default '',
   ai_enabled boolean not null default true,
-  ai_character text not null default '',
-  ai_tone text not null default '',
   google_sheets_webhook_url text not null default '',
   google_sheets_tab_name text not null default 'Sheet1',
   lead_capture_fields text not null default 'Full Name
@@ -35,8 +33,6 @@ alter table public.clients
   add column if not exists bot_type text not null default 'ai',
   add column if not exists business_info text not null default '',
   add column if not exists ai_enabled boolean not null default true,
-  add column if not exists ai_character text not null default '',
-  add column if not exists ai_tone text not null default '',
   add column if not exists google_sheets_webhook_url text not null default '',
   add column if not exists google_sheets_tab_name text not null default 'Sheet1',
   add column if not exists lead_capture_fields text not null default 'Full Name
@@ -57,8 +53,6 @@ set
   bot_type = 'ai',
   business_info = coalesce(business_info, ''),
   ai_enabled = coalesce(ai_enabled, true),
-  ai_character = coalesce(ai_character, ''),
-  ai_tone = coalesce(ai_tone, ''),
   google_sheets_webhook_url = coalesce(google_sheets_webhook_url, ''),
   google_sheets_tab_name = coalesce(nullif(google_sheets_tab_name, ''), 'Sheet1'),
   lead_capture_fields = coalesce(nullif(lead_capture_fields, ''), 'Full Name
@@ -79,8 +73,6 @@ alter table public.clients
   alter column bot_type set default 'ai',
   alter column business_info set default '',
   alter column ai_enabled set default true,
-  alter column ai_character set default '',
-  alter column ai_tone set default '',
   alter column google_sheets_webhook_url set default '',
   alter column google_sheets_tab_name set default 'Sheet1',
   alter column lead_capture_fields set default 'Full Name
@@ -89,8 +81,6 @@ Phone',
   alter column bot_type set not null,
   alter column business_info set not null,
   alter column ai_enabled set not null,
-  alter column ai_character set not null,
-  alter column ai_tone set not null,
   alter column google_sheets_webhook_url set not null,
   alter column google_sheets_tab_name set not null,
   alter column lead_capture_fields set not null,
@@ -107,6 +97,10 @@ Phone',
   alter column welcome_image_urls set not null,
   alter column manual_ai_pause_minutes set not null,
   alter column auto_reply_ignore_pattern set not null;
+
+alter table public.clients
+  drop column if exists ai_character,
+  drop column if exists ai_tone;
 
 do $$
 begin
