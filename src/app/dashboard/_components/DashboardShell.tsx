@@ -66,7 +66,7 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
   }, [currentPathname, router, searchInputValue, searchParams, searchValue]);
 
   return (
-    <main className="page-enter flex min-h-screen bg-background text-foreground">
+    <main className="page-enter flex min-h-dvh w-full overflow-x-clip bg-background text-foreground">
       {isSidebarOpen ? (
         <button
           type="button"
@@ -77,7 +77,7 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
       ) : null}
 
       <aside
-        className={`panel-enter fixed inset-y-0 left-0 z-40 flex w-[calc(100vw-1rem)] max-w-[274px] flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 ${
+        className={`panel-enter fixed inset-y-0 left-0 z-40 flex w-[min(19rem,calc(100vw-1rem))] max-w-none flex-col overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -152,9 +152,9 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-[var(--border)] bg-background px-4 py-3.5 sm:px-8 lg:px-10">
+        <header className="border-b border-[var(--border)] bg-background px-3 py-3.5 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center justify-between gap-3">
               <h1 className="text-[1rem] font-bold text-[var(--text-primary)]">
                 AI Inbox Admin
               </h1>
@@ -168,21 +168,21 @@ const DashboardShell = ({ children }: DashboardShellProps) => {
               </button>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <div className="relative min-w-0 flex-1 sm:max-w-[320px] lg:w-[320px]">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative min-w-0 flex-1 sm:max-w-[360px] lg:w-[360px]">
                 <input
                   type="search"
                   value={searchInputValue}
                   onChange={(event) => setSearchInputValue(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="w-full rounded-md border border-[var(--border-input)] bg-background px-4 py-2 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
+                  className="w-full rounded-md border border-[var(--border-input)] bg-background px-3.5 py-2.5 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
                 />
               </div>
             </div>
           </div>
         </header>
 
-        <section className="px-4 py-6 sm:px-8 lg:px-10">{children}</section>
+        <section className="w-full min-w-0 px-3 py-4 sm:px-6 sm:py-6 lg:px-10">{children}</section>
       </div>
     </main>
   );

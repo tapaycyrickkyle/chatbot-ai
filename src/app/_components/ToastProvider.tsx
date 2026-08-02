@@ -90,7 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="pointer-events-none fixed inset-x-3 bottom-4 z-[100] flex flex-col items-stretch gap-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:max-w-[calc(100vw-2.5rem)] sm:items-end">
+      <div className="pointer-events-none fixed inset-x-3 bottom-3 z-[100] flex max-h-[calc(100dvh-1.5rem)] flex-col items-stretch gap-3 overflow-hidden sm:inset-x-auto sm:right-5 sm:bottom-5 sm:max-w-[calc(100vw-2.5rem)] sm:items-end">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -99,7 +99,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             }`}
           >
             <div
-              className={`flex items-center gap-3 rounded border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
+              className={`flex min-w-0 items-start gap-3 rounded border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${
                 toast.tone === "success"
                   ? "border-[var(--accent-bright)] bg-[var(--surface)]"
                   : "border-[#6a2d2d] bg-[#2b1717]"
@@ -119,7 +119,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 />
               </span>
               <p
-                className={`text-[13px] font-medium ${
+                className={`min-w-0 break-words text-[13px] font-medium ${
                   toast.tone === "success"
                     ? "text-[var(--text-primary)]"
                     : "text-[#ffd4d4]"

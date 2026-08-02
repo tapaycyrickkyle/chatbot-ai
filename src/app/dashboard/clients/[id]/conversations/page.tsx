@@ -197,37 +197,37 @@ export default function ConversationsPage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 sm:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               Conversations
             </p>
-            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
+            <h1 className="mt-2 break-words text-[1.35rem] font-extrabold leading-tight text-[var(--text-primary)] sm:text-[1.8rem]">
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
               Pause or resume AI replies when a human takes over a customer conversation.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
+          <div className="grid w-full grid-cols-1 gap-2 min-[420px]:flex min-[420px]:w-auto min-[420px]:flex-wrap">
             <button
               type="button"
               onClick={() => void resumeAllConversations()}
               disabled={loading || isResumingAll || pausedConversationCount === 0}
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 min-[360px]:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 min-[420px]:w-fit"
             >
               {isResumingAll ? "Resuming..." : `Resume All${pausedConversationCount > 0 ? ` (${pausedConversationCount})` : ""}`}
             </button>
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[420px]:w-fit"
             >
               AI Instructions
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[420px]:w-fit"
             >
               Back to Pages
             </Link>
@@ -250,7 +250,7 @@ export default function ConversationsPage() {
                   key={conversation.id}
                   className="border-t border-[var(--border)] bg-background px-4 py-4 first:border-t-0 sm:px-5"
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <h2 className="break-all text-[1rem] font-bold text-[var(--text-primary)]">
@@ -281,7 +281,7 @@ export default function ConversationsPage() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex w-full flex-wrap gap-2 lg:w-auto">
+                    <div className="grid w-full grid-cols-1 gap-2 min-[520px]:flex min-[520px]:flex-wrap lg:w-auto lg:justify-end">
                       {conversation.ai_paused ? (
                         <>
                           {conversation.ai_pause_expires_at ? (
@@ -289,7 +289,7 @@ export default function ConversationsPage() {
                               type="button"
                               onClick={() => void updateAiStatus(conversation.recipient_id, "pause")}
                               disabled={updatingRecipientId === conversation.recipient_id}
-                              className="inline-flex w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-center text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 min-[520px]:w-auto"
                             >
                               {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Stop Until Resume"}
                             </button>
@@ -298,7 +298,7 @@ export default function ConversationsPage() {
                             type="button"
                             onClick={() => void updateAiStatus(conversation.recipient_id, "resume")}
                             disabled={updatingRecipientId === conversation.recipient_id}
-                            className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 min-[520px]:w-auto"
                           >
                             {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Resume AI"}
                           </button>
@@ -308,7 +308,7 @@ export default function ConversationsPage() {
                           type="button"
                           onClick={() => void updateAiStatus(conversation.recipient_id, "pause")}
                           disabled={updatingRecipientId === conversation.recipient_id}
-                          className="inline-flex w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[#7a5a25] bg-[#2b2417] px-4 py-2 text-center text-[13px] font-semibold text-[#ffd37a] transition-colors hover:bg-[#382d19] disabled:cursor-not-allowed disabled:opacity-70 min-[520px]:w-auto"
                         >
                           {updatingRecipientId === conversation.recipient_id ? "Updating..." : "Pause AI"}
                         </button>

@@ -142,29 +142,29 @@ export default function PromptBuilderPage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 sm:gap-6">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
               AI Instructions
             </p>
-            <h1 className="mt-2 break-words text-[1.45rem] font-extrabold text-[var(--text-primary)] sm:text-[1.8rem]">
+            <h1 className="mt-2 break-words text-[1.35rem] font-extrabold leading-tight text-[var(--text-primary)] sm:text-[1.8rem]">
               {clientName || "Connected page"}
             </h1>
             <p className="mt-2 text-[14px] text-[var(--text-muted)]">
               Keep the business facts short, current, and easy for the AI to follow.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-3 min-[360px]:flex min-[360px]:flex-wrap">
+          <div className="grid w-full grid-cols-1 gap-2 min-[420px]:flex min-[420px]:w-auto min-[420px]:flex-wrap">
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}`}
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[420px]:w-fit"
             >
               Settings
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[360px]:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] min-[420px]:w-fit"
             >
               Back to Pages
             </Link>
@@ -177,8 +177,8 @@ export default function PromptBuilderPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div>
+            <div className="flex min-w-0 flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-[var(--text-primary)]">
                   AI Replies
                 </p>
@@ -188,7 +188,7 @@ export default function PromptBuilderPage() {
                     : "AI is off for this page and will not reply to customer messages."}
                 </p>
               </div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex shrink-0 items-center gap-2.5">
                 <span className="min-w-5 text-right text-[12px] font-semibold text-[var(--text-muted)]">
                   {aiEnabled ? "On" : "Off"}
                 </span>
@@ -214,7 +214,7 @@ export default function PromptBuilderPage() {
               </div>
             </div>
 
-            <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+            <div className="min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
               <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="ai-prompt">
                 Business Knowledge
               </label>
@@ -225,7 +225,7 @@ export default function PromptBuilderPage() {
                 onChange={(event) => setPrompt(event.target.value)}
                 maxLength={MAX_BUSINESS_INFO_LENGTH}
                 placeholder={COMPACT_BUSINESS_INFO_TEMPLATE}
-                className="mt-2 w-full rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
+                className="mt-2 min-h-[320px] w-full min-w-0 rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:min-h-[420px] sm:px-4"
               />
               <div className="mt-2 flex flex-col gap-2 text-[12px] leading-6 text-[var(--text-muted)]">
                 <p>
@@ -242,7 +242,7 @@ export default function PromptBuilderPage() {
                   type="button"
                   onClick={() => void savePrompt()}
                   disabled={saving}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-center text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                 >
                   {saving ? "Saving..." : "Save Prompt"}
                 </button>

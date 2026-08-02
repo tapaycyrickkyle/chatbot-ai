@@ -314,10 +314,10 @@ const DashboardPage = () => {
 
   return (
     <>
-      <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-[760px]">
-              <h2 className="text-[1.8rem] font-extrabold sm:text-[2.1rem]">
+      <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
+          <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 max-w-[760px]">
+              <h2 className="text-[1.55rem] font-extrabold leading-tight sm:text-[2.1rem]">
                 Connected Pages
               </h2>
               <p className="mt-2.5 max-w-[640px] text-[14px] leading-6 text-[var(--text-muted)]">
@@ -327,7 +327,7 @@ const DashboardPage = () => {
 
             <Link
               href="/api/auth/facebook/login"
-              className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-center text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
             >
               Connect Page
             </Link>
@@ -366,7 +366,7 @@ const DashboardPage = () => {
                 key={client.id}
                 className="border-t border-[var(--border)] px-4 py-4 first:border-t-0 sm:px-5"
               >
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[var(--surface-strong)] min-[360px]:h-12 min-[360px]:w-12">
                       {client.picture_url ? (
@@ -390,11 +390,11 @@ const DashboardPage = () => {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <h3 className="break-words text-[1.05rem] font-bold sm:text-[1.125rem]">
                           {client.client_name}
                         </h3>
-                        <span className="h-2 w-2 rounded-full bg-[#4ce2a2]" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#4ce2a2]" />
                       </div>
                       <p className="mt-1.5 break-all text-[13px] text-[var(--text-subtle)]">
                         Facebook Page {client.page_id}
@@ -402,7 +402,7 @@ const DashboardPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
+                  <div className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:flex sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:flex-none lg:gap-6">
                     <div className="min-w-0 sm:min-w-[120px]">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                         Connected
@@ -430,22 +430,22 @@ const DashboardPage = () => {
                       </p>
                     </div>
 
-                    <div className="grid w-full grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap">
+                    <div className="grid w-full grid-cols-1 gap-2 min-[420px]:col-span-2 min-[420px]:grid-cols-2 sm:col-span-1 sm:flex sm:w-auto sm:flex-wrap">
                       <Link
                         href={`/api/auth/facebook/login?reconnect_client_id=${encodeURIComponent(client.id)}`}
-                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
                       >
                         Reconnect
                       </Link>
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/prompt-builder`}
-                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-fit"
                       >
                         Prompt
                       </Link>
                       <Link
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}/conversations`}
-                        className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-fit"
                       >
                         Conversations
                       </Link>
@@ -453,7 +453,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={() => openDisconnectModal(client)}
                         disabled={isDisconnectingClientId === client.id}
-                        className="inline-flex w-full items-center justify-center rounded-md border border-transparent bg-[#b42318] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-transparent bg-[#b42318] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-70 sm:w-fit"
                       >
                         {isDisconnectingClientId === client.id ? "Disconnecting..." : "Disconnect"}
                       </button>
@@ -461,7 +461,7 @@ const DashboardPage = () => {
                         href={`/dashboard/clients/${encodeURIComponent(client.id)}`}
                         aria-label={`Open settings for ${client.client_name}`}
                         title="Settings"
-                        className="inline-flex h-[36px] w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:w-[36px]"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-strong)] text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] sm:h-10 sm:w-10"
                       >
                         <FontAwesomeIcon aria-hidden="true" className="h-4 w-4" icon={faGear} />
                       </Link>
@@ -475,8 +475,8 @@ const DashboardPage = () => {
           </div>
       </div>
       {disconnectTarget ? (
-        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
+        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center overflow-y-auto bg-black/70 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-8">
+          <div className="my-auto w-full max-w-[520px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-md border border-[#5a2626] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between gap-3 border-b border-[#5a2626] px-4 py-5 sm:px-7 sm:py-6">
               <h3 className="text-[1.2rem] font-extrabold text-[#ffdfdf] sm:text-[1.5rem]">
                 Confirm Disconnect
@@ -494,7 +494,7 @@ const DashboardPage = () => {
 
             <div className="space-y-5 px-4 py-5 sm:px-7 sm:py-6">
               <p className="text-[15px] leading-7 text-[var(--text-label)]">
-                You are about to disconnect <span className="font-semibold text-[var(--text-primary)]">{disconnectTarget.client_name}</span> and remove its connected page data and saved FAQs.
+                You are about to disconnect <span className="font-semibold text-[var(--text-primary)]">{disconnectTarget.client_name}</span> and remove its connected page data and settings.
               </p>
               <p className="text-[14px] leading-6 text-[var(--text-muted)]">
                 To continue, type <span className="font-semibold lowercase text-[#ffb4b4]">disconnect</span> below.
@@ -511,7 +511,7 @@ const DashboardPage = () => {
                   type="button"
                   onClick={closeDisconnectModal}
                   disabled={Boolean(isDisconnectingClientId)}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-[14px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -519,7 +519,7 @@ const DashboardPage = () => {
                   type="button"
                   onClick={() => void disconnectClient()}
                   disabled={!canConfirmDisconnect || Boolean(isDisconnectingClientId)}
-                  className="rounded-md border border-transparent bg-[#b42318] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-md border border-transparent bg-[#b42318] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#d92d20] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isDisconnectingClientId ? "Disconnecting..." : "Disconnect Page"}
                 </button>
@@ -529,10 +529,10 @@ const DashboardPage = () => {
         </div>
       ) : null}
       {showModal ? (
-        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center overflow-y-auto bg-black/70 px-4 py-4 backdrop-blur-sm sm:py-8">
+        <div className="fixed inset-0 z-50 flex animate-[fadeIn_180ms_ease-out] items-center justify-center overflow-y-auto bg-black/70 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-8">
           <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[640px] animate-[modalIn_220ms_cubic-bezier(0.22,1,0.36,1)] flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[0_32px_80px_rgba(0,0,0,0.45)] sm:max-h-[calc(100vh-4rem)]">
-            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-5 sm:px-7 sm:py-6">
-              <h3 className="text-[1.2rem] font-extrabold sm:text-[1.5rem]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-5 sm:px-7 sm:py-6">
+              <h3 className="min-w-0 text-[1.2rem] font-extrabold leading-tight sm:text-[1.5rem]">
                 Connect a New Facebook Page
               </h3>
               <button
@@ -578,7 +578,7 @@ const DashboardPage = () => {
                   return (
                     <div
                       key={page.id}
-                      className="flex flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                      className="flex min-w-0 flex-col gap-4 rounded border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
                     >
                       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,_rgba(62,207,142,0.24),_transparent_55%),linear-gradient(135deg,#1d3025_0%,#101010_100%)]">
@@ -616,7 +616,7 @@ const DashboardPage = () => {
                         type="button"
                         onClick={isDisabled ? undefined : () => void connectPage(page)}
                         disabled={isDisabled}
-                        className={`w-full rounded-md px-5 py-2.5 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed sm:w-auto ${
+                        className={`min-h-11 w-full rounded-md px-5 py-2.5 text-center text-[14px] font-semibold transition-colors disabled:cursor-not-allowed sm:w-auto ${
                           isAlreadyConnected && !isReconnectTarget
                             ? "border border-[#2f5f49] bg-[#173126] text-[#9ce3c1] opacity-80"
                             : "border border-[var(--accent-bright)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-70"

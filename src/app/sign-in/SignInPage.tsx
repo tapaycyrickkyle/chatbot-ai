@@ -81,22 +81,22 @@ const SignInPage = () => {
   };
 
   return (
-    <main className="page-enter flex min-h-screen flex-col bg-[#171717] text-[#f3f4f6]">
-      <section className="flex flex-1 items-start justify-center px-4 pt-12 pb-10 sm:px-6 sm:pt-16">
+    <main className="page-enter flex min-h-dvh flex-col bg-[#171717] text-[#f3f4f6]">
+      <section className="flex flex-1 items-start justify-center px-3 pt-8 pb-8 sm:px-6 sm:pt-16">
         <div className="w-full max-w-[420px] panel-enter">
           <div className="mb-7">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a8a8f]">
               Secure workspace
             </p>
             <h1
-              className="mt-2 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem]"
+              className="mt-2 text-[1.55rem] font-extrabold leading-tight sm:text-[1.85rem]"
               style={{ color: "var(--accent-text)" }}
             >
               AI Inbox
             </h1>
           </div>
 
-          <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-5 py-6 sm:px-6 sm:py-6">
+          <div className="rounded border border-[#2a2a2a] bg-[#1d1d1d] px-4 py-5 sm:px-6 sm:py-6">
             <form className="space-y-4.5" onSubmit={handleSubmit}>
               <div className="border-b border-[#2a2a2a] pb-4">
                 <h2 className="text-[1.2rem] font-bold text-[#f3f4f6]">
@@ -124,7 +124,7 @@ const SignInPage = () => {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="Email"
-                    className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    className="min-h-11 w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-4 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                     suppressHydrationWarning
                   />
                 </div>
@@ -149,7 +149,7 @@ const SignInPage = () => {
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="********"
-                    className="w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-12 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
+                    className="min-h-11 w-full rounded-md border border-[#303030] bg-[#171717] py-2.5 pr-12 pl-10 text-[15px] text-[#f3f4f6] placeholder:text-[#8a8a8f] focus:border-[#006139] focus:outline-none focus:ring-2 focus:ring-[#006139]/20"
                     suppressHydrationWarning
                   />
                   <button
@@ -171,7 +171,7 @@ const SignInPage = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-3 w-full rounded-md border border-[#3ECF8E] bg-[#006139] py-2.5 text-[15px] font-semibold text-white transition-colors hover:border-[#3ECF8E] hover:bg-[#0a7a4a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                className="mt-3 min-h-11 w-full rounded-md border border-[#3ECF8E] bg-[#006139] py-2.5 text-[15px] font-semibold text-white transition-colors hover:border-[#3ECF8E] hover:bg-[#0a7a4a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
                 suppressHydrationWarning
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}

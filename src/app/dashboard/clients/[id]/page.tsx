@@ -89,14 +89,14 @@ function serializeAutoReplyIgnorePatterns(patterns: string[]) {
 }
 
 const panelClass =
-  "rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-5 sm:py-5";
+  "min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-5 sm:py-5";
 const labelClass = "block text-[13px] font-semibold text-[var(--text-label)]";
 const inputClass =
-  "w-full rounded-md border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20";
+  "min-h-11 w-full min-w-0 rounded-md border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20";
 const secondaryButtonClass =
-  "inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-background px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+  "inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--border)] bg-background px-4 py-2.5 text-center text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-70";
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70";
+  "inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-4 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70";
 
 function SettingsSection({
   eyebrow,
@@ -125,7 +125,7 @@ function SettingsSection({
             {description}
           </p>
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
+        {actions ? <div className="w-full shrink-0 lg:w-auto">{actions}</div> : null}
       </div>
       <div className="pt-5">{children}</div>
     </section>
@@ -422,7 +422,7 @@ export default function ClientSettingsPage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 sm:gap-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--accent-bright)]">
@@ -435,7 +435,7 @@ export default function ClientSettingsPage() {
               Configure AI handoff, first replies, and page maintenance from one workspace.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:justify-end">
+          <div className="grid w-full grid-cols-1 gap-2 min-[420px]:flex min-[420px]:w-auto min-[420px]:flex-wrap min-[420px]:justify-end">
             <Link
               href={`/dashboard/clients/${encodeURIComponent(clientId)}/prompt-builder`}
               className={`${secondaryButtonClass} w-full min-[420px]:w-auto`}
@@ -454,24 +454,24 @@ export default function ClientSettingsPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid min-w-0 gap-3 md:grid-cols-3">
               {[
                 ["Page", clientName || "Unknown page"],
                 ["Page ID", pageId || "Not available"],
                 ["AI Pause", `${manualAiPauseMinutes} min default`],
               ].map(([label, value]) => (
-                <div key={label} className="rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                <div key={label} className="min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
                     {label}
                   </p>
-                  <p className="mt-2 truncate text-[14px] font-semibold text-[var(--text-primary)]" title={value}>
+                  <p className="mt-2 break-words text-[14px] font-semibold text-[var(--text-primary)]" title={value}>
                     {value}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
               <div className="flex min-w-0 flex-col gap-5">
                 <SettingsSection
                   eyebrow="AI handoff"
@@ -486,7 +486,7 @@ export default function ClientSettingsPage() {
                     </Link>
                   }
                 >
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                     <div>
                       <label className={labelClass} htmlFor="manual-ai-pause-minutes">
                         Manual reply pause duration
@@ -495,7 +495,7 @@ export default function ClientSettingsPage() {
                         id="manual-ai-pause-minutes"
                         value={manualAiPauseMinutes}
                         onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
-                        className={`${inputClass} mt-2 max-w-[220px]`}
+                        className={`${inputClass} mt-2 max-w-full sm:max-w-[220px]`}
                       >
                         {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -528,7 +528,7 @@ export default function ClientSettingsPage() {
                       </div>
                       <div className="mt-3 space-y-2">
                         {autoReplyIgnorePatterns.map((pattern, index) => (
-                          <div key={`auto-reply-ignore-pattern-${index}`} className="flex min-w-0 gap-2">
+                          <div key={`auto-reply-ignore-pattern-${index}`} className="flex min-w-0 flex-col gap-2 min-[520px]:flex-row">
                             <input
                               id={`auto-reply-ignore-pattern-${index}`}
                               type="text"
@@ -547,7 +547,7 @@ export default function ClientSettingsPage() {
                             <button
                               type="button"
                               onClick={() => removeAutoReplyIgnorePattern(index)}
-                              className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
+                              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-center text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
                             >
                               Remove
                             </button>
@@ -654,7 +654,7 @@ export default function ClientSettingsPage() {
                       void uploadWelcomeImage(file);
                     }}
                     disabled={uploadingWelcomeImage || welcomeAttachmentIds.length >= 11}
-                    className={`${inputClass} mt-2 file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70`}
+                    className={`${inputClass} mt-2 min-h-[unset] file:mr-3 file:rounded file:border-0 file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-70`}
                   />
                   <textarea
                     id="welcome-image-urls"
