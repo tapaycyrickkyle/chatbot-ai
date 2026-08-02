@@ -89,7 +89,7 @@ function serializeAutoReplyIgnorePatterns(patterns: string[]) {
 }
 
 const panelClass =
-  "min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-5 sm:py-5";
+  "min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-5 shadow-[0_1px_0_rgba(255,255,255,0.03)] sm:px-6 sm:py-6";
 const labelClass = "block text-[13px] font-semibold text-[var(--text-label)]";
 const inputClass =
   "min-h-11 w-full min-w-0 rounded-md border border-[var(--border-input)] bg-background px-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20";
@@ -113,12 +113,12 @@ function SettingsSection({
 }) {
   return (
     <section className={panelClass}>
-      <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
             {eyebrow}
           </p>
-          <h2 className="mt-2 text-[1rem] font-bold text-[var(--text-primary)]">
+          <h2 className="mt-2 text-[1.08rem] font-bold text-[var(--text-primary)] sm:text-[1.15rem]">
             {title}
           </h2>
           <p className="mt-1 max-w-2xl text-[13px] leading-6 text-[var(--text-muted)]">
@@ -127,9 +127,19 @@ function SettingsSection({
         </div>
         {actions ? <div className="w-full shrink-0 lg:w-auto">{actions}</div> : null}
       </div>
-      <div className="pt-5">{children}</div>
+      <div className="pt-5 sm:pt-6">{children}</div>
     </section>
   );
+}
+
+function getWelcomeMessageOrder(index: number) {
+  return [
+    "Sent first",
+    "Sent second",
+    "Sent third",
+    "Sent fourth",
+    "Sent fifth",
+  ][index] ?? `Sent #${index + 1}`;
 }
 
 export default function ClientSettingsPage() {
@@ -471,165 +481,76 @@ export default function ClientSettingsPage() {
               ))}
             </div>
 
-            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-              <div className="flex min-w-0 flex-col gap-5">
-                <SettingsSection
-                  eyebrow="AI handoff"
-                  title="Conversation Control"
-                  description="Set how the AI behaves after a human replies from the Page inbox."
-                  actions={
-                    <Link
-                      href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
-                      className={`${secondaryButtonClass} w-full lg:w-auto`}
-                    >
-                      Open Conversations
-                    </Link>
-                  }
-                >
-                  <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-                    <div>
-                      <label className={labelClass} htmlFor="manual-ai-pause-minutes">
-                        Manual reply pause duration
-                      </label>
-                      <select
-                        id="manual-ai-pause-minutes"
-                        value={manualAiPauseMinutes}
-                        onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
-                        className={`${inputClass} mt-2 max-w-full sm:max-w-[220px]`}
+            <SettingsSection
+              eyebrow="First reply"
+              title="Welcome Sequence"
+              description="Messages are sent in this order after a customer first replies in Messenger."
+              actions={
+                <div className="flex w-full items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-background px-3 py-2 lg:w-auto">
+                  <span className="text-[12px] font-semibold text-[var(--text-muted)]">
+                    {welcomeSequenceEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={welcomeSequenceEnabled}
+                    aria-label={welcomeSequenceEnabled ? "Disable welcome sequence" : "Enable welcome sequence"}
+                    onClick={() => setWelcomeSequenceEnabled((value) => !value)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 ${
+                      welcomeSequenceEnabled
+                        ? "border-[var(--accent-bright)] bg-[var(--accent)]"
+                        : "border-[var(--border)] bg-[var(--surface-strong)]"
+                    }`}
+                  >
+                    <span
+                      className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        welcomeSequenceEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              }
+            >
+              <div className="grid gap-4 lg:grid-cols-2">
+                {welcomeMessages.map((message, index) => (
+                  <div
+                    key={`welcome-message-${index}`}
+                    className="min-w-0 rounded-md border border-[var(--border)] bg-background px-4 py-4"
+                  >
+                    <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+                      <label
+                        className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)]"
+                        htmlFor={`welcome-message-${index}`}
                       >
-                        {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
-                        Applies only to the customer where the human replied.
-                      </p>
+                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)]/20 text-[12px] font-bold text-[var(--accent-bright)]">
+                          {index + 1}
+                        </span>
+                        <span>{getWelcomeMessageOrder(index)}</span>
+                      </label>
+                      <span className="text-[11px] text-[var(--text-subtle)]">
+                        {message.length} / {MAX_WELCOME_MESSAGE_LENGTH}
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                          <label className={labelClass} htmlFor="auto-reply-ignore-pattern-0">
-                            Auto-reply messages to ignore
-                          </label>
-                          <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
-                            Use {"{name}"} for customer-specific greetings.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={addAutoReplyIgnorePattern}
-                          disabled={autoReplyIgnorePatterns.length >= MAX_AUTO_REPLY_IGNORE_PATTERNS}
-                          className={`${secondaryButtonClass} w-full sm:w-auto`}
-                        >
-                          Add
-                        </button>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {autoReplyIgnorePatterns.map((pattern, index) => (
-                          <div key={`auto-reply-ignore-pattern-${index}`} className="flex min-w-0 flex-col gap-2 min-[520px]:flex-row">
-                            <input
-                              id={`auto-reply-ignore-pattern-${index}`}
-                              type="text"
-                              value={pattern}
-                              onChange={(event) =>
-                                updateAutoReplyIgnorePattern(index, event.target.value)
-                              }
-                              maxLength={MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH}
-                              placeholder={
-                                index === 0
-                                  ? "Hello {name}, how can we assist you today?"
-                                  : "Call now to get faster service."
-                              }
-                              className={`${inputClass} min-w-0 flex-1`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeAutoReplyIgnorePattern(index)}
-                              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-center text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <textarea
+                      id={`welcome-message-${index}`}
+                      value={message}
+                      onChange={(event) => updateWelcomeMessage(index, event.target.value)}
+                      rows={index === 0 ? 5 : 4}
+                      maxLength={MAX_WELCOME_MESSAGE_LENGTH}
+                      placeholder={
+                        index === 0
+                          ? "This message is sent first."
+                          : `Optional message sent ${index + 1} in the sequence.`
+                      }
+                      className={`${inputClass} mt-3 min-h-[132px] resize-y`}
+                    />
                   </div>
-                  <div className="mt-5 flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-between">
-                    <button
-                      type="button"
-                      onClick={() => void repairMessengerWebhook()}
-                      disabled={repairingMessengerWebhook || loading}
-                      className={`${secondaryButtonClass} w-full sm:w-auto`}
-                    >
-                      {repairingMessengerWebhook ? "Repairing..." : "Repair Messenger Webhook"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveAutoReplyIgnorePattern()}
-                      disabled={savingAutoReplyIgnorePattern || loading}
-                      className={`${primaryButtonClass} w-full sm:w-auto`}
-                    >
-                      {savingAutoReplyIgnorePattern ? "Saving..." : "Save AI Controls"}
-                    </button>
-                  </div>
-                </SettingsSection>
-
+                ))}
               </div>
 
-              <div className="flex min-w-0 flex-col gap-5">
-                <SettingsSection
-                  eyebrow="First reply"
-                  title="Welcome Sequence"
-                  description="Send up to five prepared responses after a customer first replies in Messenger."
-                  actions={
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={welcomeSequenceEnabled}
-                      onClick={() => setWelcomeSequenceEnabled((value) => !value)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25 ${
-                        welcomeSequenceEnabled
-                          ? "border-[var(--accent-bright)] bg-[var(--accent)]"
-                          : "border-[var(--border)] bg-background"
-                      }`}
-                    >
-                      <span
-                        className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                          welcomeSequenceEnabled ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  }
-                >
-                  <div className="space-y-4">
-                    {welcomeMessages.map((message, index) => (
-                      <div key={`welcome-message-${index}`}>
-                        <label className={labelClass} htmlFor={`welcome-message-${index}`}>
-                          Message {index + 1}
-                        </label>
-                        <textarea
-                          id={`welcome-message-${index}`}
-                          value={message}
-                          onChange={(event) => updateWelcomeMessage(index, event.target.value)}
-                          rows={index === 0 ? 4 : 3}
-                          maxLength={MAX_WELCOME_MESSAGE_LENGTH}
-                          placeholder={
-                            index === 0
-                              ? "Welcome! Here are the details you requested..."
-                              : "Optional follow-up message..."
-                          }
-                          className={`${inputClass} mt-2 resize-y`}
-                        />
-                        <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
-                          {message.length} / {MAX_WELCOME_MESSAGE_LENGTH} characters
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className={`${labelClass} mt-4`} htmlFor="welcome-link-url">
+              <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 lg:grid-cols-2">
+                <div className="min-w-0">
+                  <label className={labelClass} htmlFor="welcome-link-url">
                     Link URL
                   </label>
                   <input
@@ -640,8 +561,10 @@ export default function ClientSettingsPage() {
                     placeholder="https://facebook.com/your-page-or-post"
                     className={`${inputClass} mt-2`}
                   />
+                </div>
 
-                  <label className={`${labelClass} mt-4`} htmlFor="welcome-image-urls">
+                <div className="min-w-0">
+                  <label className={labelClass} htmlFor="welcome-image-urls">
                     Messenger image attachments
                   </label>
                   <input
@@ -668,60 +591,165 @@ export default function ClientSettingsPage() {
                   <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
                     {welcomeAttachmentIds.length} / 11 Messenger attachments used.
                   </p>
+                </div>
+              </div>
 
-                  <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-4">
+              <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-5">
+                <button
+                  type="button"
+                  onClick={() => void saveWelcomeSequence()}
+                  disabled={savingWelcomeSequence || loading}
+                  className={`${primaryButtonClass} w-full sm:w-auto`}
+                >
+                  {savingWelcomeSequence ? "Saving..." : "Save Welcome Sequence"}
+                </button>
+              </div>
+            </SettingsSection>
+
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)]">
+              <SettingsSection
+                eyebrow="AI handoff"
+                title="Conversation Control"
+                description="Set how the AI behaves after a human replies from the Page inbox."
+                actions={
+                  <Link
+                    href={`/dashboard/clients/${encodeURIComponent(clientId)}/conversations`}
+                    className={`${secondaryButtonClass} w-full lg:w-auto`}
+                  >
+                    Open Conversations
+                  </Link>
+                }
+              >
+                <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(180px,240px)_minmax(0,1fr)]">
+                  <div>
+                    <label className={labelClass} htmlFor="manual-ai-pause-minutes">
+                      Manual reply pause duration
+                    </label>
+                    <select
+                      id="manual-ai-pause-minutes"
+                      value={manualAiPauseMinutes}
+                      onChange={(event) => setManualAiPauseMinutes(Number(event.target.value))}
+                      className={`${inputClass} mt-2 max-w-full sm:max-w-[220px]`}
+                    >
+                      {MANUAL_AI_PAUSE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">
+                      Applies only to the customer where the human replied.
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <label className={labelClass} htmlFor="auto-reply-ignore-pattern-0">
+                          Auto-reply messages to ignore
+                        </label>
+                        <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                          Use {"{name}"} for customer-specific greetings.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addAutoReplyIgnorePattern}
+                        disabled={autoReplyIgnorePatterns.length >= MAX_AUTO_REPLY_IGNORE_PATTERNS}
+                        className={`${secondaryButtonClass} w-full sm:w-auto`}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {autoReplyIgnorePatterns.map((pattern, index) => (
+                        <div key={`auto-reply-ignore-pattern-${index}`} className="flex min-w-0 flex-col gap-2 min-[520px]:flex-row">
+                          <input
+                            id={`auto-reply-ignore-pattern-${index}`}
+                            type="text"
+                            value={pattern}
+                            onChange={(event) =>
+                              updateAutoReplyIgnorePattern(index, event.target.value)
+                            }
+                            maxLength={MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH}
+                            placeholder={
+                              index === 0
+                                ? "Hello {name}, how can we assist you today?"
+                                : "Call now to get faster service."
+                            }
+                            className={`${inputClass} min-w-0 flex-1`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAutoReplyIgnorePattern(index)}
+                            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-background px-3 py-2 text-center text-[12px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text-primary)]"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-col gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => void repairMessengerWebhook()}
+                    disabled={repairingMessengerWebhook || loading}
+                    className={`${secondaryButtonClass} w-full sm:w-auto`}
+                  >
+                    {repairingMessengerWebhook ? "Repairing..." : "Repair Messenger Webhook"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveAutoReplyIgnorePattern()}
+                    disabled={savingAutoReplyIgnorePattern || loading}
+                    className={`${primaryButtonClass} w-full sm:w-auto`}
+                  >
+                    {savingAutoReplyIgnorePattern ? "Saving..." : "Save AI Controls"}
+                  </button>
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                eyebrow="Maintenance"
+                title="Page Tools"
+                description="Run occasional fixes and cleanups for this connected Page."
+              >
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
+                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                      Storage cleanup
+                    </p>
+                    <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                      Removes old rate limit logs and legacy reply sessions.
+                    </p>
                     <button
                       type="button"
-                      onClick={() => void saveWelcomeSequence()}
-                      disabled={savingWelcomeSequence || loading}
-                      className={`${primaryButtonClass} w-full sm:w-auto`}
+                      onClick={() => void cleanupStorage()}
+                      disabled={cleaningStorage || loading}
+                      className={`${secondaryButtonClass} mt-3 w-full`}
                     >
-                      {savingWelcomeSequence ? "Saving..." : "Save First Reply"}
+                      {cleaningStorage ? "Cleaning..." : "Clean Old Logs"}
                     </button>
                   </div>
-                </SettingsSection>
-
-                <SettingsSection
-                  eyebrow="Maintenance"
-                  title="Page Tools"
-                  description="Run occasional fixes and cleanups for this connected Page."
-                >
-                  <div className="space-y-4">
-                    <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
-                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
-                        Storage cleanup
-                      </p>
-                      <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
-                        Removes old rate limit logs and legacy reply sessions.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void cleanupStorage()}
-                        disabled={cleaningStorage || loading}
-                        className={`${secondaryButtonClass} mt-3 w-full`}
-                      >
-                        {cleaningStorage ? "Cleaning..." : "Clean Old Logs"}
-                      </button>
-                    </div>
-                    <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
-                      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
-                        Messenger webhook
-                      </p>
-                      <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
-                        Re-subscribes this Page to messages, postbacks, and echoes.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void repairMessengerWebhook()}
-                        disabled={repairingMessengerWebhook || loading}
-                        className={`${secondaryButtonClass} mt-3 w-full`}
-                      >
-                        {repairingMessengerWebhook ? "Repairing..." : "Repair Webhook"}
-                      </button>
-                    </div>
+                  <div className="rounded-md border border-[var(--border)] bg-background px-4 py-4">
+                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                      Messenger webhook
+                    </p>
+                    <p className="mt-1 text-[12px] leading-6 text-[var(--text-muted)]">
+                      Re-subscribes this Page to messages, postbacks, and echoes.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void repairMessengerWebhook()}
+                      disabled={repairingMessengerWebhook || loading}
+                      className={`${secondaryButtonClass} mt-3 w-full`}
+                    >
+                      {repairingMessengerWebhook ? "Repairing..." : "Repair Webhook"}
+                    </button>
                   </div>
-                </SettingsSection>
-              </div>
+                </div>
+              </SettingsSection>
             </div>
           </>
         )}
