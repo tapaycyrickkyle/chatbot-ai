@@ -40,6 +40,8 @@ For higher Messenger traffic, configure the webhook to queue deliveries and proc
 AI_WORKER_SECRET="long-random-secret"
 AI_QUEUE_ENABLED="true"
 AI_MESSAGE_JOB_BATCH_SIZE="5"
+AI_MESSAGE_JOB_CONCURRENCY="5"
+AI_MESSAGE_JOB_MAX_ROUNDS="3"
 AI_REQUEST_TIMEOUT_MS="20000"
 AI_WORKER_WEBHOOK_TIMEOUT_MS="120000"
 ```
