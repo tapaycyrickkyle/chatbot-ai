@@ -58,6 +58,13 @@ The workflow in `.github/workflows/process-ai-message-jobs.yml` calls the worker
 
 If `AI_WORKER_SECRET` or `CRON_SECRET` is missing, the webhook falls back to inline processing so messages are not trapped in the queue.
 
+To verify production queue config and stuck jobs without exposing secrets:
+
+```bash
+curl --fail --request POST "https://your-vercel-domain.com/api/ai-message-jobs/health" \
+  --header "Authorization: Bearer $AI_WORKER_SECRET"
+```
+
 ## Storage Retention
 
 The admin storage cleanup endpoint keeps database usage low:
