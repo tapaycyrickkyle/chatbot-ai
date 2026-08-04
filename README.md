@@ -38,6 +38,7 @@ For higher Messenger traffic, configure the webhook to queue deliveries and proc
 
 ```env
 AI_WORKER_SECRET="long-random-secret"
+CRON_SECRET="same-long-random-secret"
 AI_QUEUE_ENABLED="true"
 AI_MESSAGE_JOB_BATCH_SIZE="5"
 AI_MESSAGE_JOB_CONCURRENCY="5"
@@ -46,7 +47,11 @@ AI_REQUEST_TIMEOUT_MS="20000"
 AI_WORKER_WEBHOOK_TIMEOUT_MS="120000"
 ```
 
-Run `supabase/17-ai-message-jobs.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery. For a free backup, add these GitHub Actions repository secrets:
+Run `supabase/17-ai-message-jobs.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery, and `vercel.json` runs the worker every minute as the primary production drain.
+
+Set `CRON_SECRET` in Vercel to the same value as `AI_WORKER_SECRET` so Vercel Cron can call the protected worker routes.
+
+For a backup drain, add these GitHub Actions repository secrets:
 
 ```text
 AI_WORKER_URL=https://your-vercel-domain.com/api/ai-message-jobs/process

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/ai-message-jobs/process?batchSize=15&maxRounds=5",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/maintenance/storage-cleanup",
+      "schedule": "0 16 * * *"
+    }
+  ]
+}
