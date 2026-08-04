@@ -44,6 +44,8 @@ const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
 const DEFAULT_HUMAN_REPLY_MIN_DELAY_MS = 800;
 const DEFAULT_HUMAN_REPLY_MAX_DELAY_MS = 2500;
 const DEFAULT_HUMAN_REPLY_MS_PER_CHAR = 10;
+const DEFAULT_AI_MESSAGE_JOB_BATCH_SIZE = 5;
+const MAX_AI_MESSAGE_JOB_BATCH_SIZE = 25;
 const FALLBACK_MESSAGE_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 const AUTO_REPLY_NAME_TOKEN = "{name}";
 
@@ -1557,13 +1559,16 @@ function triggerAiMessageJobWorker(req: NextApiRequest) {
     return;
   }
 
-  const workerPromise = fetch(`${getRequestOrigin(req)}/api/ai-message-jobs/process?batchSize=1`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-ai-worker-secret": workerSecret,
-    },
-  })
+  const workerPromise = fetch(
+    `${getRequestOrigin(req)}/api/ai-message-jobs/process?batchSize=${getAiMessageJobBatchSize()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-worker-secret": workerSecret,
+      },
+    }
+  )
     .then((response) => {
       if (!response.ok) {
         console.warn("AI message job worker self-kick failed", {
@@ -1579,6 +1584,20 @@ function triggerAiMessageJobWorker(req: NextApiRequest) {
     });
 
   waitUntil(workerPromise);
+}
+
+function getAiMessageJobBatchSize() {
+  const configuredValue = Number(process.env.AI_MESSAGE_JOB_BATCH_SIZE);
+
+  if (
+    Number.isFinite(configuredValue) &&
+    configuredValue >= 1 &&
+    configuredValue <= MAX_AI_MESSAGE_JOB_BATCH_SIZE
+  ) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_AI_MESSAGE_JOB_BATCH_SIZE;
 }
 
 function getRequestOrigin(req: NextApiRequest) {

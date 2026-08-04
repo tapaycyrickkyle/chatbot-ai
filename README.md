@@ -40,6 +40,8 @@ For higher Messenger traffic, configure the webhook to queue deliveries and proc
 AI_WORKER_SECRET="long-random-secret"
 AI_QUEUE_ENABLED="true"
 AI_MESSAGE_JOB_BATCH_SIZE="5"
+AI_REQUEST_TIMEOUT_MS="20000"
+AI_WORKER_WEBHOOK_TIMEOUT_MS="120000"
 ```
 
 Run `supabase/17-ai-message-jobs.sql` and `supabase/19-ai-job-cancel-and-auto-cleanup.sql` in Supabase. The webhook will self-kick the worker after queueing each delivery. For a free backup, add these GitHub Actions repository secrets:

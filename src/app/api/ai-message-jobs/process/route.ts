@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_BATCH_SIZE = 5;
 const MAX_BATCH_SIZE = 25;
+const DEFAULT_WEBHOOK_PROCESS_TIMEOUT_MS = 120000;
 
 export async function POST(request: Request) {
   const workerSecret = getWorkerSecret();
@@ -27,6 +28,9 @@ export async function POST(request: Request) {
   }> = [];
 
   for (const job of jobs) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), getWebhookProcessTimeoutMs());
+
     try {
       const response = await fetch(new URL("/api/webhook", request.url), {
         method: "POST",
@@ -34,6 +38,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
           "x-ai-worker-secret": workerSecret,
         },
+        signal: controller.signal,
         body: JSON.stringify(job.payload),
       });
 
@@ -57,6 +62,8 @@ export async function POST(request: Request) {
         maxAttempts: job.max_attempts,
       });
       results.push({ id: job.id, status: "failed", error: errorMessage });
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -109,4 +116,14 @@ function getBatchSize(request: Request) {
   }
 
   return DEFAULT_BATCH_SIZE;
+}
+
+function getWebhookProcessTimeoutMs() {
+  const configuredValue = Number(process.env.AI_WORKER_WEBHOOK_TIMEOUT_MS);
+
+  if (Number.isFinite(configuredValue) && configuredValue >= 30000 && configuredValue <= 300000) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_WEBHOOK_PROCESS_TIMEOUT_MS;
 }

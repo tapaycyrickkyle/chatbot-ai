@@ -74,6 +74,7 @@ const MAX_RECENT_MESSAGE_CHARS = 320;
 const MAX_MEMORY_CHARS = 900;
 const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = MAX_BUSINESS_INFO_LENGTH;
 const DEFAULT_REPLY_SENTENCE_LIMIT = 2;
+const DEFAULT_AI_REQUEST_TIMEOUT_MS = 20000;
 const LEAD_INTENTS = new Set<LeadCaptureIntent>([
   "INFO_ONLY",
   "SOFT_INTEREST",
@@ -348,6 +349,16 @@ function getReplySentenceLimit() {
   return DEFAULT_REPLY_SENTENCE_LIMIT;
 }
 
+function getAiRequestTimeoutMs() {
+  const configuredValue = Number(process.env.AI_REQUEST_TIMEOUT_MS);
+
+  if (Number.isFinite(configuredValue) && configuredValue >= 5000 && configuredValue <= 60000) {
+    return Math.floor(configuredValue);
+  }
+
+  return DEFAULT_AI_REQUEST_TIMEOUT_MS;
+}
+
 function getBusinessContextForPrompt(value: string) {
   const cleanedValue = value.replace(/\s+/g, " ").trim();
   const maxLength = getMaxBusinessContextChars();
@@ -408,11 +419,31 @@ async function requestChatCompletion(input: {
   maxTokens: number;
   purpose: "planner" | "reply";
 }) {
-  const response = await fetch(input.apiUrl, {
-    method: "POST",
-    headers: createAiHeaders(input.apiKey, input.apiUrl),
-    body: JSON.stringify(createAiRequestBody(input)),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), getAiRequestTimeoutMs());
+
+  let response: Response;
+
+  try {
+    response = await fetch(input.apiUrl, {
+      method: "POST",
+      headers: createAiHeaders(input.apiKey, input.apiUrl),
+      signal: controller.signal,
+      body: JSON.stringify(createAiRequestBody(input)),
+    });
+  } catch (error) {
+    console.error("AI request failed before response", {
+      providerUrl: input.apiUrl,
+      model: input.model,
+      purpose: input.purpose,
+      timeoutMs: getAiRequestTimeoutMs(),
+      error: getErrorSummary(error),
+    });
+
+    return AI_TEMPORARY_UNAVAILABLE_MESSAGE;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
