@@ -12,6 +12,7 @@ import {
   recordCustomerConversationMessage,
   recordWelcomeSequenceCandidate,
   recordWelcomeSequenceSent,
+  releaseMessengerMessageClaim,
   tryClaimMessengerMessage,
   resumeAiConversation,
 } from "@/lib/database";
@@ -111,6 +112,7 @@ type SafeSendContext = {
   clientId: string;
   pageId: string;
   recipientId: string;
+  messengerMessageId?: string;
   messageType: "text" | "image";
 };
 
@@ -569,6 +571,7 @@ async function sendWelcomeSequence(input: {
   client: ConnectedPageClient;
   pageId: string;
   recipientId: string;
+  messengerMessageId?: string;
   pageAccessToken: string;
 }) {
   const messages = getWelcomeTextMessages(input.client.welcome_message);
@@ -585,11 +588,12 @@ async function sendWelcomeSequence(input: {
           0,
           input.pageId,
           input.client.id
-        ).then(() => undefined),
+        ).then(requireSuccessfulMessengerSend),
       {
         clientId: input.client.id,
         pageId: input.pageId,
         recipientId: input.recipientId,
+        messengerMessageId: input.messengerMessageId,
         messageType: "text",
       }
     );
@@ -605,11 +609,12 @@ async function sendWelcomeSequence(input: {
           0,
           input.pageId,
           input.client.id
-        ).then(() => undefined),
+        ).then(requireSuccessfulMessengerSend),
       {
         clientId: input.client.id,
         pageId: input.pageId,
         recipientId: input.recipientId,
+        messengerMessageId: input.messengerMessageId,
         messageType: "image",
       }
     );
@@ -625,11 +630,12 @@ async function sendWelcomeSequence(input: {
           0,
           input.pageId,
           input.client.id
-        ).then(() => undefined),
+        ).then(requireSuccessfulMessengerSend),
       {
         clientId: input.client.id,
         pageId: input.pageId,
         recipientId: input.recipientId,
+        messengerMessageId: input.messengerMessageId,
         messageType: "text",
       }
     );
@@ -894,6 +900,7 @@ export default async function handler(
               client,
               pageId,
               recipientId: userId,
+              messengerMessageId: messageId,
               pageAccessToken,
             });
           }
@@ -922,8 +929,14 @@ export default async function handler(
                     pageAccessToken,
                     pageId,
                     client.id
-                  ).then(() => undefined),
-                { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+                  ),
+                {
+                  clientId: client.id,
+                  pageId,
+                  recipientId: userId,
+                  messengerMessageId: messageId,
+                  messageType: "text",
+                }
               );
               await safelyRecordAiReply({
                 clientId: client.id,
@@ -1011,7 +1024,13 @@ export default async function handler(
                   recentMessages,
                 });
               },
-              { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              {
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                messengerMessageId: messageId,
+                messageType: "text",
+              }
             );
             continue;
           }
@@ -1026,8 +1045,14 @@ export default async function handler(
                   0,
                   pageId,
                   client.id
-                ).then(() => undefined),
-              { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+                ).then(requireSuccessfulMessengerSend),
+              {
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                messengerMessageId: messageId,
+                messageType: "text",
+              }
             );
             continue;
           }
@@ -1041,8 +1066,14 @@ export default async function handler(
                 0,
                 pageId,
                 client.id
-              ).then(() => undefined),
-            { clientId: client.id, pageId, recipientId: userId, messageType: "text" }
+              ).then(requireSuccessfulMessengerSend),
+            {
+              clientId: client.id,
+              pageId,
+              recipientId: userId,
+              messengerMessageId: messageId,
+              messageType: "text",
+            }
           );
         }
       }
@@ -1170,7 +1201,15 @@ async function safeSendHumanTextReply(
   await sleep(getHumanReplyDelayMs(text));
   await safeSendSenderAction(recipientId, "typing_off", pageToken);
 
-  return safeSendMessage(recipientId, text, pageToken, 0, pageId, clientId);
+  requireSuccessfulMessengerSend(
+    await safeSendMessage(recipientId, text, pageToken, 0, pageId, clientId)
+  );
+}
+
+function requireSuccessfulMessengerSend(wasSent: boolean) {
+  if (!wasSent) {
+    throw new Error("Messenger send failed");
+  }
 }
 
 async function safeSendSenderAction(
@@ -1443,6 +1482,26 @@ async function safelyHandleFlowSend(
       errorMessage: error instanceof Error ? error.message : "Unknown send failure",
       payload: { recipient: { id: context.recipientId }, message: {} },
     });
+
+    if (context.messengerMessageId) {
+      try {
+        await releaseMessengerMessageClaim({
+          pageId: context.pageId,
+          recipientId: context.recipientId,
+          messageId: context.messengerMessageId,
+        });
+      } catch (releaseError) {
+        console.warn("Failed to release Messenger message claim after send failure", {
+          clientId: context.clientId,
+          pageId: context.pageId,
+          recipientId: context.recipientId,
+          messageId: context.messengerMessageId,
+          error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+        });
+      }
+    }
+
+    throw error;
   }
 }
 

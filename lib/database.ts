@@ -370,6 +370,27 @@ export async function tryClaimMessengerMessage(input: {
   return Boolean(data?.id);
 }
 
+export async function releaseMessengerMessageClaim(input: {
+  pageId: string;
+  recipientId: string;
+  messageId: string;
+}) {
+  const supabase = getDb();
+  const eventKey = `${input.pageId}:${input.recipientId}:${input.messageId}`;
+  const { error } = await supabase
+    .from("processed_messenger_messages")
+    .delete()
+    .eq("event_key", eventKey);
+
+  if (error) {
+    if (isMissingProcessedMessengerMessagesError(error)) {
+      return;
+    }
+
+    throw new Error(error.message || "Failed to release Messenger message claim");
+  }
+}
+
 export async function claimAiMessageJobs(input: {
   batchSize: number;
   workerId: string;
