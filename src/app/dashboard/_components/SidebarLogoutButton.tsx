@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../../_components/ToastProvider";
 import LoadingModal from "../../_components/LoadingModal";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type SidebarLogoutButtonProps = {
   collapsed?: boolean;
@@ -21,16 +20,6 @@ const SidebarLogoutButton = ({ collapsed = false }: SidebarLogoutButtonProps) =>
     setIsLoggingOut(true);
 
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { error: signOutError } = await supabase.auth.signOut();
-
-      if (
-        signOutError &&
-        !signOutError.message.toLowerCase().includes("refresh token not found")
-      ) {
-        throw signOutError;
-      }
-
       const response = await fetch("/api/auth/admin/logout", {
         method: "POST",
       });

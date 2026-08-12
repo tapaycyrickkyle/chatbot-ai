@@ -5,6 +5,12 @@ import {
   verifyAdminAccessToken,
 } from "@/lib/admin-auth";
 import { assertSameOrigin } from "@/lib/api-security";
+import { getSupabaseAuthClient } from "@/lib/supabase";
+
+type SignInPayload = {
+  email?: unknown;
+  password?: unknown;
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,11 +23,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const accessToken = typeof body?.accessToken === "string" ? body.accessToken : "";
+    const body = (await req.json()) as SignInPayload;
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const password = typeof body.password === "string" ? body.password : "";
 
-    if (!accessToken.trim()) {
-      return NextResponse.json({ error: "Missing access token" }, { status: 400 });
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAuthClient();
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    const accessToken = data.session?.access_token;
+
+    if (signInError || !accessToken) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
     const admin = await verifyAdminAccessToken(accessToken);

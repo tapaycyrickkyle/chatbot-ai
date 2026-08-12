@@ -3,6 +3,9 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
+  createLeadRecord,
+  getOpenLeadRecord,
+  updateLeadRecord,
   hasWelcomeSequenceReceipt,
   cancelPendingAiMessageJobsForConversation,
   enqueueAiMessageJob,
@@ -24,6 +27,16 @@ import {
   updateConversationSummary,
 } from "@/lib/conversation-memory";
 import { supabaseAdmin } from "@/lib/supabase";
+import {
+  extractLeadValues,
+  getLeadConfirmationPrompt,
+  getLeadDeliveredReply,
+  getLeadPrompt,
+  getMissingLeadField,
+  isLeadConfirmation,
+  parseLeadFields,
+} from "@/lib/lead-capture";
+import { detectCustomerLanguageStyle } from "@/lib/language-style";
 
 type ConnectedPageClient = NonNullable<Awaited<ReturnType<typeof getClientByPageId>>>;
 
@@ -496,6 +509,111 @@ function getLeadCaptureIntentFromPlan(message: string, planIntent: LeadCaptureIn
   return getFallbackLeadIntent(message);
 }
 
+async function deliverConfirmedLead(input: {
+  leadId: string;
+  pageId: string;
+  recipientId: string;
+  fields: Record<string, string>;
+  webhookUrl: string;
+  sheetTab: string;
+  attempts: number;
+}) {
+  const nextAttempts = input.attempts + 1;
+  if (!input.webhookUrl) {
+    await updateLeadRecord(input.leadId, {
+      status: "delivery_failed", delivery_attempts: nextAttempts,
+      last_delivery_error: "Google Apps Script webhook URL is not configured",
+    });
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(input.webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        leadId: input.leadId, pageId: input.pageId, recipientId: input.recipientId,
+        capturedAt: new Date().toISOString(), sheetTab: input.sheetTab, fields: input.fields,
+      }),
+    });
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Google Sheets returned ${response.status}`);
+    await updateLeadRecord(input.leadId, {
+      status: "delivered", delivery_attempts: nextAttempts, delivered_at: new Date().toISOString(),
+      last_delivery_error: "",
+    });
+    return true;
+  } catch (error) {
+    await updateLeadRecord(input.leadId, {
+      status: "delivery_failed", delivery_attempts: nextAttempts,
+      last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Google Sheets delivery failed",
+    });
+    console.warn("Confirmed lead could not be delivered to Google Sheets", error);
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function handleLeadCapture(input: {
+  client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
+}) {
+  if (!input.client.lead_capture_enabled) return null;
+  const fields = parseLeadFields(input.client.lead_capture_fields);
+  if (!fields.length) return null;
+  const style = detectCustomerLanguageStyle(input.message);
+  let lead = await getOpenLeadRecord(input.client.id, input.recipientId);
+
+  if (!lead) return null;
+  if (lead.status === "awaiting_confirmation" && isLeadConfirmation(input.message)) {
+    lead = await updateLeadRecord(lead.id, { status: "confirmed", confirmed_at: new Date().toISOString() });
+    await deliverConfirmedLead({
+      leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
+      webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
+      attempts: lead.delivery_attempts,
+    });
+    return getLeadDeliveredReply(style);
+  }
+
+  // A new customer question should be answered by the normal AI first. The open
+  // lead remains saved, so the next answer can continue from the missing field.
+  if (/\?/.test(input.message)) {
+    return null;
+  }
+
+  const values = extractLeadValues(input.message, fields, lead.fields);
+  const missingField = getMissingLeadField(fields, values);
+  lead = await updateLeadRecord(lead.id, {
+    fields: values,
+    status: missingField ? "collecting" : "awaiting_confirmation",
+  });
+  return missingField
+    ? getLeadPrompt(missingField, style)
+    : getLeadConfirmationPrompt(fields, lead.fields, style);
+}
+
+async function startLeadCapture(input: {
+  client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
+}) {
+  if (!input.client.lead_capture_enabled) return null;
+  const fields = parseLeadFields(input.client.lead_capture_fields);
+  if (!fields.length) return null;
+  const values = extractLeadValues(input.message, fields);
+  const lead = await createLeadRecord({
+    clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
+    fields: values, fieldConfig: fields,
+  });
+  const missingField = getMissingLeadField(fields, values);
+  if (!missingField) {
+    const updatedLead = await updateLeadRecord(lead.id, { status: "awaiting_confirmation" });
+    return getLeadConfirmationPrompt(fields, updatedLead.fields, detectCustomerLanguageStyle(input.message));
+  }
+  return getLeadPrompt(missingField, detectCustomerLanguageStyle(input.message));
+}
+
 function shouldUseAiReplyPlanner(
   message: string,
   conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
@@ -906,6 +1024,22 @@ export default async function handler(
           }
 
           if (rawText) {
+            const activeLeadReply = await handleLeadCapture({
+              client, pageId, recipientId: userId, message: rawText,
+            });
+
+            if (activeLeadReply) {
+              const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
+              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, activeLeadReply);
+              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, activeLeadReply);
+              await safelyHandleFlowSend(
+                () => safeSendHumanTextReply(userId, activeLeadReply, pageAccessToken, pageId, client.id),
+                { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
+              );
+              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: activeLeadReply, conversationSummary, customerState, recentMessages });
+              continue;
+            }
+
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {
@@ -970,6 +1104,23 @@ export default async function handler(
               rawText,
               replyPlan?.leadCaptureIntent ?? fallbackLeadIntent
             );
+
+            if (leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT") {
+              const leadReply = await startLeadCapture({
+                client, pageId, recipientId: userId, message: rawText,
+              });
+              if (leadReply) {
+                const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
+                const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, leadReply);
+                const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, leadReply);
+                await safelyHandleFlowSend(
+                  () => safeSendHumanTextReply(userId, leadReply, pageAccessToken, pageId, client.id),
+                  { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
+                );
+                await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: leadReply, conversationSummary, customerState, recentMessages });
+                continue;
+              }
+            }
 
             if (!shouldPlanReply) {
               console.info("AI reply planner skipped for token control", {

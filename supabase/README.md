@@ -27,6 +27,7 @@ If you prefer running files individually, run them in this order:
 17. `21-messenger-message-dedupe.sql`
 18. `22-welcome-sequence-recipients.sql`
 19. `23-remove-ai-character-tone.sql`
+20. `24-confirmed-lead-capture.sql`
 
 ## Tables Used
 
@@ -54,3 +55,18 @@ The app uses Next.js API routes plus `SUPABASE_SERVICE_ROLE_KEY` for server-side
 ## Admin Access
 
 Admin users are controlled only by `SUPABASE_ADMIN_EMAILS`.
+
+## Confirmed Google Sheets Leads
+
+Run `24-confirmed-lead-capture.sql` for an existing database (or run the updated
+`00-run-all.sql` for a fresh setup). In Page Settings, enable Confirmed Lead
+Capture, add each required `label|type` field, and enter the Google Apps Script
+Web App `/exec` URL plus sheet tab name. Copy the script in
+`google-apps-script-lead-webhook.js` to Apps Script, deploy it as a Web App with
+access set to anyone, and paste its deployment URL into Page Settings.
+
+The app creates a Google Sheet row only after the customer confirms the summary.
+Drafts and delivery attempts are stored for 30 days so a temporary Apps Script
+failure can be retried without asking the customer for their details again.
+The same deployed Apps Script works for any later field changes: it adds missing
+header columns and maps each lead value by its configured field label.

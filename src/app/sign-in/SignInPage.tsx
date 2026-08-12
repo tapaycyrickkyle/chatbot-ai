@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "../_components/ToastProvider";
 import LoadingModal from "../_components/LoadingModal";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import SignInFooter from "./SignInFooter";
 
 const SignInPage = () => {
@@ -27,26 +26,12 @@ const SignInPage = () => {
     setIsSubmitting(true);
 
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError || !data.session?.access_token) {
-        showToast({
-          tone: "error",
-          message: signInError?.message || "Unable to sign in",
-        });
-        return;
-      }
-
       const response = await fetch("/api/auth/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ accessToken: data.session.access_token }),
+        body: JSON.stringify({ email, password }),
       });
 
       const payload = (await response.json().catch(() => null)) as
@@ -54,13 +39,6 @@ const SignInPage = () => {
         | null;
 
       if (!response.ok) {
-        const { error: signOutError } = await supabase.auth.signOut();
-        if (
-          signOutError &&
-          !signOutError.message.toLowerCase().includes("refresh token not found")
-        ) {
-          console.error(signOutError);
-        }
         showToast({
           tone: "error",
           message: payload?.error || "Unable to sign in",
