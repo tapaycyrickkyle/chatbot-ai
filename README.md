@@ -104,6 +104,9 @@ deployment URL in the dashboard. A row is created as soon as all configured lead
 fields are received. Failed deliveries remain in Supabase and are retried during
 the scheduled maintenance cleanup.
 
+The Google Sheet uses only the lead-field names configured for that Page. It does
+not add tracking columns such as Messenger customer ID or capture time.
+
 ## Getting Started
 
 First, run the development server:
