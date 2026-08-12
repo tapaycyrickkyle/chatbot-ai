@@ -29,11 +29,10 @@ import {
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   extractLeadValues,
-  getLeadConfirmationPrompt,
   getLeadDeliveredReply,
+  getLeadFormPrompt,
   getLeadPrompt,
   getMissingLeadField,
-  isLeadConfirmation,
   parseLeadFields,
 } from "@/lib/lead-capture";
 import { detectCustomerLanguageStyle } from "@/lib/language-style";
@@ -568,16 +567,6 @@ async function handleLeadCapture(input: {
   let lead = await getOpenLeadRecord(input.client.id, input.recipientId);
 
   if (!lead) return null;
-  if (lead.status === "awaiting_confirmation" && isLeadConfirmation(input.message)) {
-    lead = await updateLeadRecord(lead.id, { status: "confirmed", confirmed_at: new Date().toISOString() });
-    await deliverConfirmedLead({
-      leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
-      webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
-      attempts: lead.delivery_attempts,
-    });
-    return getLeadDeliveredReply(style);
-  }
-
   // A new customer question should be answered by the normal AI first. The open
   // lead remains saved, so the next answer can continue from the missing field.
   if (/\?/.test(input.message)) {
@@ -586,13 +575,20 @@ async function handleLeadCapture(input: {
 
   const values = extractLeadValues(input.message, fields, lead.fields);
   const missingField = getMissingLeadField(fields, values);
+  if (missingField) {
+    await updateLeadRecord(lead.id, { fields: values, status: "collecting" });
+    return getLeadPrompt(missingField, style);
+  }
+
   lead = await updateLeadRecord(lead.id, {
-    fields: values,
-    status: missingField ? "collecting" : "awaiting_confirmation",
+    fields: values, status: "confirmed", confirmed_at: new Date().toISOString(),
   });
-  return missingField
-    ? getLeadPrompt(missingField, style)
-    : getLeadConfirmationPrompt(fields, lead.fields, style);
+  await deliverConfirmedLead({
+    leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
+    webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
+    attempts: lead.delivery_attempts,
+  });
+  return getLeadDeliveredReply(style);
 }
 
 async function startLeadCapture(input: {
@@ -608,10 +604,17 @@ async function startLeadCapture(input: {
   });
   const missingField = getMissingLeadField(fields, values);
   if (!missingField) {
-    const updatedLead = await updateLeadRecord(lead.id, { status: "awaiting_confirmation" });
-    return getLeadConfirmationPrompt(fields, updatedLead.fields, detectCustomerLanguageStyle(input.message));
+    const confirmedLead = await updateLeadRecord(lead.id, {
+      status: "confirmed", confirmed_at: new Date().toISOString(),
+    });
+    await deliverConfirmedLead({
+      leadId: confirmedLead.id, pageId: input.pageId, recipientId: input.recipientId,
+      fields: confirmedLead.fields, webhookUrl: input.client.google_sheets_webhook_url,
+      sheetTab: input.client.google_sheets_tab_name, attempts: confirmedLead.delivery_attempts,
+    });
+    return getLeadDeliveredReply(detectCustomerLanguageStyle(input.message));
   }
-  return getLeadPrompt(missingField, detectCustomerLanguageStyle(input.message));
+  return getLeadFormPrompt(fields, detectCustomerLanguageStyle(input.message));
 }
 
 function shouldUseAiReplyPlanner(

@@ -100,8 +100,8 @@ Google Sheet tab name.
 
 Copy `supabase/google-apps-script-lead-webhook.js` into a script attached to the
 target Google Sheet, deploy it as a Web App with access set to anyone, and use its
-deployment URL in the dashboard. A row is created only after the customer confirms
-the displayed summary. Failed deliveries remain in Supabase and are retried during
+deployment URL in the dashboard. A row is created as soon as all configured lead
+fields are received. Failed deliveries remain in Supabase and are retried during
 the scheduled maintenance cleanup.
 
 ## Getting Started

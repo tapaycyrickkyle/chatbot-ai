@@ -79,25 +79,20 @@ export function getMissingLeadField(fields: LeadField[], values: Record<string, 
   return fields.find((field) => !values[field.label]);
 }
 
-export function isLeadConfirmation(message: string) {
-  return /^(?:yes|yeah|yep|correct|confirmed|confirm|sure|okay|ok|go|proceed|oo|opo|sige|sakto|tama|tuloy|yes po|okay po|sige po)[.!\s]*$/i.test(message.trim());
-}
+export function getLeadFormPrompt(fields: LeadField[], languageStyle: string) {
+  const heading = languageStyle === "cebuano"
+    ? "Palihug ihatag ang mosunod nga detalye:"
+    : languageStyle === "tagalog" || languageStyle === "taglish"
+      ? "Pakibigay ang mga sumusunod na detalye:"
+      : "We need the following details:";
 
-export function formatLeadSummary(fields: LeadField[], values: Record<string, string>) {
-  return fields.map((field) => `${field.label}: ${values[field.label] ?? ""}`).join("; ");
+  return `${heading}\n${fields.map((field) => `${field.label.toUpperCase()}:`).join("\n")}`;
 }
 
 export function getLeadPrompt(field: LeadField, languageStyle: string) {
   if (languageStyle === "cebuano") return `Unsa imong ${field.label}?`;
   if (languageStyle === "tagalog" || languageStyle === "taglish") return `Ano ang ${field.label} mo?`;
   return `What is your ${field.label}?`;
-}
-
-export function getLeadConfirmationPrompt(fields: LeadField[], values: Record<string, string>, languageStyle: string) {
-  const summary = formatLeadSummary(fields, values);
-  if (languageStyle === "cebuano") return `Kumpirmahi: ${summary}. Sakto ni?`;
-  if (languageStyle === "tagalog" || languageStyle === "taglish") return `Pakikumpirma: ${summary}. Tama ba ito?`;
-  return `Please confirm: ${summary}. Is this correct?`;
 }
 
 export function getLeadDeliveredReply(languageStyle: string) {
