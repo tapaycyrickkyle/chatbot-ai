@@ -103,6 +103,11 @@ details?** to set a page-specific trigger, such as “when the customer requests
 quote or asks about discounts.” Leave it blank to use the standard trigger: the
 customer is ready to buy/book or asks to speak with the team.
 
+When the trigger matches, the AI first asks whether the customer wants to
+proceed. It only shows the lead form after a clear confirmation. If a customer
+asks a question while a form is open, the AI answers first and then asks whether
+they want to continue.
+
 Copy `supabase/google-apps-script-lead-webhook.js` into a script attached to the
 target Google Sheet, deploy it as a Web App with access set to anyone, and use its
 deployment URL in the dashboard. A row is created as soon as all configured lead

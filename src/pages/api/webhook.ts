@@ -518,6 +518,19 @@ function isLeadCaptureQuestion(message: string) {
   );
 }
 
+function isLeadProceedingMessage(message: string) {
+  const normalizedMessage = message.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  return /^(?:(?:yes|yeah|yep|sure|okay|ok|oo|opo|sige|pwede)(?:\s+(?:po|please|na|ako))?|go ahead|proceed|lets proceed|let us proceed|gusto ko|gusto ko mag proceed|mag proceed|magproceed|book|reserve)$/i.test(
+    normalizedMessage
+  );
+}
+
+function getLeadProceedConfirmationPrompt(languageStyle: string) {
+  if (languageStyle === "cebuano") return "Gusto nimo mopadayon? Kung oo, kuhaon nako imong detalye para sa sunod nga step.";
+  if (languageStyle === "tagalog" || languageStyle === "taglish") return "Gusto mo bang mag-proceed? Kung oo, kukunin ko ang details mo para sa next step.";
+  return "Would you like to proceed? If yes, I’ll collect your details for the next step.";
+}
+
 async function deliverConfirmedLead(input: {
   leadId: string;
   pageId: string;
@@ -569,20 +582,56 @@ async function deliverConfirmedLead(input: {
   }
 }
 
+type LeadCaptureResult = {
+  reply: string | null;
+  confirmationPrompt?: string;
+  hasOpenLead: boolean;
+};
+
 async function handleLeadCapture(input: {
   client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
-}) {
-  if (!input.client.lead_capture_enabled) return null;
+}): Promise<LeadCaptureResult> {
+  if (!input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
   const fields = parseLeadFields(input.client.lead_capture_fields);
-  if (!fields.length) return null;
+  if (!fields.length) return { reply: null, hasOpenLead: false };
   const style = detectCustomerLanguageStyle(input.message);
   let lead = await getOpenLeadRecord(input.client.id, input.recipientId);
 
-  if (!lead) return null;
+  if (!lead) return { reply: null, hasOpenLead: false };
   // A new customer question should be answered by the normal AI first. The open
-  // lead remains saved, so the next answer can continue from the missing field.
+  // lead is paused until the customer explicitly chooses to proceed again.
   if (isLeadCaptureQuestion(input.message)) {
-    return null;
+    if (lead.status !== "awaiting_confirmation") {
+      lead = await updateLeadRecord(lead.id, { status: "awaiting_confirmation" });
+    }
+    return {
+      reply: null,
+      confirmationPrompt: getLeadProceedConfirmationPrompt(style),
+      hasOpenLead: true,
+    };
+  }
+
+  if (lead.status === "awaiting_confirmation") {
+    if (!isLeadProceedingMessage(input.message)) {
+      return { reply: null, hasOpenLead: true };
+    }
+
+    const missingField = getMissingLeadField(fields, lead.fields);
+    if (missingField) {
+      await updateLeadRecord(lead.id, { status: "collecting" });
+      return { reply: getLeadFormPrompt(fields, style), hasOpenLead: true };
+    }
+
+    lead = await updateLeadRecord(lead.id, {
+      status: "confirmed", confirmed_at: new Date().toISOString(),
+    });
+    await deliverConfirmedLead({
+      leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
+      fieldConfig: lead.field_config,
+      webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
+      attempts: lead.delivery_attempts,
+    });
+    return { reply: getLeadDeliveredReply(style), hasOpenLead: true };
   }
 
   const expectedField = getMissingLeadField(fields, lead.fields);
@@ -590,7 +639,7 @@ async function handleLeadCapture(input: {
   const missingField = getMissingLeadField(fields, values);
   if (missingField) {
     await updateLeadRecord(lead.id, { fields: values, status: "collecting" });
-    return getLeadPrompt(missingField, style);
+    return { reply: getLeadPrompt(missingField, style), hasOpenLead: true };
   }
 
   lead = await updateLeadRecord(lead.id, {
@@ -602,7 +651,7 @@ async function handleLeadCapture(input: {
     webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
     attempts: lead.delivery_attempts,
   });
-  return getLeadDeliveredReply(style);
+  return { reply: getLeadDeliveredReply(style), hasOpenLead: true };
 }
 
 async function startLeadCapture(input: {
@@ -612,24 +661,11 @@ async function startLeadCapture(input: {
   const fields = parseLeadFields(input.client.lead_capture_fields);
   if (!fields.length) return null;
   const values = extractLeadValues(input.message, fields);
-  const lead = await createLeadRecord({
+  await createLeadRecord({
     clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
-    fields: values, fieldConfig: fields,
+    fields: values, fieldConfig: fields, status: "awaiting_confirmation",
   });
-  const missingField = getMissingLeadField(fields, values);
-  if (!missingField) {
-    const confirmedLead = await updateLeadRecord(lead.id, {
-      status: "confirmed", confirmed_at: new Date().toISOString(),
-    });
-    await deliverConfirmedLead({
-      leadId: confirmedLead.id, pageId: input.pageId, recipientId: input.recipientId,
-      fields: confirmedLead.fields, fieldConfig: confirmedLead.field_config,
-      webhookUrl: input.client.google_sheets_webhook_url,
-      sheetTab: input.client.google_sheets_tab_name, attempts: confirmedLead.delivery_attempts,
-    });
-    return getLeadDeliveredReply(detectCustomerLanguageStyle(input.message));
-  }
-  return getLeadFormPrompt(fields, detectCustomerLanguageStyle(input.message));
+  return getLeadProceedConfirmationPrompt(detectCustomerLanguageStyle(input.message));
 }
 
 function shouldUseAiReplyPlanner(
@@ -1042,42 +1078,45 @@ export default async function handler(
           }
 
           if (rawText) {
-            const activeLeadReply = await handleLeadCapture({
+            const activeLead = await handleLeadCapture({
               client, pageId, recipientId: userId, message: rawText,
             });
 
-            if (activeLeadReply) {
+            if (activeLead.reply) {
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
-              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, activeLeadReply);
-              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, activeLeadReply);
+              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, activeLead.reply);
+              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, activeLead.reply);
               await safelyHandleFlowSend(
-                () => safeSendHumanTextReply(userId, activeLeadReply, pageAccessToken, pageId, client.id),
+                () => safeSendHumanTextReply(userId, activeLead.reply!, pageAccessToken, pageId, client.id),
                 { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
               );
-              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: activeLeadReply, conversationSummary, customerState, recentMessages });
+              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: activeLead.reply, conversationSummary, customerState, recentMessages });
               continue;
             }
 
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {
+              const reply = activeLead.confirmationPrompt
+                ? `${deterministicReply}\n\n${activeLead.confirmationPrompt}`
+                : deterministicReply;
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
                 rawText,
-                deterministicReply
+                reply
               );
               const conversationSummary = updateConversationSummary(
                 existingConversation?.conversation_summary || "",
                 rawText,
-                deterministicReply
+                reply
               );
 
               await safelyHandleFlowSend(
                 () =>
                   safeSendHumanTextReply(
                     userId,
-                    deterministicReply,
+                    reply,
                     pageAccessToken,
                     pageId,
                     client.id
@@ -1094,7 +1133,7 @@ export default async function handler(
                 clientId: client.id,
                 pageId,
                 recipientId: userId,
-                reply: deterministicReply,
+                reply,
                 conversationSummary,
                 customerState,
                 recentMessages,
@@ -1130,7 +1169,7 @@ export default async function handler(
               ? replyPlan?.shouldStartLeadCapture === true
               : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT";
 
-            if (shouldStartLeadCapture) {
+            if (!activeLead.hasOpenLead && shouldStartLeadCapture) {
               const leadReply = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
               });
@@ -1169,6 +1208,9 @@ export default async function handler(
                   latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),
                 });
+                const reply = activeLead.confirmationPrompt
+                  ? `${aiReply}\n\n${activeLead.confirmationPrompt}`
+                  : aiReply;
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,
                   rawText
@@ -1176,25 +1218,25 @@ export default async function handler(
                 const recentMessages = appendRecentConversationMessages(
                   existingConversation?.recent_messages,
                   rawText,
-                  aiReply
+                  reply
                 );
                 const conversationSummary = updateConversationSummary(
                   existingConversation?.conversation_summary || "",
                   rawText,
-                  aiReply
+                  reply
                 );
                 console.info("AI webhook generated reply", {
                   clientId: client.id,
                   pageId,
                   userId,
-                  preview: aiReply.slice(0, 120),
+                  preview: reply.slice(0, 120),
                 });
-                await safeSendHumanTextReply(userId, aiReply, pageAccessToken, pageId, client.id);
+                await safeSendHumanTextReply(userId, reply, pageAccessToken, pageId, client.id);
                 await safelyRecordAiReply({
                   clientId: client.id,
                   pageId,
                   recipientId: userId,
-                  reply: aiReply,
+                  reply,
                   conversationSummary,
                   customerState,
                   recentMessages,

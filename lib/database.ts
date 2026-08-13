@@ -825,10 +825,11 @@ export async function getOpenLeadRecord(clientId: string, recipientId: string) {
 export async function createLeadRecord(input: {
   clientId: string; pageId: string; recipientId: string;
   fields: Record<string, string>; fieldConfig: Array<{ label: string; type: string }>;
+  status?: LeadRecord["status"];
 }) {
   const { data, error } = await getDb().from("lead_records").insert({
     client_id: input.clientId, page_id: input.pageId, recipient_id: input.recipientId,
-    fields: input.fields, field_config: input.fieldConfig, status: "collecting",
+    fields: input.fields, field_config: input.fieldConfig, status: input.status ?? "collecting",
   }).select("*").single();
   if (error) throw new Error(error.message || "Failed to create lead record");
   return normalizeLeadRecord(data as Record<string, unknown>);
