@@ -17,10 +17,12 @@ type ClientSettings = {
   bot_type: "ai";
   business_info: string;
   lead_capture_trigger: string;
+  lead_capture_offer: string;
   ai_enabled: boolean;
 };
 
 const MAX_LEAD_CAPTURE_TRIGGER_LENGTH = 1200;
+const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 600;
 
 export default function PromptBuilderPage() {
   const params = useParams<{ id: string }>();
@@ -29,6 +31,7 @@ export default function PromptBuilderPage() {
   const [clientName, setClientName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [leadCaptureTrigger, setLeadCaptureTrigger] = useState("");
+  const [leadCaptureOffer, setLeadCaptureOffer] = useState("");
   const [aiEnabled, setAiEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,6 +60,7 @@ export default function PromptBuilderPage() {
         setClientName(data.client_name || "");
         setPrompt(data.business_info || "");
         setLeadCaptureTrigger(data.lead_capture_trigger || "");
+        setLeadCaptureOffer(data.lead_capture_offer || "");
         setAiEnabled(data.ai_enabled ?? true);
       } catch (error) {
         console.error(error);
@@ -86,6 +90,7 @@ export default function PromptBuilderPage() {
         body: JSON.stringify({
           business_info: prompt,
           lead_capture_trigger: leadCaptureTrigger,
+          lead_capture_offer: leadCaptureOffer,
         }),
       });
 
@@ -260,7 +265,7 @@ export default function PromptBuilderPage() {
                 When should the AI ask for lead details?
               </label>
               <p className="mt-1 text-[13px] leading-6 text-[var(--text-muted)]">
-                Add the customer signals that should start your enabled lead form. Leave this blank to use the standard rule: ready to buy, book, or speak with your team.
+                Add the customer signals that should make the AI offer the next step. The lead form opens only after the customer says yes.
               </p>
               <textarea
                 id="lead-capture-trigger"
@@ -272,7 +277,28 @@ export default function PromptBuilderPage() {
                 className="mt-3 min-h-28 w-full min-w-0 rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
               />
               <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                {leadCaptureTrigger.length} / {MAX_LEAD_CAPTURE_TRIGGER_LENGTH} characters used. Lead fields are set in Page Settings.
+                {leadCaptureTrigger.length} / {MAX_LEAD_CAPTURE_TRIGGER_LENGTH} characters used.
+              </p>
+              <label className="mt-5 block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="lead-capture-offer">
+                Question before the lead form
+              </label>
+              <p className="mt-1 text-[13px] leading-6 text-[var(--text-muted)]">
+                This is sent when the trigger matches. Example: “Would you like a free quick audit of your current page?”
+              </p>
+              <textarea
+                id="lead-capture-offer"
+                rows={3}
+                value={leadCaptureOffer}
+                onChange={(event) => setLeadCaptureOffer(event.target.value)}
+                maxLength={MAX_LEAD_CAPTURE_MESSAGE_LENGTH}
+                placeholder="Would you like a free quick audit of your current page?"
+                className="mt-3 min-h-24 w-full min-w-0 rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
+              />
+              <p className="mt-2 text-[12px] text-[var(--text-muted)]">
+                {leadCaptureOffer.length} / {MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters used. Leave blank for the default question.
+              </p>
+              <p className="mt-5 text-[12px] leading-6 text-[var(--text-muted)]">
+                After the customer says yes, the AI writes one short, contextual confirmation before it sends the lead fields.
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
                 <button

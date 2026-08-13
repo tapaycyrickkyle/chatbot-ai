@@ -20,6 +20,7 @@ const MANUAL_AI_PAUSE_MINUTE_OPTIONS = [5, 15, 30, 60, 120, 240, 480, 1440];
 const MAX_WELCOME_ATTACHMENTS = 11;
 const MAX_GOOGLE_SHEETS_WEBHOOK_URL_LENGTH = 2000;
 const MAX_LEAD_CAPTURE_TRIGGER_LENGTH = 1200;
+const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 600;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MESSENGER_WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes"];
 
@@ -69,6 +70,7 @@ function validateClientSettingsPayload(payload: unknown) {
     lead_capture_enabled,
     lead_capture_fields,
     lead_capture_trigger,
+    lead_capture_offer,
     google_sheets_webhook_url,
     google_sheets_tab_name,
   } = payload as Record<string, unknown>;
@@ -85,6 +87,7 @@ function validateClientSettingsPayload(payload: unknown) {
     lead_capture_enabled: boolean;
     lead_capture_fields: string;
     lead_capture_trigger: string;
+    lead_capture_offer: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
   }> = {};
@@ -272,6 +275,13 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.lead_capture_trigger = lead_capture_trigger.trim();
   }
 
+  if (lead_capture_offer !== undefined) {
+    if (typeof lead_capture_offer !== "string" || lead_capture_offer.length > MAX_LEAD_CAPTURE_MESSAGE_LENGTH) {
+      throw new Error(`lead_capture_offer must be ${MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters or fewer`);
+    }
+    updates.lead_capture_offer = lead_capture_offer.trim();
+  }
+
   if (google_sheets_webhook_url !== undefined) {
     if (typeof google_sheets_webhook_url !== "string") throw new Error("Invalid Google Sheets webhook URL");
     const url = google_sheets_webhook_url.trim();
@@ -334,6 +344,7 @@ export async function GET(
       lead_capture_enabled: client.lead_capture_enabled,
       lead_capture_fields: client.lead_capture_fields,
       lead_capture_trigger: client.lead_capture_trigger,
+      lead_capture_offer: client.lead_capture_offer,
       google_sheets_webhook_url: client.google_sheets_webhook_url,
       google_sheets_tab_name: client.google_sheets_tab_name,
       lead_delivery: leadDelivery,

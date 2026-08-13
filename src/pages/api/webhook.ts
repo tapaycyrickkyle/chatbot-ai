@@ -19,7 +19,7 @@ import {
   tryClaimMessengerMessage,
   resumeAiConversation,
 } from "@/lib/database";
-import { askAi, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
+import { askAi, getLeadFormIntro, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
   appendRecentConversationMessages,
   getDeterministicReply,
@@ -525,7 +525,8 @@ function isLeadProceedingMessage(message: string) {
   );
 }
 
-function getLeadProceedConfirmationPrompt(languageStyle: string) {
+function getLeadProceedConfirmationPrompt(languageStyle: string, customOffer = "") {
+  if (customOffer.trim()) return customOffer.trim();
   if (languageStyle === "cebuano") return "Gusto nimo mopadayon? Kung oo, kuhaon nako imong detalye para sa sunod nga step.";
   if (languageStyle === "tagalog" || languageStyle === "taglish") return "Gusto mo bang mag-proceed? Kung oo, kukunin ko ang details mo para sa next step.";
   return "Would you like to proceed? If yes, I’ll collect your details for the next step.";
@@ -584,6 +585,7 @@ async function deliverConfirmedLead(input: {
 
 type LeadCaptureResult = {
   reply: string | null;
+  formReply?: string;
   confirmationPrompt?: string;
   hasOpenLead: boolean;
 };
@@ -606,7 +608,7 @@ async function handleLeadCapture(input: {
     }
     return {
       reply: null,
-      confirmationPrompt: getLeadProceedConfirmationPrompt(style),
+      confirmationPrompt: getLeadProceedConfirmationPrompt(style, input.client.lead_capture_offer),
       hasOpenLead: true,
     };
   }
@@ -619,7 +621,15 @@ async function handleLeadCapture(input: {
     const missingField = getMissingLeadField(fields, lead.fields);
     if (missingField) {
       await updateLeadRecord(lead.id, { status: "collecting" });
-      return { reply: getLeadFormPrompt(fields, style), hasOpenLead: true };
+      return {
+        reply: await getLeadFormIntro({
+          customerMessage: input.message,
+          businessContext: input.client.business_info,
+          leadOffer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
+        }),
+        formReply: getLeadFormPrompt(fields, style),
+        hasOpenLead: true,
+      };
     }
 
     lead = await updateLeadRecord(lead.id, {
@@ -665,7 +675,10 @@ async function startLeadCapture(input: {
     clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
     fields: values, fieldConfig: fields, status: "awaiting_confirmation",
   });
-  return getLeadProceedConfirmationPrompt(detectCustomerLanguageStyle(input.message));
+  return getLeadProceedConfirmationPrompt(
+    detectCustomerLanguageStyle(input.message),
+    input.client.lead_capture_offer
+  );
 }
 
 function shouldUseAiReplyPlanner(
@@ -1084,13 +1097,19 @@ export default async function handler(
 
             if (activeLead.reply) {
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
-              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, activeLead.reply);
-              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, activeLead.reply);
+              const recordedReply = [activeLead.reply, activeLead.formReply].filter(Boolean).join("\n\n");
+              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
+              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, recordedReply);
               await safelyHandleFlowSend(
-                () => safeSendHumanTextReply(userId, activeLead.reply!, pageAccessToken, pageId, client.id),
+                async () => {
+                  await safeSendHumanTextReply(userId, activeLead.reply!, pageAccessToken, pageId, client.id);
+                  if (activeLead.formReply) {
+                    await safeSendHumanTextReply(userId, activeLead.formReply, pageAccessToken, pageId, client.id);
+                  }
+                },
                 { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
               );
-              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: activeLead.reply, conversationSummary, customerState, recentMessages });
+              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: recordedReply, conversationSummary, customerState, recentMessages });
               continue;
             }
 

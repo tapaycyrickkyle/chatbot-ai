@@ -421,7 +421,7 @@ async function requestChatCompletion(input: {
   messages: ChatMessage[];
   temperature: number;
   maxTokens: number;
-  purpose: "planner" | "reply";
+  purpose: "planner" | "reply" | "lead_form_intro";
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), getAiRequestTimeoutMs());
@@ -646,6 +646,50 @@ export async function planAiReply(
   } catch (error) {
     console.warn("AI planning failed", getErrorSummary(error));
     return parseSalesPlan("", latestLanguageStyle);
+  }
+}
+
+export async function getLeadFormIntro(input: {
+  customerMessage: string;
+  businessContext: string;
+  leadOffer: string;
+}) {
+  const languageStyle = detectCustomerLanguageStyle(input.customerMessage);
+  const { apiKey, apiUrl, model } = getAiConfig();
+  const fallback = languageStyle === "cebuano"
+    ? "Sige, ihatag lang ang mosunod nga detalye aron maka-andam mi para sa sunod nga step."
+    : languageStyle === "tagalog" || languageStyle === "taglish"
+      ? "Sige, pakibigay ang mga sumusunod na detalye para maihanda namin ang next step."
+      : "Great, please share the following details so we can prepare for the next step.";
+
+  if (!apiKey || !apiUrl || !model) return fallback;
+
+  try {
+    const reply = await requestChatCompletion({
+      apiKey,
+      apiUrl,
+      model,
+      temperature: 0.3,
+      maxTokens: 60,
+      purpose: "lead_form_intro",
+      messages: [
+        {
+          role: "system",
+          content: "Write one short customer-facing confirmation sentence that appears immediately before a lead-details form. Do not ask a question. Do not include field labels, a list, markdown, promises, or facts not provided. Match the customer's language or language mix.",
+        },
+        {
+          role: "user",
+          content: `Customer just agreed: "${input.customerMessage.slice(0, 240)}"\nOffer they agreed to: "${input.leadOffer.slice(0, 600)}"\nBusiness facts: ${getBusinessContextForPrompt(input.businessContext).slice(0, 1400) || "None"}`,
+        },
+      ],
+    });
+    const cleanedReply = reply.replace(/\s+/g, " ").trim();
+    return cleanedReply && cleanedReply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE
+      ? cleanedReply.slice(0, 320)
+      : fallback;
+  } catch (error) {
+    console.warn("Lead form intro generation failed", getErrorSummary(error));
+    return fallback;
   }
 }
 

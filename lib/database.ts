@@ -17,6 +17,7 @@ type ClientRow = {
   lead_capture_enabled?: boolean | null;
   lead_capture_fields?: string | null;
   lead_capture_trigger?: string | null;
+  lead_capture_offer?: string | null;
   welcome_sequence_enabled?: boolean | null;
   welcome_message?: string | null;
   welcome_link_url?: string | null;
@@ -71,6 +72,8 @@ const CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE =
   `${CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE}, auto_reply_ignore_pattern, lead_capture_enabled, lead_capture_fields`;
 const CLIENT_COLUMNS_WITH_LEAD_TRIGGER =
   `${CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE}, lead_capture_trigger`;
+const CLIENT_COLUMNS_WITH_LEAD_MESSAGES =
+  `${CLIENT_COLUMNS_WITH_LEAD_TRIGGER}, lead_capture_offer`;
 const LEGACY_CLIENT_COLUMNS =
   "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url";
 const AI_CONVERSATION_COLUMNS =
@@ -150,6 +153,13 @@ function isMissingLeadCaptureTriggerError(error: { message?: string } | null) {
   );
 }
 
+function isMissingLeadCaptureMessagesError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.includes("lead_capture_offer") &&
+      error.message.includes("does not exist")
+  );
+}
+
 function isMissingProcessedMessengerMessagesError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("processed_messenger_messages") &&
@@ -186,6 +196,7 @@ function normalizeClient(row: ClientRow) {
     lead_capture_enabled: Boolean(row.lead_capture_enabled),
     lead_capture_fields: row.lead_capture_fields ?? "Full Name|name\nPhone|phone",
     lead_capture_trigger: row.lead_capture_trigger ?? "",
+    lead_capture_offer: row.lead_capture_offer ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -255,14 +266,20 @@ export async function getClients() {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
     .order("created_at", { ascending: true });
-  const triggerResponse = isMissingLeadCaptureTriggerError(response.error)
+  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .order("created_at", { ascending: true })
+    : response;
+  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
     ? await supabase
         .from("clients")
         .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
         .order("created_at", { ascending: true })
-    : response;
+    : messageResponse;
   const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
     ? await supabase
         .from("clients")
@@ -301,16 +318,23 @@ export async function getClientByPageId(pageId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
     .eq("page_id", pageId)
     .maybeSingle();
-  const triggerResponse = isMissingLeadCaptureTriggerError(response.error)
+  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .eq("page_id", pageId)
+        .maybeSingle()
+    : response;
+  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
     ? await supabase
         .from("clients")
         .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
         .eq("page_id", pageId)
         .maybeSingle()
-    : response;
+    : messageResponse;
   const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
     ? await supabase
         .from("clients")
@@ -612,16 +636,23 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
     .eq("id", clientId)
     .maybeSingle();
-  const triggerResponse = isMissingLeadCaptureTriggerError(response.error)
+  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+    ? await supabase
+        .from("clients")
+        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .eq("id", clientId)
+        .maybeSingle()
+    : response;
+  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
     ? await supabase
         .from("clients")
         .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
         .eq("id", clientId)
         .maybeSingle()
-    : response;
+    : messageResponse;
   const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
     ? await supabase
         .from("clients")
@@ -681,6 +712,7 @@ export async function updateClientSettings(
     lead_capture_enabled: boolean;
     lead_capture_fields: string;
     lead_capture_trigger: string;
+    lead_capture_offer: string;
   }>
 ) {
   const supabase = getDb();
