@@ -1979,7 +1979,7 @@ function getHumanReplyDelayConfig() {
     "AI_HUMAN_REPLY_MAX_DELAY_MS",
     DEFAULT_HUMAN_REPLY_MAX_DELAY_MS,
     0,
-    8000
+    5000
   );
 
   return {
