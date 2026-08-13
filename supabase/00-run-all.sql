@@ -107,7 +107,8 @@ alter table public.clients
 -- Confirmed lead capture configuration and retry-safe lead records.
 alter table public.clients
   add column if not exists lead_capture_enabled boolean not null default false,
-  add column if not exists lead_capture_fields text not null default 'Full Name|name\nPhone|phone';
+  add column if not exists lead_capture_fields text not null default 'Full Name|name\nPhone|phone',
+  add column if not exists lead_capture_trigger text not null default '';
 
 create table if not exists public.lead_records (
   id uuid primary key default gen_random_uuid(),

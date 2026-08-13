@@ -19,6 +19,7 @@ const MAX_AUTO_REPLY_IGNORE_PATTERNS_TOTAL_LENGTH =
 const MANUAL_AI_PAUSE_MINUTE_OPTIONS = [5, 15, 30, 60, 120, 240, 480, 1440];
 const MAX_WELCOME_ATTACHMENTS = 11;
 const MAX_GOOGLE_SHEETS_WEBHOOK_URL_LENGTH = 2000;
+const MAX_LEAD_CAPTURE_TRIGGER_LENGTH = 1200;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MESSENGER_WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes"];
 
@@ -67,6 +68,7 @@ function validateClientSettingsPayload(payload: unknown) {
     auto_reply_ignore_pattern,
     lead_capture_enabled,
     lead_capture_fields,
+    lead_capture_trigger,
     google_sheets_webhook_url,
     google_sheets_tab_name,
   } = payload as Record<string, unknown>;
@@ -82,6 +84,7 @@ function validateClientSettingsPayload(payload: unknown) {
     auto_reply_ignore_pattern: string;
     lead_capture_enabled: boolean;
     lead_capture_fields: string;
+    lead_capture_trigger: string;
     google_sheets_webhook_url: string;
     google_sheets_tab_name: string;
   }> = {};
@@ -262,6 +265,13 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.lead_capture_fields = fields.map((field) => `${field.label}|${field.type}`).join("\n");
   }
 
+  if (lead_capture_trigger !== undefined) {
+    if (typeof lead_capture_trigger !== "string" || lead_capture_trigger.length > MAX_LEAD_CAPTURE_TRIGGER_LENGTH) {
+      throw new Error(`Lead trigger must be ${MAX_LEAD_CAPTURE_TRIGGER_LENGTH} characters or fewer`);
+    }
+    updates.lead_capture_trigger = lead_capture_trigger.trim();
+  }
+
   if (google_sheets_webhook_url !== undefined) {
     if (typeof google_sheets_webhook_url !== "string") throw new Error("Invalid Google Sheets webhook URL");
     const url = google_sheets_webhook_url.trim();
@@ -323,6 +333,7 @@ export async function GET(
       auto_reply_ignore_pattern: client.auto_reply_ignore_pattern,
       lead_capture_enabled: client.lead_capture_enabled,
       lead_capture_fields: client.lead_capture_fields,
+      lead_capture_trigger: client.lead_capture_trigger,
       google_sheets_webhook_url: client.google_sheets_webhook_url,
       google_sheets_tab_name: client.google_sheets_tab_name,
       lead_delivery: leadDelivery,

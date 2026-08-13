@@ -1095,20 +1095,27 @@ export default async function handler(
               recentMessages: existingConversation?.recent_messages,
             };
             const fallbackLeadIntent = getFallbackLeadIntent(rawText);
-            const shouldPlanReply = shouldUseAiReplyPlanner(
+            const leadCaptureTrigger = client.lead_capture_enabled
+              ? client.lead_capture_trigger.trim()
+              : "";
+            const shouldPlanReply = Boolean(leadCaptureTrigger) || shouldUseAiReplyPlanner(
               rawText,
               existingConversation,
               fallbackLeadIntent
             );
             const replyPlan = shouldPlanReply
-              ? await planAiReply(rawText, client.business_info || "", aiConversationContext)
+              ? await planAiReply(rawText, client.business_info || "", aiConversationContext, leadCaptureTrigger)
               : undefined;
             const leadIntent = getLeadCaptureIntentFromPlan(
               rawText,
               replyPlan?.leadCaptureIntent ?? fallbackLeadIntent
             );
 
-            if (leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT") {
+            const shouldStartLeadCapture = leadCaptureTrigger
+              ? replyPlan?.shouldStartLeadCapture === true
+              : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT";
+
+            if (shouldStartLeadCapture) {
               const leadReply = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
               });

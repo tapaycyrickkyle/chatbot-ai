@@ -65,6 +65,11 @@ Web App `/exec` URL plus sheet tab name. Copy the script in
 `google-apps-script-lead-webhook.js` to Apps Script, deploy it as a Web App with
 access set to anyone, and paste its deployment URL into Page Settings.
 
+Use **When should the AI ask for lead details?** in the Page's Prompt Builder to
+set the lead trigger for that Page. For example, “when the customer asks for a
+quote, discount, or to place an order.” Leaving it blank keeps the standard
+ready-to-buy, booking, or human-contact trigger.
+
 The app creates a Google Sheet row only after the customer confirms the summary.
 Drafts and delivery attempts are stored for 30 days so a temporary Apps Script
 failure can be retried without asking the customer for their details again.

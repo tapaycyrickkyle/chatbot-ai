@@ -37,6 +37,7 @@ type SalesPlan = {
   languageName: string;
   replyInstruction: string;
   leadCaptureIntent: LeadCaptureIntent;
+  shouldStartLeadCapture: boolean;
   resolvedCustomerMeaning: string;
   conversationAction: string;
   buyerIntent: string;
@@ -120,6 +121,7 @@ function createFallbackSalesPlan(
   return {
     ...parseSalesPlan("", languageStyle),
     leadCaptureIntent: latestLeadIntent ?? "UNCLEAR",
+    shouldStartLeadCapture: false,
     resolvedCustomerMeaning:
       "Answer the latest customer message directly using the business facts and recent conversation only when needed.",
     conversationAction: "answer_latest_message",
@@ -226,6 +228,7 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
         typeof parsed.leadCaptureIntent === "string"
           ? parseLeadIntent(parsed.leadCaptureIntent)
           : "UNCLEAR",
+      shouldStartLeadCapture: parsed.shouldStartLeadCapture === true,
       resolvedCustomerMeaning:
         typeof parsed.resolvedCustomerMeaning === "string"
           ? parsed.resolvedCustomerMeaning.slice(0, 240)
@@ -246,6 +249,7 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
       languageName: fallbackStyle,
       replyInstruction: getReplyLanguageInstruction(fallbackStyle),
       leadCaptureIntent: "UNCLEAR",
+      shouldStartLeadCapture: false,
       resolvedCustomerMeaning: "Interpret the latest message using the recent conversation.",
       conversationAction: "answer_latest_message",
       buyerIntent: "understand_latest_message",
@@ -490,6 +494,7 @@ async function planRealEstateSalesReply(input: {
   conversationSummary: string;
   recentMessages: Array<{ role?: string; content: string }>;
   latestLeadIntent?: LeadCaptureIntent;
+  leadCaptureTrigger?: string;
   fallbackStyle: CustomerLanguageStyle;
 }) {
   const recentMessages = input.recentMessages
@@ -534,6 +539,7 @@ Rules:
 - Use benefits as proof-based persuasion, not hype. Never claim guarantees, scarcity, urgency, returns, approval, outcomes, or superiority unless explicitly stated in the business facts.
 - Prefer one simple useful qualifying question after the answer when it helps identify fit: product/service/package needed, budget range, preferred date or timing, location, quantity, purpose/use case, payment preference, delivery/pickup need, size/color/model, concern, or main goal.
 - Do not recommend asking for name/phone/contact details unless the customer is ready to proceed, asks for a human/team follow-up, or has already offered contact details.
+- Lead-form trigger: ${input.leadCaptureTrigger?.trim() ? `The page owner chose this rule: "${input.leadCaptureTrigger.trim()}". Set shouldStartLeadCapture to true only when the latest customer message, interpreted in context, clearly matches that rule. Otherwise set it to false.` : "No custom rule is configured. Set shouldStartLeadCapture to false."}
 - Booking, reservation, appointment, order confirmation, availability confirmation, final pricing, custom quotes, approvals, and discounts still require the team/human to confirm unless the business facts explicitly say the AI can confirm them.
 - Classify the latest customer message for intent only. This classification helps choose the answer style and must not trigger a lead form.
 - Intent labels:
@@ -553,6 +559,7 @@ Return only JSON:
   "languageName":"English/Tagalog/Taglish/Cebuano-English/etc",
   "replyInstruction":"Reply in English only.",
   "leadCaptureIntent":"INFO_ONLY/SOFT_INTEREST/READY_TO_BUY_OR_BOOK/WANTS_HUMAN_CONTACT/PROVIDED_LEAD_DETAILS/UNCLEAR",
+  "shouldStartLeadCapture":false,
   "resolvedCustomerMeaning":"what the latest customer message means in context",
   "conversationAction":"continue_previous_offer/answer_new_question/answer_choice/clarify/soft_sell/ask_next_step",
   "buyerIntent":"price/location/availability/payment/options/comparison/etc",
@@ -612,7 +619,8 @@ function parseLeadIntent(value: string): LeadCaptureIntent {
 export async function planAiReply(
   userMessage: string,
   businessContext: string,
-  conversationContext: ConversationContext = {}
+  conversationContext: ConversationContext = {},
+  leadCaptureTrigger = ""
 ): Promise<SalesPlan> {
   const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const { apiKey, apiUrl, model } = getAiConfig();
@@ -632,6 +640,7 @@ export async function planAiReply(
       conversationSummary: getMemorySummaryForPrompt(conversationContext),
       recentMessages: getRecentMessagesForPrompt(conversationContext),
       latestLeadIntent: conversationContext.latestLeadIntent,
+      leadCaptureTrigger,
       fallbackStyle: latestLanguageStyle,
     });
   } catch (error) {

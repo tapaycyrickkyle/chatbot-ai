@@ -98,6 +98,11 @@ Capture. Add required fields (for example, `Full Name|name`, `Phone|phone`, and
 `Email|email`), then paste the Google Apps Script Web App `/exec` URL and the
 Google Sheet tab name.
 
+In the connected Page's Prompt Builder, use **When should the AI ask for lead
+details?** to set a page-specific trigger, such as “when the customer requests a
+quote or asks about discounts.” Leave it blank to use the standard trigger: the
+customer is ready to buy/book or asks to speak with the team.
+
 Copy `supabase/google-apps-script-lead-webhook.js` into a script attached to the
 target Google Sheet, deploy it as a Web App with access set to anyone, and use its
 deployment URL in the dashboard. A row is created as soon as all configured lead
