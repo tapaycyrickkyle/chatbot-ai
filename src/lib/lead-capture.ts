@@ -43,7 +43,12 @@ function labelPattern(label: string) {
   return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
 }
 
-export function extractLeadValues(message: string, fields: LeadField[], previous: Record<string, string> = {}) {
+export function extractLeadValues(
+  message: string,
+  fields: LeadField[],
+  previous: Record<string, string> = {},
+  expectedField?: LeadField
+) {
   const values = { ...previous };
   const labeled = fields.flatMap((field) => {
     const match = message.match(new RegExp(`(?:^|[\\n,;])\\s*(?:${labelPattern(field.label)})\\s*[:=-]\\s*([^\\n,;]+)`, "i"));
@@ -64,6 +69,15 @@ export function extractLeadValues(message: string, fields: LeadField[], previous
       const value = normalizeLeadValue(field.type, candidate);
       if (value) values[field.label] = value;
     }
+  }
+
+  const extractedNewValue = fields.some(
+    (field) => !previous[field.label] && Boolean(values[field.label])
+  );
+  if (expectedField && !values[expectedField.label] && !extractedNewValue) {
+    const looksLikeAnswer = message.trim().length <= 180 && !/[?]/.test(message);
+    const value = looksLikeAnswer ? normalizeLeadValue(expectedField.type, message) : "";
+    if (value) values[expectedField.label] = value;
   }
 
   const missing = fields.filter((field) => !values[field.label]);

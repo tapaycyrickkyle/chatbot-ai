@@ -575,7 +575,8 @@ async function handleLeadCapture(input: {
     return null;
   }
 
-  const values = extractLeadValues(input.message, fields, lead.fields);
+  const expectedField = getMissingLeadField(fields, lead.fields);
+  const values = extractLeadValues(input.message, fields, lead.fields, expectedField);
   const missingField = getMissingLeadField(fields, values);
   if (missingField) {
     await updateLeadRecord(lead.id, { fields: values, status: "collecting" });
