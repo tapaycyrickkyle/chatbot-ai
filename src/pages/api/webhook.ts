@@ -19,7 +19,7 @@ import {
   tryClaimMessengerMessage,
   resumeAiConversation,
 } from "@/lib/database";
-import { askAi, getLeadFormIntro, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
+import { askAi, getLeadFormIntro, getLeadOfferQuestion, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
 import {
   appendRecentConversationMessages,
   getDeterministicReply,
@@ -608,7 +608,11 @@ async function handleLeadCapture(input: {
     }
     return {
       reply: null,
-      confirmationPrompt: getLeadProceedConfirmationPrompt(style, input.client.lead_capture_offer),
+      confirmationPrompt: await getLeadOfferQuestion({
+        customerMessage: input.message,
+        businessContext: input.client.business_info,
+        offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
+      }),
       hasOpenLead: true,
     };
   }
@@ -675,10 +679,12 @@ async function startLeadCapture(input: {
     clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
     fields: values, fieldConfig: fields, status: "awaiting_confirmation",
   });
-  return getLeadProceedConfirmationPrompt(
-    detectCustomerLanguageStyle(input.message),
-    input.client.lead_capture_offer
-  );
+  const style = detectCustomerLanguageStyle(input.message);
+  return getLeadOfferQuestion({
+    customerMessage: input.message,
+    businessContext: input.client.business_info,
+    offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
+  });
 }
 
 function shouldUseAiReplyPlanner(

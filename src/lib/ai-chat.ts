@@ -421,7 +421,7 @@ async function requestChatCompletion(input: {
   messages: ChatMessage[];
   temperature: number;
   maxTokens: number;
-  purpose: "planner" | "reply" | "lead_form_intro";
+  purpose: "planner" | "reply" | "lead_form_intro" | "lead_offer";
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), getAiRequestTimeoutMs());
@@ -689,6 +689,50 @@ export async function getLeadFormIntro(input: {
       : fallback;
   } catch (error) {
     console.warn("Lead form intro generation failed", getErrorSummary(error));
+    return fallback;
+  }
+}
+
+export async function getLeadOfferQuestion(input: {
+  customerMessage: string;
+  businessContext: string;
+  offer: string;
+}) {
+  const languageStyle = detectCustomerLanguageStyle(input.customerMessage);
+  const { apiKey, apiUrl, model } = getAiConfig();
+  const fallback = input.offer.trim() || (languageStyle === "cebuano"
+    ? "Gusto nimo mopadayon?"
+    : languageStyle === "tagalog" || languageStyle === "taglish"
+      ? "Gusto mo bang mag-proceed?"
+      : "Would you like to proceed?");
+
+  if (!apiKey || !apiUrl || !model) return fallback;
+
+  try {
+    const reply = await requestChatCompletion({
+      apiKey,
+      apiUrl,
+      model,
+      temperature: 0.2,
+      maxTokens: 60,
+      purpose: "lead_offer",
+      messages: [
+        {
+          role: "system",
+          content: "Rewrite the saved offer as exactly one short, natural customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning; do not add another offer, promises, field labels, markdown, or any facts not provided.",
+        },
+        {
+          role: "user",
+          content: `Customer's latest message: "${input.customerMessage.slice(0, 240)}"\nSaved offer to express: "${fallback.slice(0, 600)}"\nBusiness facts: ${getBusinessContextForPrompt(input.businessContext).slice(0, 1400) || "None"}`,
+        },
+      ],
+    });
+    const cleanedReply = reply.replace(/\s+/g, " ").trim();
+    return cleanedReply && cleanedReply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE
+      ? cleanedReply.slice(0, 320)
+      : fallback;
+  } catch (error) {
+    console.warn("Lead offer generation failed", getErrorSummary(error));
     return fallback;
   }
 }
