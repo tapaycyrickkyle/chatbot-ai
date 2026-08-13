@@ -669,22 +669,37 @@ async function handleLeadCapture(input: {
 }
 
 async function startLeadCapture(input: {
-  client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
-}) {
-  if (!input.client.lead_capture_enabled) return null;
+  client: ConnectedPageClient; pageId: string; recipientId: string; message: string; confirmed?: boolean;
+}): Promise<LeadCaptureResult> {
+  if (!input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
   const fields = parseLeadFields(input.client.lead_capture_fields);
-  if (!fields.length) return null;
+  if (!fields.length) return { reply: null, hasOpenLead: false };
   const values = extractLeadValues(input.message, fields);
   await createLeadRecord({
     clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
-    fields: values, fieldConfig: fields, status: "awaiting_confirmation",
+    fields: values, fieldConfig: fields, status: input.confirmed ? "collecting" : "awaiting_confirmation",
   });
   const style = detectCustomerLanguageStyle(input.message);
-  return getLeadOfferQuestion({
-    customerMessage: input.message,
-    businessContext: input.client.business_info,
-    offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
-  });
+  if (!input.confirmed) {
+    return {
+      reply: await getLeadOfferQuestion({
+        customerMessage: input.message,
+        businessContext: input.client.business_info,
+        offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
+      }),
+      hasOpenLead: true,
+    };
+  }
+
+  return {
+    reply: await getLeadFormIntro({
+      customerMessage: input.message,
+      businessContext: input.client.business_info,
+      leadOffer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
+    }),
+    formReply: getLeadFormPrompt(fields, style),
+    hasOpenLead: true,
+  };
 }
 
 function shouldUseAiReplyPlanner(
@@ -1183,7 +1198,13 @@ export default async function handler(
               fallbackLeadIntent
             );
             const replyPlan = shouldPlanReply
-              ? await planAiReply(rawText, client.business_info || "", aiConversationContext, leadCaptureTrigger)
+              ? await planAiReply(
+                  rawText,
+                  client.business_info || "",
+                  aiConversationContext,
+                  leadCaptureTrigger,
+                  client.lead_capture_offer
+                )
               : undefined;
             const leadIntent = getLeadCaptureIntentFromPlan(
               rawText,
@@ -1193,20 +1214,32 @@ export default async function handler(
             const shouldStartLeadCapture = leadCaptureTrigger
               ? replyPlan?.shouldStartLeadCapture === true
               : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT";
+            const shouldOfferLeadCapture = Boolean(
+              leadCaptureTrigger &&
+              client.lead_capture_offer.trim() &&
+              replyPlan?.shouldOfferLeadCapture === true
+            );
 
-            if (!activeLead.hasOpenLead && shouldStartLeadCapture) {
-              const leadReply = await startLeadCapture({
+            if (!activeLead.hasOpenLead && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
+              const startedLead = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
+                confirmed: shouldStartLeadCapture,
               });
-              if (leadReply) {
+              if (startedLead.reply) {
                 const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
-                const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, leadReply);
-                const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, leadReply);
+                const recordedReply = [startedLead.reply, startedLead.formReply].filter(Boolean).join("\n\n");
+                const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
+                const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, recordedReply);
                 await safelyHandleFlowSend(
-                  () => safeSendHumanTextReply(userId, leadReply, pageAccessToken, pageId, client.id),
+                  async () => {
+                    await safeSendHumanTextReply(userId, startedLead.reply!, pageAccessToken, pageId, client.id);
+                    if (startedLead.formReply) {
+                      await safeSendHumanTextReply(userId, startedLead.formReply, pageAccessToken, pageId, client.id);
+                    }
+                  },
                   { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
                 );
-                await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: leadReply, conversationSummary, customerState, recentMessages });
+                await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: recordedReply, conversationSummary, customerState, recentMessages });
                 continue;
               }
             }
