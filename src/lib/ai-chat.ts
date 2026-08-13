@@ -684,7 +684,7 @@ export async function getLeadFormIntro(input: {
       messages: [
         {
           role: "system",
-          content: "Write one short customer-facing confirmation sentence that appears immediately before a lead-details form. Do not ask a question. Do not include field labels, a list, markdown, promises, or facts not provided. Match the customer's language or language mix.",
+          content: "Write one short customer-facing confirmation sentence that appears immediately before a lead-details form. Do not ask a question. Do not include emojis, icons, field labels, a list, markdown, promises, or facts not provided. Match the customer's language or language mix.",
         },
         {
           role: "user",
@@ -728,7 +728,7 @@ export async function getLeadOfferQuestion(input: {
       messages: [
         {
           role: "system",
-          content: "Rewrite the saved offer as exactly one short, natural customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning; do not add another offer, promises, field labels, markdown, or any facts not provided.",
+          content: "Rewrite the saved offer as exactly one short, natural customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning; do not add emojis, icons, another offer, promises, field labels, markdown, or any facts not provided.",
         },
         {
           role: "user",
@@ -781,6 +781,7 @@ Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
 - Talk like a helpful person replying in Messenger: warm, plain, and natural.
+- Do not use emojis, icons, decorative symbols, or reaction-style characters.
 - Use simple everyday words. Avoid formal wording, sales language, explanations the customer did not ask for, and filler such as "I'd be happy to assist."
 - Be direct: answer the latest message immediately. Do not recap, explain your reasoning, greet again, or warm up before the answer.
 - Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum. Use a second sentence only when it is essential to give the direct answer or ask one necessary question.
