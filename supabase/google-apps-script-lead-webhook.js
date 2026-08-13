@@ -7,6 +7,9 @@ function doPost(event) {
   }
   const sheet = SpreadsheetApp.getActive().getSheetByName(payload.sheetTab);
   if (!sheet) return json({ ok: false, error: "Sheet tab not found" });
+  const fieldTypes = payload.fieldTypes && typeof payload.fieldTypes === "object"
+    ? payload.fieldTypes
+    : {};
   const requestedHeaders = Object.keys(payload.fields);
   const currentHeaders = sheet.getLastColumn() > 0
     ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String)
@@ -25,9 +28,17 @@ function doPost(event) {
     return json({ ok: true, duplicate: true });
   }
   const row = headers.map((header) => {
-    return payload.fields[header] || "";
+    return Object.prototype.hasOwnProperty.call(payload.fields, header)
+      ? String(payload.fields[header])
+      : "";
   });
-  sheet.appendRow(row);
+  const nextRow = sheet.getLastRow() + 1;
+  headers.forEach((header, columnIndex) => {
+    if (fieldTypes[header] === "phone") {
+      sheet.getRange(nextRow, columnIndex + 1).setNumberFormat("@");
+    }
+  });
+  sheet.getRange(nextRow, 1, 1, headers.length).setValues([row]);
   deliveredLeads.setProperty(`lead:${payload.leadId}`, new Date().toISOString());
   return json({ ok: true });
 }

@@ -513,6 +513,7 @@ async function deliverConfirmedLead(input: {
   pageId: string;
   recipientId: string;
   fields: Record<string, string>;
+  fieldConfig: Array<{ label: string; type: string }>;
   webhookUrl: string;
   sheetTab: string;
   attempts: number;
@@ -536,6 +537,7 @@ async function deliverConfirmedLead(input: {
       body: JSON.stringify({
         leadId: input.leadId, pageId: input.pageId, recipientId: input.recipientId,
         capturedAt: new Date().toISOString(), sheetTab: input.sheetTab, fields: input.fields,
+        fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, field.type])),
       }),
     });
     const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
@@ -585,6 +587,7 @@ async function handleLeadCapture(input: {
   });
   await deliverConfirmedLead({
     leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
+    fieldConfig: lead.field_config,
     webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
     attempts: lead.delivery_attempts,
   });
@@ -609,7 +612,8 @@ async function startLeadCapture(input: {
     });
     await deliverConfirmedLead({
       leadId: confirmedLead.id, pageId: input.pageId, recipientId: input.recipientId,
-      fields: confirmedLead.fields, webhookUrl: input.client.google_sheets_webhook_url,
+      fields: confirmedLead.fields, fieldConfig: confirmedLead.field_config,
+      webhookUrl: input.client.google_sheets_webhook_url,
       sheetTab: input.client.google_sheets_tab_name, attempts: confirmedLead.delivery_attempts,
     });
     return getLeadDeliveredReply(detectCustomerLanguageStyle(input.message));

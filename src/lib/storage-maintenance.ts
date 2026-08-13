@@ -102,7 +102,12 @@ async function retryConfirmedLeadDeliveries() {
     try {
       const response = await fetch(record.google_sheets_webhook_url, {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ leadId: record.id, pageId: record.page_id, recipientId: record.recipient_id, capturedAt: record.confirmed_at || record.created_at, sheetTab: record.google_sheets_tab_name, fields: record.fields }),
+        body: JSON.stringify({
+          leadId: record.id, pageId: record.page_id, recipientId: record.recipient_id,
+          capturedAt: record.confirmed_at || record.created_at, sheetTab: record.google_sheets_tab_name,
+          fields: record.fields,
+          fieldTypes: Object.fromEntries(record.field_config.map((field) => [field.label, field.type])),
+        }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Google Sheets returned ${response.status}`);

@@ -76,3 +76,4 @@ failure can be retried without asking the customer for their details again.
 The lead sheet contains only the configured lead-field headers. The same deployed
 Apps Script works for later field changes: it adds missing header columns and maps
 each lead value by its configured field label.
+Configured phone fields are stored as text, preserving leading zeroes.

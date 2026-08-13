@@ -111,6 +111,8 @@ the scheduled maintenance cleanup.
 
 The Google Sheet uses only the lead-field names configured for that Page. It does
 not add tracking columns such as Messenger customer ID or capture time.
+Phone fields are written as text so a number such as `09622441406` keeps its
+leading zero.
 
 ## Getting Started
 
