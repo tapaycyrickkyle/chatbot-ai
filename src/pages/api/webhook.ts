@@ -508,6 +508,16 @@ function getLeadCaptureIntentFromPlan(message: string, planIntent: LeadCaptureIn
   return getFallbackLeadIntent(message);
 }
 
+function isLeadCaptureQuestion(message: string) {
+  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalizedMessage) return false;
+  if (normalizedMessage.includes("?") || isClearlyInfoOnlyMessage(normalizedMessage)) return true;
+
+  return /^(?:what|why|how|where|when|who|which|can|could|do|does|did|is|are|may|will|would|ano|anong|bakit|paano|saan|kailan|magkano|ilan|para\s+saan|may|meron|pwede|maaari|unsa|ngano|nganong|asa|kanus-a|pila|naa|pwede\s+ba|makaya\s+ba)\b/i.test(
+    normalizedMessage
+  );
+}
+
 async function deliverConfirmedLead(input: {
   leadId: string;
   pageId: string;
@@ -571,7 +581,7 @@ async function handleLeadCapture(input: {
   if (!lead) return null;
   // A new customer question should be answered by the normal AI first. The open
   // lead remains saved, so the next answer can continue from the missing field.
-  if (/\?/.test(input.message)) {
+  if (isLeadCaptureQuestion(input.message)) {
     return null;
   }
 
