@@ -109,7 +109,7 @@ export function getLeadFormPrompt(fields: LeadField[], languageStyle: string) {
       ? "Para mapabilis ang paggawa ng quotation, pakikopya ang format sa ibaba at sagutan ang required na fields. Puwedeng iwanang blanko ang optional na field."
       : "To help us prepare your quotation faster, please copy the format below and complete the required fields. Optional fields may be left blank.";
 
-  return `${heading}\n\n${fields.map((field) => `${field.label.toUpperCase()}${field.required ? "" : " (OPTIONAL)"}:`).join("\n")}`;
+  return `${heading}\n\n${fields.map((field) => `${field.label}${field.required ? "" : " (Optional)"}:`).join("\n")}`;
 }
 
 export function getLeadPrompt(field: LeadField, languageStyle: string) {

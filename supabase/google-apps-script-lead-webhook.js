@@ -44,18 +44,24 @@ function doPost(event) {
       ? String(payload.fields[header])
       : "";
   });
-  const nextRow = findFirstAvailableLeadRow(sheet, headers.length);
+  const dateSentColumn = headers.indexOf(DATE_SENT_HEADER) + 1;
+  const nextRow = findFirstAvailableLeadRow(sheet, dateSentColumn);
   headers.forEach((header, columnIndex) => {
-    if (fieldTypes[header] === "phone") {
-      sheet.getRange(nextRow, columnIndex + 1).setNumberFormat("@");
+    if (header !== DATE_SENT_HEADER && !Object.prototype.hasOwnProperty.call(payload.fields, header)) {
+      return;
     }
+
+    const cell = sheet.getRange(nextRow, columnIndex + 1);
+    if (fieldTypes[header] === "phone") {
+      cell.setNumberFormat("@");
+    }
+    cell.setValue(row[columnIndex]);
   });
-  sheet.getRange(nextRow, 1, 1, headers.length).setValues([row]);
   deliveredLeads.setProperty(`lead:${payload.leadId}`, new Date().toISOString());
   return json({ ok: true });
 }
 
-function findFirstAvailableLeadRow(sheet, columnCount) {
+function findFirstAvailableLeadRow(sheet, dateSentColumn) {
   const firstLeadRow = 2;
   const lastUsedRow = sheet.getLastRow();
 
@@ -64,12 +70,10 @@ function findFirstAvailableLeadRow(sheet, columnCount) {
   }
 
   const rowCount = lastUsedRow - firstLeadRow + 1;
-  const range = sheet.getRange(firstLeadRow, 1, rowCount, columnCount);
-  const values = range.getDisplayValues();
-  const formulas = range.getFormulas();
-  const firstEmptyRowIndex = values.findIndex((row, rowIndex) =>
-    row.every((cell, columnIndex) => !String(cell).trim() && !formulas[rowIndex][columnIndex])
-  );
+  const dates = sheet
+    .getRange(firstLeadRow, dateSentColumn, rowCount, 1)
+    .getDisplayValues();
+  const firstEmptyRowIndex = dates.findIndex(([dateSent]) => !String(dateSent).trim());
 
   return firstEmptyRowIndex >= 0
     ? firstLeadRow + firstEmptyRowIndex
