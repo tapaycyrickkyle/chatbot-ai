@@ -1219,13 +1219,14 @@ export default async function handler(
               client.lead_capture_offer.trim() &&
               replyPlan?.shouldOfferLeadCapture === true
             );
+            let leadConfirmationPrompt = activeLead.confirmationPrompt;
 
             if (!activeLead.hasOpenLead && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
               const startedLead = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
                 confirmed: shouldStartLeadCapture,
               });
-              if (startedLead.reply) {
+              if (startedLead.reply && shouldStartLeadCapture) {
                 const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
                 const recordedReply = [startedLead.reply, startedLead.formReply].filter(Boolean).join("\n\n");
                 const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
@@ -1241,6 +1242,11 @@ export default async function handler(
                 );
                 await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: recordedReply, conversationSummary, customerState, recentMessages });
                 continue;
+              }
+              // For a soft offer, keep the normal answer and append the saved
+              // offer question instead of replacing the answer with it.
+              if (startedLead.reply && shouldOfferLeadCapture) {
+                leadConfirmationPrompt = startedLead.reply;
               }
             }
 
@@ -1266,8 +1272,8 @@ export default async function handler(
                   latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),
                 });
-                const reply = activeLead.confirmationPrompt
-                  ? `${aiReply}\n\n${activeLead.confirmationPrompt}`
+                const reply = leadConfirmationPrompt
+                  ? `${aiReply}\n\n${leadConfirmationPrompt}`
                   : aiReply;
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,
