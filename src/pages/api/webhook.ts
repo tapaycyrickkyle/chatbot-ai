@@ -520,7 +520,14 @@ function isLeadCaptureQuestion(message: string) {
 
 function isLeadProceedingMessage(message: string) {
   const normalizedMessage = message.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-  return /^(?:(?:yes|yeah|yep|sure|okay|ok|oo|opo|sige|pwede)(?:\s+(?:po|please|na|ako))?|go ahead|proceed|lets proceed|let us proceed|gusto ko|gusto ko mag proceed|mag proceed|magproceed|book|reserve)$/i.test(
+  const confirmationWord = "(?:yes|yeah|yep|sure|okay|ok|oo|opo|sige|sge|pwede)";
+  const confirmationFiller = "(?:po|please|na|ako|kami|ko|lang|nga|bitaw)";
+  const shortConfirmation = new RegExp(
+    `^${confirmationWord}(?:\\s+(?:${confirmationWord}|${confirmationFiller}))*$`,
+    "i"
+  );
+
+  return shortConfirmation.test(normalizedMessage) || /^(?:go ahead|proceed|lets proceed|let us proceed|gusto ko(?:\s+(?:na|po|sana|mag proceed))?|mag proceed|magproceed|book|reserve)$/i.test(
     normalizedMessage
   );
 }
