@@ -105,7 +105,7 @@ export function getLeadFormPrompt(fields: LeadField[], languageStyle: string) {
       ? "Para mapabilis ang paggawa ng quotation, pakikopya ang format sa ibaba at sagutan ang bawat field. Kung hindi pa sigurado, ilagay lang ang “Not sure.”"
       : "To help us prepare your quotation faster, please copy the format below and complete every field. If you are not sure, write “Not sure.”";
 
-  return `${heading}\n${fields.map((field) => `${field.label.toUpperCase()}:`).join("\n")}`;
+  return `${heading}\n\n${fields.map((field) => `${field.label.toUpperCase()}:`).join("\n")}`;
 }
 
 export function getLeadPrompt(field: LeadField, languageStyle: string) {
