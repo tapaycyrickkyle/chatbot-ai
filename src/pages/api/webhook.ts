@@ -1137,9 +1137,8 @@ export default async function handler(
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {
-              const reply = activeLead.confirmationPrompt
-                ? `${deterministicReply}\n\n${activeLead.confirmationPrompt}`
-                : deterministicReply;
+              const replyParts = [deterministicReply, activeLead.confirmationPrompt].filter(Boolean) as string[];
+              const reply = replyParts.join("\n\n");
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
@@ -1153,14 +1152,11 @@ export default async function handler(
               );
 
               await safelyHandleFlowSend(
-                () =>
-                  safeSendHumanTextReply(
-                    userId,
-                    reply,
-                    pageAccessToken,
-                    pageId,
-                    client.id
-                  ),
+                async () => {
+                  for (const replyPart of replyParts) {
+                    await safeSendHumanTextReply(userId, replyPart, pageAccessToken, pageId, client.id);
+                  }
+                },
                 {
                   clientId: client.id,
                   pageId,
@@ -1272,9 +1268,8 @@ export default async function handler(
                   latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),
                 });
-                const reply = leadConfirmationPrompt
-                  ? `${aiReply}\n\n${leadConfirmationPrompt}`
-                  : aiReply;
+                const replyParts = [aiReply, leadConfirmationPrompt].filter(Boolean) as string[];
+                const reply = replyParts.join("\n\n");
                 const customerState = inferCustomerState(
                   existingConversation?.customer_state,
                   rawText
@@ -1295,7 +1290,9 @@ export default async function handler(
                   userId,
                   preview: reply.slice(0, 120),
                 });
-                await safeSendHumanTextReply(userId, reply, pageAccessToken, pageId, client.id);
+                for (const replyPart of replyParts) {
+                  await safeSendHumanTextReply(userId, replyPart, pageAccessToken, pageId, client.id);
+                }
                 await safelyRecordAiReply({
                   clientId: client.id,
                   pageId,
