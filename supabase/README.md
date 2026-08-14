@@ -60,7 +60,8 @@ Admin users are controlled only by `SUPABASE_ADMIN_EMAILS`.
 
 Run `24-confirmed-lead-capture.sql` for an existing database (or run the updated
 `00-run-all.sql` for a fresh setup). In Page Settings, enable Confirmed Lead
-Capture, add each required `label|type` field, and enter the Google Apps Script
+Capture, add each `label|type` field, and mark an optional one as
+`label|type|optional`, then enter the Google Apps Script
 Web App `/exec` URL plus sheet tab name. Copy the script in
 `google-apps-script-lead-webhook.js` to Apps Script, deploy it as a Web App with
 access set to anyone, and paste its deployment URL into Page Settings.

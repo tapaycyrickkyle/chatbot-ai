@@ -554,7 +554,7 @@ async function deliverConfirmedLead(input: {
   pageId: string;
   recipientId: string;
   fields: Record<string, string>;
-  fieldConfig: Array<{ label: string; type: string }>;
+  fieldConfig: Array<{ label: string; type: string; required: boolean }>;
   webhookUrl: string;
   sheetTab: string;
   attempts: number;
@@ -577,7 +577,8 @@ async function deliverConfirmedLead(input: {
       signal: controller.signal,
       body: JSON.stringify({
         leadId: input.leadId, pageId: input.pageId, recipientId: input.recipientId,
-        capturedAt: new Date().toISOString(), sheetTab: input.sheetTab, fields: input.fields,
+        capturedAt: new Date().toISOString(), sheetTab: input.sheetTab,
+        fields: Object.fromEntries(input.fieldConfig.map((field) => [field.label, input.fields[field.label] ?? ""])),
         fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, field.type])),
       }),
     });

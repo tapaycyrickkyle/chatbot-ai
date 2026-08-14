@@ -105,7 +105,7 @@ async function retryConfirmedLeadDeliveries() {
         body: JSON.stringify({
           leadId: record.id, pageId: record.page_id, recipientId: record.recipient_id,
           capturedAt: record.confirmed_at || record.created_at, sheetTab: record.google_sheets_tab_name,
-          fields: record.fields,
+          fields: Object.fromEntries(record.field_config.map((field) => [field.label, record.fields[field.label] ?? ""])),
           fieldTypes: Object.fromEntries(record.field_config.map((field) => [field.label, field.type])),
         }),
       });

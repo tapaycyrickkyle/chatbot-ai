@@ -808,7 +808,7 @@ export type LeadRecord = {
   page_id: string;
   recipient_id: string;
   fields: Record<string, string>;
-  field_config: Array<{ label: string; type: string }>;
+  field_config: Array<{ label: string; type: string; required: boolean }>;
   status: "collecting" | "awaiting_confirmation" | "confirmed" | "delivered" | "delivery_failed";
   delivery_attempts: number;
   last_delivery_error: string;
@@ -829,7 +829,7 @@ function normalizeLeadRecord(row: Record<string, unknown>): LeadRecord {
         if (!field || typeof field !== "object") return [];
         const value = field as Record<string, unknown>;
         return typeof value.label === "string" && typeof value.type === "string"
-          ? [{ label: value.label, type: value.type }]
+          ? [{ label: value.label, type: value.type, required: value.required !== false }]
           : [];
       })
     : [];
@@ -856,7 +856,7 @@ export async function getOpenLeadRecord(clientId: string, recipientId: string) {
 
 export async function createLeadRecord(input: {
   clientId: string; pageId: string; recipientId: string;
-  fields: Record<string, string>; fieldConfig: Array<{ label: string; type: string }>;
+  fields: Record<string, string>; fieldConfig: Array<{ label: string; type: string; required: boolean }>;
   status?: LeadRecord["status"];
 }) {
   const { data, error } = await getDb().from("lead_records").insert({

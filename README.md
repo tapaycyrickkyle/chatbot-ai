@@ -94,8 +94,8 @@ The AI is configured to keep helping with the latest customer message instead of
 
 To collect qualified leads, run `supabase/24-confirmed-lead-capture.sql` in the
 Supabase SQL Editor. Open the connected Page's Settings and enable Confirmed Lead
-Capture. Add required fields (for example, `Full Name|name`, `Phone|phone`, and
-`Email|email`), then paste the Google Apps Script Web App `/exec` URL and the
+Capture. Add fields (for example, `Full Name|name`, `Phone|phone`, and
+`Email|email|optional`), then paste the Google Apps Script Web App `/exec` URL and the
 Google Sheet tab name.
 
 In the connected Page's Prompt Builder, use **When should the AI ask for lead
@@ -112,7 +112,8 @@ Copy `supabase/google-apps-script-lead-webhook.js` into a script attached to the
 target Google Sheet, deploy it as a Web App with access set to anyone, and use its
 deployment URL in the dashboard. A row is created as soon as all configured lead
 fields are received. Failed deliveries remain in Supabase and are retried during
-the scheduled maintenance cleanup.
+the scheduled maintenance cleanup. Optional fields may be left blank and are
+still included as blank columns in the lead sheet.
 
 The first Google Sheet column is **Date Sent**, automatically formatted like
 `August 14, 2026` when the completed lead is delivered. The remaining columns

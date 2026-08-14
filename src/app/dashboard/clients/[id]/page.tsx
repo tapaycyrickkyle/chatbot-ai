@@ -33,19 +33,19 @@ const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
 const MAX_LEAD_FIELDS = 8;
 const LEAD_FIELD_TYPES = ["name", "phone", "email", "text", "number", "date", "address"] as const;
 type LeadFieldType = (typeof LEAD_FIELD_TYPES)[number];
-type LeadField = { label: string; type: LeadFieldType };
+type LeadField = { label: string; type: LeadFieldType; required: boolean };
 
 function parseLeadFields(value: string): LeadField[] {
   return value.split(/\r?\n/).flatMap((line) => {
-    const [label, type] = line.split("|");
+    const [label, type, requirement] = line.split("|");
     return label?.trim() && LEAD_FIELD_TYPES.includes(type?.trim() as LeadFieldType)
-      ? [{ label: label.trim(), type: type.trim() as LeadFieldType }]
+      ? [{ label: label.trim(), type: type.trim() as LeadFieldType, required: requirement?.trim().toLowerCase() !== "optional" }]
       : [];
   }).slice(0, MAX_LEAD_FIELDS);
 }
 
 function serializeLeadFields(fields: LeadField[]) {
-  return fields.map((field) => `${field.label.trim()}|${field.type}`).join("\n");
+  return fields.map((field) => `${field.label.trim()}|${field.type}${field.required ? "" : "|optional"}`).join("\n");
 }
 const MANUAL_AI_PAUSE_OPTIONS = [
   { label: "5 minutes", value: 5 },
@@ -178,7 +178,7 @@ export default function ClientSettingsPage() {
   const [autoReplyIgnorePatterns, setAutoReplyIgnorePatterns] = useState<string[]>([""]);
   const [leadCaptureEnabled, setLeadCaptureEnabled] = useState(false);
   const [leadFields, setLeadFields] = useState<LeadField[]>([
-    { label: "Full Name", type: "name" }, { label: "Phone", type: "phone" },
+    { label: "Full Name", type: "name", required: true }, { label: "Phone", type: "phone", required: true },
   ]);
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
   const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
@@ -464,7 +464,7 @@ export default function ClientSettingsPage() {
     } finally { setSavingLeadCapture(false); }
   };
 
-  const updateLeadField = (index: number, key: keyof LeadField, value: string) => {
+  const updateLeadField = (index: number, key: keyof LeadField, value: string | boolean) => {
     setLeadFields((current) => current.map((field, fieldIndex) => fieldIndex === index ? { ...field, [key]: value } : field));
   };
 
@@ -675,8 +675,8 @@ export default function ClientSettingsPage() {
               actions={<div className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-background px-3 py-2"><span className="text-[12px] font-semibold text-[var(--text-muted)]">{leadCaptureEnabled ? "Enabled" : "Disabled"}</span><button type="button" role="switch" aria-checked={leadCaptureEnabled} onClick={() => setLeadCaptureEnabled((value) => !value)} className={`relative inline-flex h-6 w-11 rounded-full border ${leadCaptureEnabled ? "border-[var(--accent-bright)] bg-[var(--accent)]" : "border-[var(--border)] bg-[var(--surface-strong)]"}`}><span className={`absolute left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${leadCaptureEnabled ? "translate-x-5" : "translate-x-0"}`} /></button></div>}
             >
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3"><div><p className={labelClass}>Required customer details</p><p className="mt-1 text-[12px] text-[var(--text-muted)]">The AI accepts natural replies in any order. Phone and email values are validated.</p></div><button type="button" onClick={() => setLeadFields((current) => current.length >= MAX_LEAD_FIELDS ? current : [...current, { label: "", type: "text" }])} disabled={leadFields.length >= MAX_LEAD_FIELDS} className={secondaryButtonClass}>Add field</button></div>
-                {leadFields.map((field, index) => <div key={`lead-field-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]"><input value={field.label} onChange={(event) => updateLeadField(index, "label", event.target.value)} maxLength={60} placeholder="Field name, e.g. Full Name" className={inputClass} /><select value={field.type} onChange={(event) => updateLeadField(index, "type", event.target.value)} className={inputClass}>{LEAD_FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select><button type="button" onClick={() => setLeadFields((current) => current.length > 1 ? current.filter((_, fieldIndex) => fieldIndex !== index) : current)} className={secondaryButtonClass}>Remove</button></div>)}
+                <div className="flex items-center justify-between gap-3"><div><p className={labelClass}>Customer details</p><p className="mt-1 text-[12px] text-[var(--text-muted)]">Required fields must be completed. Optional fields can be left blank. Phone and email values are validated.</p></div><button type="button" onClick={() => setLeadFields((current) => current.length >= MAX_LEAD_FIELDS ? current : [...current, { label: "", type: "text", required: true }])} disabled={leadFields.length >= MAX_LEAD_FIELDS} className={secondaryButtonClass}>Add field</button></div>
+                {leadFields.map((field, index) => <div key={`lead-field-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-center"><input value={field.label} onChange={(event) => updateLeadField(index, "label", event.target.value)} maxLength={60} placeholder="Field name, e.g. Full Name" className={inputClass} /><select value={field.type} onChange={(event) => updateLeadField(index, "type", event.target.value)} className={inputClass}>{LEAD_FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select><div className="flex items-center justify-between gap-2"><label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-[12px] font-medium text-[var(--text-muted)]"><input type="checkbox" checked={!field.required} onChange={(event) => updateLeadField(index, "required", !event.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />Optional</label><button type="button" onClick={() => setLeadFields((current) => current.length > 1 ? current.filter((_, fieldIndex) => fieldIndex !== index) : current)} className={secondaryButtonClass}>Remove</button></div></div>)}
               </div>
               <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 lg:grid-cols-2"><div><label className={labelClass} htmlFor="google-sheets-webhook-url">Google Apps Script Web App URL</label><input id="google-sheets-webhook-url" type="url" value={googleSheetsWebhookUrl} onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)} placeholder="https://script.google.com/macros/s/.../exec" className={`${inputClass} mt-2`} /></div><div><label className={labelClass} htmlFor="google-sheets-tab-name">Google Sheet tab name</label><input id="google-sheets-tab-name" value={googleSheetsTabName} onChange={(event) => setGoogleSheetsTabName(event.target.value)} maxLength={100} placeholder="Sheet1" className={`${inputClass} mt-2`} /></div></div>
               <p className="mt-4 text-[12px] leading-6 text-[var(--text-muted)]">Set the fields here whenever your lead form changes. The one Apps Script template automatically creates new Google Sheet columns and maps values by field name, so you do not need to edit the script after deployment.</p>

@@ -3,7 +3,7 @@ import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-a
 import { assertSameOrigin, sanitizeIdentifier } from "@/lib/api-security";
 import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
 import { getClientById, getLeadDeliverySummary, updateClientSettings } from "@/lib/database";
-import { LEAD_FIELD_TYPES, parseLeadFields } from "@/lib/lead-capture";
+import { LEAD_FIELD_TYPES, parseLeadFields, serializeLeadFields } from "@/lib/lead-capture";
 
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
@@ -265,7 +265,7 @@ function validateClientSettingsPayload(payload: unknown) {
     if (fields.length === 0) {
       throw new Error(`Add at least one valid field using Label|type. Types: ${LEAD_FIELD_TYPES.join(", ")}`);
     }
-    updates.lead_capture_fields = fields.map((field) => `${field.label}|${field.type}`).join("\n");
+    updates.lead_capture_fields = serializeLeadFields(fields);
   }
 
   if (lead_capture_trigger !== undefined) {

@@ -2,7 +2,7 @@ import "server-only";
 
 export const LEAD_FIELD_TYPES = ["name", "phone", "email", "text", "number", "date", "address"] as const;
 export type LeadFieldType = (typeof LEAD_FIELD_TYPES)[number];
-export type LeadField = { label: string; type: LeadFieldType };
+export type LeadField = { label: string; type: LeadFieldType; required: boolean };
 
 const MAX_FIELDS = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
@@ -11,18 +11,20 @@ const PHONE_CANDIDATE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/g;
 export function parseLeadFields(value: string): LeadField[] {
   const seen = new Set<string>();
   return value.split(/\r?\n/).flatMap((line) => {
-    const [rawLabel, rawType] = line.split("|");
+    const [rawLabel, rawType, rawRequirement] = line.split("|");
     const label = rawLabel?.replace(/\s+/g, " ").trim().slice(0, 60) ?? "";
     const type = rawType?.trim().toLowerCase() as LeadFieldType;
     const key = label.toLowerCase();
     if (!label || !LEAD_FIELD_TYPES.includes(type) || seen.has(key) || seen.size >= MAX_FIELDS) return [];
     seen.add(key);
-    return [{ label, type }];
+    return [{ label, type, required: rawRequirement?.trim().toLowerCase() !== "optional" }];
   });
 }
 
 export function serializeLeadFields(fields: LeadField[]) {
-  return fields.map((field) => `${field.label.trim()}|${field.type}`).join("\n");
+  return fields
+    .map((field) => `${field.label.trim()}|${field.type}${field.required ? "" : "|optional"}`)
+    .join("\n");
 }
 
 export function normalizeLeadValue(type: LeadFieldType, value: string) {
@@ -97,17 +99,17 @@ export function extractLeadValues(
 }
 
 export function getMissingLeadField(fields: LeadField[], values: Record<string, string>) {
-  return fields.find((field) => !values[field.label]);
+  return fields.find((field) => field.required && !values[field.label]);
 }
 
 export function getLeadFormPrompt(fields: LeadField[], languageStyle: string) {
   const heading = languageStyle === "cebuano"
-    ? "Aron mapaspas ang paghimo sa quotation, palihug kopyaha ang format sa ubos ug tubaga ang matag field. Kung dili pa ka sigurado, isulat lang ang “Not sure.”"
+    ? "Aron mapaspas ang paghimo sa quotation, palihug kopyaha ang format sa ubos ug tubaga ang mga required nga field. Pwede ra nimo biyaan og blanko ang optional nga field."
     : languageStyle === "tagalog" || languageStyle === "taglish"
-      ? "Para mapabilis ang paggawa ng quotation, pakikopya ang format sa ibaba at sagutan ang bawat field. Kung hindi pa sigurado, ilagay lang ang “Not sure.”"
-      : "To help us prepare your quotation faster, please copy the format below and complete every field. If you are not sure, write “Not sure.”";
+      ? "Para mapabilis ang paggawa ng quotation, pakikopya ang format sa ibaba at sagutan ang required na fields. Puwedeng iwanang blanko ang optional na field."
+      : "To help us prepare your quotation faster, please copy the format below and complete the required fields. Optional fields may be left blank.";
 
-  return `${heading}\n\n${fields.map((field) => `${field.label.toUpperCase()}:`).join("\n")}`;
+  return `${heading}\n\n${fields.map((field) => `${field.label.toUpperCase()}${field.required ? "" : " (OPTIONAL)"}:`).join("\n")}`;
 }
 
 export function getLeadPrompt(field: LeadField, languageStyle: string) {
