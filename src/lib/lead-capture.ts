@@ -81,7 +81,9 @@ export function extractLeadValues(
   }
 
   const missing = fields.filter((field) => !values[field.label]);
-  if (missing.length === 1 && ["name", "text", "address", "date", "number"].includes(missing[0].type)) {
+  // A message may already have supplied another field (for example, a phone
+  // number). Do not reuse that same message as the final free-text field.
+  if (!extractedNewValue && missing.length === 1 && ["name", "text", "address", "date", "number"].includes(missing[0].type)) {
     const looksLikeAnswer = message.trim().length <= 180 && !/[?]/.test(message);
     const value = looksLikeAnswer ? normalizeLeadValue(missing[0].type, message) : "";
     if (value) values[missing[0].label] = value;
