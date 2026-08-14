@@ -22,6 +22,15 @@ type WorkerResult = {
   status: "sent" | "failed";
   error?: string;
 };
+type MessengerWebhookPayload = {
+  entry?: Array<{
+    id?: string;
+    messaging?: Array<{
+      sender?: { id?: string };
+      message?: { text?: string; is_echo?: boolean };
+    }>;
+  }>;
+};
 
 export async function POST(request: Request) {
   const workerSecret = getWorkerSecret();
@@ -121,6 +130,12 @@ async function processJobsByConversation(
       const group = groups[nextGroupIndex];
       nextGroupIndex += 1;
 
+      const combinedPayload = getCombinedCustomerTextPayload(group);
+      if (combinedPayload) {
+        results.push(...(await processJobGroup(group, combinedPayload, request, workerSecret)));
+        continue;
+      }
+
       for (const job of group) {
         results.push(await processJob(job, request, workerSecret));
       }
@@ -167,6 +182,66 @@ function getJobConversationKey(job: AiMessageJob) {
       : event?.sender?.id || `job:${job.id}`;
 
   return `${pageId}:${recipientId}`;
+}
+
+function getCombinedCustomerTextPayload(jobs: AiMessageJob[]): MessengerWebhookPayload | null {
+  if (jobs.length < 2) return null;
+
+  const messages = jobs.map((job) => {
+    const payload = job.payload as MessengerWebhookPayload;
+    const entry = payload.entry?.[0];
+    const event = entry?.messaging?.[0];
+    const text = event?.message?.text?.trim();
+    const senderId = event?.sender?.id;
+
+    if (
+      payload.entry?.length !== 1 ||
+      entry?.messaging?.length !== 1 ||
+      !senderId ||
+      !text ||
+      event?.message?.is_echo
+    ) {
+      return null;
+    }
+
+    return { pageId: entry.id ?? "", senderId, text };
+  });
+
+  if (messages.some((message) => !message)) return null;
+  const customerMessages = messages as Array<{ pageId: string; senderId: string; text: string }>;
+  const firstMessage = customerMessages[0];
+  if (customerMessages.some((message) => message.pageId !== firstMessage.pageId || message.senderId !== firstMessage.senderId)) {
+    return null;
+  }
+
+  const payload = JSON.parse(JSON.stringify(jobs[jobs.length - 1].payload)) as MessengerWebhookPayload;
+  const message = payload.entry?.[0]?.messaging?.[0]?.message;
+  if (!message) return null;
+  message.text = customerMessages.map((customerMessage) => customerMessage.text).join("\n");
+  return payload;
+}
+
+async function processJobGroup(
+  jobs: AiMessageJob[],
+  payload: MessengerWebhookPayload,
+  request: Request,
+  workerSecret: string
+) {
+  const primaryJob = { ...jobs[jobs.length - 1], payload };
+  const primaryResult = await processJob(primaryJob, request, workerSecret);
+
+  if (primaryResult.status === "sent") {
+    await Promise.all(jobs.slice(0, -1).map((job) => completeAiMessageJob(job.id)));
+    return jobs.map((job) => ({ id: job.id, status: "sent" as const }));
+  }
+
+  await Promise.all(jobs.slice(0, -1).map((job) => failAiMessageJob({
+    jobId: job.id,
+    errorMessage: primaryResult.error ?? "Grouped webhook processing failed",
+    attempts: job.attempts,
+    maxAttempts: job.max_attempts,
+  })));
+  return jobs.map((job) => ({ id: job.id, status: "failed" as const, error: primaryResult.error }));
 }
 
 async function processJob(

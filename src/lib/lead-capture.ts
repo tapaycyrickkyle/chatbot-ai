@@ -74,9 +74,11 @@ export function extractLeadValues(
   let extractedNewValue = fields.some(
     (field) => !previous[field.label] && Boolean(values[field.label])
   );
-  if (expectedField && !values[expectedField.label] && !extractedNewValue) {
-    const looksLikeAnswer = message.trim().length <= 180 && !/[?]/.test(message);
-    const value = looksLikeAnswer ? normalizeLeadValue(expectedField.type, message) : "";
+  const messageLines = message.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const expectedAnswer = messageLines[0] ?? message;
+  if (expectedField && !values[expectedField.label] && (!extractedNewValue || messageLines.length > 1)) {
+    const looksLikeAnswer = expectedAnswer.length <= 180 && !/[?]/.test(expectedAnswer);
+    const value = looksLikeAnswer ? normalizeLeadValue(expectedField.type, expectedAnswer) : "";
     if (value) {
       values[expectedField.label] = value;
       extractedNewValue = true;

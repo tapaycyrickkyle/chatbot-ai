@@ -59,6 +59,8 @@ const DEFAULT_HUMAN_REPLY_MAX_DELAY_MS = 2500;
 const DEFAULT_HUMAN_REPLY_MS_PER_CHAR = 10;
 const DEFAULT_AI_MESSAGE_JOB_BATCH_SIZE = 5;
 const MAX_AI_MESSAGE_JOB_BATCH_SIZE = 25;
+const DEFAULT_AI_MESSAGE_BATCH_DELAY_MS = 2000;
+const MAX_AI_MESSAGE_BATCH_DELAY_MS = 5000;
 const FALLBACK_MESSAGE_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 const AUTO_REPLY_NAME_TOKEN = "{name}";
 
@@ -74,6 +76,7 @@ type WebhookBody = {
       message?: {
         mid?: string;
         text?: string;
+        attachments?: Array<{ type?: string }>;
         is_echo?: boolean;
         app_id?: string | number;
       };
@@ -134,8 +137,15 @@ function summarizeWebhookEvent(
   return {
     messageId: event.message?.mid || "",
     hasText: Boolean(event.message?.text),
+    hasImage: hasImageAttachment(event),
     hasPostback: Boolean(event.postback?.payload),
   };
+}
+
+function hasImageAttachment(
+  event: NonNullable<NonNullable<WebhookBody["entry"]>[number]["messaging"]>[number]
+) {
+  return event.message?.attachments?.some((attachment) => attachment.type === "image") ?? false;
 }
 
 function createStableHash(value: string) {
@@ -947,6 +957,7 @@ export default async function handler(
           const userId = getConversationRecipientId(event);
           const messageId = getMessengerMessageDedupeId(event, pageId, userId);
           const rawText = event.message?.text;
+          const hasImage = hasImageAttachment(event);
           const postbackPayload = event.postback?.payload;
 
           if (event.message?.is_echo && event.sender.id === pageId) {
@@ -1046,7 +1057,7 @@ export default async function handler(
               })
             : false;
 
-          if (rawText) {
+          if (rawText || hasImage) {
             if (messageId) {
               const shouldProcessMessage = await tryClaimMessengerMessage({
                 pageId,
@@ -1065,7 +1076,7 @@ export default async function handler(
               }
             }
 
-            if (shouldSkipRecentlyAnsweredCustomerMessage(rawText, existingConversation)) {
+            if (rawText && shouldSkipRecentlyAnsweredCustomerMessage(rawText, existingConversation)) {
               console.info("AI webhook skipped recently answered duplicate text", {
                 clientId: client.id,
                 pageId,
@@ -1075,12 +1086,14 @@ export default async function handler(
               continue;
             }
 
-            await safelyRecordCustomerMessage({
-              clientId: client.id,
-              pageId,
-              recipientId: userId,
-              message: rawText,
-            });
+            if (rawText) {
+              await safelyRecordCustomerMessage({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                message: rawText,
+              });
+            }
           }
 
           if (!client.ai_enabled) {
@@ -1103,6 +1116,43 @@ export default async function handler(
 
           if (existingConversation?.ai_paused) {
             await safelyResumeExpiredPause(client.id, userId);
+          }
+
+          if (!rawText && hasImage) {
+            const imageMessage = "Customer sent an image attachment for team review.";
+            const reply = "Salamat po sa pagpapadala ng image. Ipapa-review namin ito sa team para matulungan kayo nang maayos.";
+            const customerState = inferCustomerState(existingConversation?.customer_state, imageMessage);
+            const recentMessages = appendRecentConversationMessages(
+              existingConversation?.recent_messages,
+              imageMessage,
+              reply
+            );
+            const conversationSummary = updateConversationSummary(
+              existingConversation?.conversation_summary || "",
+              imageMessage,
+              reply
+            );
+
+            await safelyHandleFlowSend(
+              () => safeSendHumanTextReply(userId, reply, pageAccessToken, pageId, client.id),
+              {
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                messengerMessageId: messageId,
+                messageType: "text",
+              }
+            );
+            await safelyRecordAiReply({
+              clientId: client.id,
+              pageId,
+              recipientId: userId,
+              reply,
+              conversationSummary,
+              customerState,
+              recentMessages,
+            });
+            continue;
           }
 
           if (
@@ -1904,16 +1954,17 @@ function triggerAiMessageJobWorker(req: NextApiRequest) {
     return;
   }
 
-  const workerPromise = fetch(
-    `${getRequestOrigin(req)}/api/ai-message-jobs/process?batchSize=${getAiMessageJobBatchSize()}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-ai-worker-secret": workerSecret,
-      },
-    }
-  )
+  const workerPromise = sleep(getAiMessageBatchDelayMs())
+    .then(() => fetch(
+      `${getRequestOrigin(req)}/api/ai-message-jobs/process?batchSize=${getAiMessageJobBatchSize()}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-ai-worker-secret": workerSecret,
+        },
+      }
+    ))
     .then((response) => {
       if (!response.ok) {
         console.warn("AI message job worker self-kick failed", {
@@ -1943,6 +1994,15 @@ function getAiMessageJobBatchSize() {
   }
 
   return DEFAULT_AI_MESSAGE_JOB_BATCH_SIZE;
+}
+
+function getAiMessageBatchDelayMs() {
+  return getConfiguredDelayMs(
+    "AI_MESSAGE_BATCH_DELAY_MS",
+    DEFAULT_AI_MESSAGE_BATCH_DELAY_MS,
+    0,
+    MAX_AI_MESSAGE_BATCH_DELAY_MS
+  );
 }
 
 function getRequestOrigin(req: NextApiRequest) {
