@@ -702,6 +702,29 @@ export async function getLeadFormIntro(input: {
   }
 }
 
+function getLeadOfferFallback(offer: string, languageStyle: CustomerLanguageStyle) {
+  const savedOffer = offer.trim();
+  const isQuotationOffer = /\b(?:quotation|quote)\b/i.test(savedOffer);
+  const isFreeQuotation = /\bfree\b|libreng/i.test(savedOffer);
+
+  if (isQuotationOffer) {
+    const quotationLabel = isFreeQuotation ? "libreng quotation" : "quotation";
+    if (languageStyle === "cebuano") {
+      return `Gusto nimo nga mag-andam mi og ${isFreeQuotation ? "libreng " : ""}quotation para nimo?`;
+    }
+    if (languageStyle === "tagalog" || languageStyle === "taglish") {
+      return `Gusto n'yo po bang maghanda kami ng ${quotationLabel} para sa inyo?`;
+    }
+    return `Would you like us to prepare a${isFreeQuotation ? " free" : ""} quotation for you?`;
+  }
+
+  return savedOffer || (languageStyle === "cebuano"
+    ? "Gusto nimo mopadayon?"
+    : languageStyle === "tagalog" || languageStyle === "taglish"
+      ? "Gusto mo bang mag-proceed?"
+      : "Would you like to proceed?");
+}
+
 export async function getLeadOfferQuestion(input: {
   customerMessage: string;
   businessContext: string;
@@ -709,11 +732,12 @@ export async function getLeadOfferQuestion(input: {
 }) {
   const languageStyle = detectCustomerLanguageStyle(input.customerMessage);
   const { apiKey, apiUrl, model } = getAiConfig();
-  const fallback = input.offer.trim() || (languageStyle === "cebuano"
-    ? "Gusto nimo mopadayon?"
-    : languageStyle === "tagalog" || languageStyle === "taglish"
-      ? "Gusto mo bang mag-proceed?"
-      : "Would you like to proceed?");
+  const fallback = getLeadOfferFallback(input.offer, languageStyle);
+  const isQuotationOffer = /\b(?:quotation|quote)\b/i.test(input.offer);
+
+  // Quotation offers need a fixed, clear question. Rephrasing can accidentally
+  // make it sound like the customer must prepare or send the quotation.
+  if (isQuotationOffer) return fallback;
 
   if (!apiKey || !apiUrl || !model) return fallback;
 
@@ -728,7 +752,7 @@ export async function getLeadOfferQuestion(input: {
       messages: [
         {
           role: "system",
-          content: "Rewrite the saved offer as exactly one short, natural customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning; do not add emojis, icons, another offer, promises, field labels, markdown, or any facts not provided.",
+          content: "Rewrite the saved offer as exactly one short, grammatically correct, customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning and who performs each action. Never use a literal word-for-word translation. For Taglish, use natural Tagalog sentence structure with only common English business terms. Do not add emojis, icons, another offer, promises, field labels, markdown, or any facts not provided.",
         },
         {
           role: "user",
@@ -781,6 +805,8 @@ Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
 - Talk like a helpful person replying in Messenger: warm, plain, and natural.
+- Write grammatically correct, complete sentences in the selected language. Never translate word-for-word between languages.
+- For Taglish, use natural Tagalog sentence structure and only common English business terms; do not create awkward literal translations.
 - Do not use emojis, icons, decorative symbols, or reaction-style characters.
 - Use simple everyday words. Avoid formal wording, sales language, explanations the customer did not ask for, and filler such as "I'd be happy to assist."
 - Be direct: answer the latest message immediately. Do not recap, explain your reasoning, greet again, or warm up before the answer.
