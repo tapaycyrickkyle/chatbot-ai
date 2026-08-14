@@ -91,7 +91,7 @@ export function inferCustomerState(
     nextState.interested_product = clip(interestedProduct, 80);
   }
 
-  if (leadCaptured) {
+  if (leadCaptured || nextState.lead_status === "captured") {
     nextState.lead_status = "captured";
   } else if (/\b(name|phone|contact|number|email)\b/i.test(customerMessage)) {
     nextState.lead_status = "partial_or_possible";

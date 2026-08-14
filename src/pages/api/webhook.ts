@@ -605,7 +605,12 @@ type LeadCaptureResult = {
   formReply?: string;
   confirmationPrompt?: string;
   hasOpenLead: boolean;
+  leadCaptured?: boolean;
 };
+
+function hasCapturedLead(customerState: Record<string, unknown> | null | undefined) {
+  return customerState?.lead_status === "captured";
+}
 
 async function handleLeadCapture(input: {
   client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
@@ -656,13 +661,13 @@ async function handleLeadCapture(input: {
     lead = await updateLeadRecord(lead.id, {
       status: "confirmed", confirmed_at: new Date().toISOString(),
     });
-    await deliverConfirmedLead({
+    const delivered = await deliverConfirmedLead({
       leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
       fieldConfig: lead.field_config,
       webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
       attempts: lead.delivery_attempts,
     });
-    return { reply: getLeadDeliveredReply(style), hasOpenLead: true };
+    return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };
   }
 
   const expectedField = getMissingLeadField(fields, lead.fields);
@@ -676,13 +681,13 @@ async function handleLeadCapture(input: {
   lead = await updateLeadRecord(lead.id, {
     fields: values, status: "confirmed", confirmed_at: new Date().toISOString(),
   });
-  await deliverConfirmedLead({
+  const delivered = await deliverConfirmedLead({
     leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
     fieldConfig: lead.field_config,
     webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
     attempts: lead.delivery_attempts,
   });
-  return { reply: getLeadDeliveredReply(style), hasOpenLead: true };
+  return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };
 }
 
 async function startLeadCapture(input: {
@@ -1174,7 +1179,7 @@ export default async function handler(
             });
 
             if (activeLead.reply) {
-              const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
+              const customerState = inferCustomerState(existingConversation?.customer_state, rawText, activeLead.leadCaptured);
               const recordedReply = [activeLead.reply, activeLead.formReply].filter(Boolean).join("\n\n");
               const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
               const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, recordedReply);
@@ -1274,7 +1279,7 @@ export default async function handler(
             );
             let leadConfirmationPrompt = activeLead.confirmationPrompt;
 
-            if (!activeLead.hasOpenLead && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
+            if (!activeLead.hasOpenLead && !hasCapturedLead(existingConversation?.customer_state) && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
               const startedLead = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
                 confirmed: shouldStartLeadCapture,
