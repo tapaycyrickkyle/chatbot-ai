@@ -44,7 +44,7 @@ function doPost(event) {
       ? String(payload.fields[header])
       : "";
   });
-  const nextRow = sheet.getLastRow() + 1;
+  const nextRow = findFirstAvailableLeadRow(sheet, headers.length);
   headers.forEach((header, columnIndex) => {
     if (fieldTypes[header] === "phone") {
       sheet.getRange(nextRow, columnIndex + 1).setNumberFormat("@");
@@ -54,4 +54,26 @@ function doPost(event) {
   deliveredLeads.setProperty(`lead:${payload.leadId}`, new Date().toISOString());
   return json({ ok: true });
 }
+
+function findFirstAvailableLeadRow(sheet, columnCount) {
+  const firstLeadRow = 2;
+  const lastUsedRow = sheet.getLastRow();
+
+  if (lastUsedRow < firstLeadRow) {
+    return firstLeadRow;
+  }
+
+  const rowCount = lastUsedRow - firstLeadRow + 1;
+  const range = sheet.getRange(firstLeadRow, 1, rowCount, columnCount);
+  const values = range.getDisplayValues();
+  const formulas = range.getFormulas();
+  const firstEmptyRowIndex = values.findIndex((row, rowIndex) =>
+    row.every((cell, columnIndex) => !String(cell).trim() && !formulas[rowIndex][columnIndex])
+  );
+
+  return firstEmptyRowIndex >= 0
+    ? firstLeadRow + firstEmptyRowIndex
+    : lastUsedRow + 1;
+}
+
 function json(value) { return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON); }

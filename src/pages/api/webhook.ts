@@ -609,10 +609,6 @@ type LeadCaptureResult = {
   leadCaptured?: boolean;
 };
 
-function hasCapturedLead(customerState: Record<string, unknown> | null | undefined) {
-  return customerState?.lead_status === "captured";
-}
-
 async function handleLeadCapture(input: {
   client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
 }): Promise<LeadCaptureResult> {
@@ -1280,7 +1276,7 @@ export default async function handler(
             );
             let leadConfirmationPrompt = activeLead.confirmationPrompt;
 
-            if (!activeLead.hasOpenLead && !hasCapturedLead(existingConversation?.customer_state) && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
+            if (!activeLead.hasOpenLead && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
               const startedLead = await startLeadCapture({
                 client, pageId, recipientId: userId, message: rawText,
                 confirmed: shouldStartLeadCapture,
