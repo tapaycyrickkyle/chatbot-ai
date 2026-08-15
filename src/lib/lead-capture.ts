@@ -45,6 +45,11 @@ function labelPattern(label: string) {
   return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
 }
 
+function formFieldLabelPattern(field: LeadField) {
+  const optionalSuffix = field.required ? "" : "\\s*\\(\\s*optional\\s*\\)?";
+  return `${labelPattern(field.label)}${optionalSuffix}`;
+}
+
 export function extractLeadValues(
   message: string,
   fields: LeadField[],
@@ -53,7 +58,7 @@ export function extractLeadValues(
 ) {
   const values = { ...previous };
   const labeled = fields.flatMap((field) => {
-    const match = message.match(new RegExp(`(?:^|[\\n,;])\\s*(?:${labelPattern(field.label)})\\s*[:=-]\\s*([^\\n,;]+)`, "i"));
+    const match = message.match(new RegExp(`(?:^|[\\n,;])\\s*(?:${formFieldLabelPattern(field)})\\s*[:=-]\\s*([^\\n,;]+)`, "i"));
     const value = match ? normalizeLeadValue(field.type, match[1]) : "";
     return value ? [[field.label, value] as const] : [];
   });
@@ -77,6 +82,45 @@ export function extractLeadValues(
     (field) => !previous[field.label] && Boolean(values[field.label])
   );
   const messageLines = message.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+  // Customers often reply by pasting one value per line instead of preserving
+  // the field labels. Once email and phone values have been recognized above,
+  // keep those lines out of the plain-text pass and map the remaining lines to
+  // the remaining name/text fields in the same order as the form. This lets an
+  // optional field be captured when it was supplied, without treating it as
+  // required when the customer leaves it out.
+  if (messageLines.length > 1) {
+    const fieldLabelLine = new RegExp(
+      `^(?:${fields.map(formFieldLabelPattern).join("|")})\\s*[:=-]`,
+      "i"
+    );
+    const plainLines = messageLines.filter((line) => {
+      if (fieldLabelLine.test(line) || /[?]/.test(line)) return false;
+
+      return ![
+        normalizeLeadValue("email", line),
+        normalizeLeadValue("phone", line),
+        normalizeLeadValue("number", line),
+      ].some(Boolean);
+    });
+    const plainFields = fields.filter(
+      (field) =>
+        !values[field.label] &&
+        ["name", "text", "address", "date"].includes(field.type)
+    );
+
+    for (const [index, line] of plainLines.entries()) {
+      const field = plainFields[index];
+      if (!field) break;
+
+      const value = normalizeLeadValue(field.type, line);
+      if (value) {
+        values[field.label] = value;
+        extractedNewValue = true;
+      }
+    }
+  }
+
   const expectedAnswer = messageLines[0] ?? message;
   if (expectedField && !values[expectedField.label] && (!extractedNewValue || messageLines.length > 1)) {
     const looksLikeAnswer = expectedAnswer.length <= 180 && !/[?]/.test(expectedAnswer);

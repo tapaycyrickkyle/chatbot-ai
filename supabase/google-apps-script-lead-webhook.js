@@ -2,6 +2,8 @@
 /** Deploy as a Google Apps Script Web App with access set to "Anyone". */
 function doPost(event) {
   const DATE_SENT_HEADER = "Date Sent";
+  const FIRST_LEAD_ROW = 2;
+  const LEAD_TABLE_COLUMN_COUNT = 10; // Lead Tracker columns A:J only.
   const payload = JSON.parse(event.postData.contents || "{}");
   if (!payload.leadId || !payload.sheetTab || !payload.fields) {
     return json({ ok: false, error: "Invalid lead payload" });
@@ -12,25 +14,21 @@ function doPost(event) {
     ? payload.fieldTypes
     : {};
   const requestedHeaders = Object.keys(payload.fields).filter((header) => header !== DATE_SENT_HEADER);
-  let currentHeaders = sheet.getLastColumn() > 0
-    ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String)
-    : [];
-  let headersChanged = !currentHeaders.length;
-  if (currentHeaders.length && !currentHeaders.includes(DATE_SENT_HEADER)) {
-    sheet.insertColumnBefore(1);
-    currentHeaders = [DATE_SENT_HEADER, ...currentHeaders];
-    headersChanged = true;
-  }
-  const headers = currentHeaders.length ? [...currentHeaders] : [DATE_SENT_HEADER, ...requestedHeaders];
+  const headers = sheet
+    .getRange(1, 1, 1, LEAD_TABLE_COLUMN_COUNT)
+    .getValues()[0]
+    .map((header) => String(header).trim());
+  const dateSentColumn = headers.indexOf(DATE_SENT_HEADER) + 1;
+  const unsupportedHeaders = requestedHeaders.filter((header) => !headers.includes(header));
 
-  requestedHeaders.forEach((header) => {
-    if (!headers.includes(header)) {
-      headers.push(header);
-      headersChanged = true;
-    }
-  });
-  if (headersChanged) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (!dateSentColumn) {
+    return json({ ok: false, error: `Missing ${DATE_SENT_HEADER} header in Lead Tracker!A1:J1` });
+  }
+  if (unsupportedHeaders.length > 0) {
+    return json({
+      ok: false,
+      error: `Lead fields must match Lead Tracker!A1:J1: ${unsupportedHeaders.join(", ")}`,
+    });
   }
 
   const deliveredLeads = PropertiesService.getScriptProperties();
@@ -44,8 +42,10 @@ function doPost(event) {
       ? String(payload.fields[header])
       : "";
   });
-  const dateSentColumn = headers.indexOf(DATE_SENT_HEADER) + 1;
-  const nextRow = findFirstAvailableLeadRow(sheet, dateSentColumn);
+  const nextRow = findFirstAvailableLeadRow(sheet, dateSentColumn, FIRST_LEAD_ROW);
+  if (!nextRow) {
+    return json({ ok: false, error: "Lead Tracker!A2:A1000 is full" });
+  }
   headers.forEach((header, columnIndex) => {
     if (header !== DATE_SENT_HEADER && !Object.prototype.hasOwnProperty.call(payload.fields, header)) {
       return;
@@ -61,15 +61,8 @@ function doPost(event) {
   return json({ ok: true });
 }
 
-function findFirstAvailableLeadRow(sheet, dateSentColumn) {
-  const firstLeadRow = 2;
-  const lastUsedRow = sheet.getLastRow();
-
-  if (lastUsedRow < firstLeadRow) {
-    return firstLeadRow;
-  }
-
-  const rowCount = lastUsedRow - firstLeadRow + 1;
+function findFirstAvailableLeadRow(sheet, dateSentColumn, firstLeadRow) {
+  const rowCount = sheet.getMaxRows() - firstLeadRow + 1;
   const dates = sheet
     .getRange(firstLeadRow, dateSentColumn, rowCount, 1)
     .getDisplayValues();
@@ -77,7 +70,7 @@ function findFirstAvailableLeadRow(sheet, dateSentColumn) {
 
   return firstEmptyRowIndex >= 0
     ? firstLeadRow + firstEmptyRowIndex
-    : lastUsedRow + 1;
+    : 0;
 }
 
 function json(value) { return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON); }
