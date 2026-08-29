@@ -67,18 +67,27 @@ export function createConfirmedLeadPayload(input: ConfirmedLeadPayloadInput) {
     recipientId: input.recipientId,
     capturedAt: input.capturedAt,
     sheetTab: input.sheetTab,
-    // Huswell validates these top-level fields. Keep the original generic
-    // field map too, so Google Sheets and custom destinations remain supported.
+    // These aliases support destinations that read canonical contact fields.
+    // Huswell reads the generic field map and its type map below.
     contactName,
     name: contactName,
     email,
     phone,
     fields,
-    fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, field.type])),
+    fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, normalizeDestinationFieldType(field)])),
   };
 }
 
 function getMappedFieldValue(input: ConfirmedLeadPayloadInput, matches: (field: ConfirmedLeadField) => boolean) {
   const field = input.fieldConfig.find(matches);
   return field ? (input.fields[field.label] ?? "").trim() : "";
+}
+
+function normalizeDestinationFieldType(field: ConfirmedLeadField) {
+  if (field.type === "name" || /(?:^|\s)(?:full\s+|client'?s?\s+|contact\s+)?name(?:\s|$)/i.test(field.label)) {
+    return "name";
+  }
+  if (field.type === "email" || /email/i.test(field.label)) return "email";
+  if (field.type === "phone" || /(?:phone|mobile|viber|whatsapp|contact number)/i.test(field.label)) return "phone";
+  return field.type;
 }
