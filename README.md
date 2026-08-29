@@ -92,6 +92,22 @@ The AI is configured to keep helping with the latest customer message instead of
 
 ## Confirmed Google Sheets Leads
 
+### Send confirmed leads to Huswell Tracker
+
+To send every confirmed lead to Huswell Tracker instead of the Google Sheets
+webhook, configure these server-only environment variables in the chatbot
+deployment:
+
+```env
+HUSWELL_LEAD_WEBHOOK_URL=https://your-huswell-tracker-domain/api/integrations/chatbot/leads
+HUSWELL_LEAD_WEBHOOK_SECRET=the-same-value-as-CHATBOT_LEAD_WEBHOOK_SECRET-in-huswell
+```
+
+The Huswell URL must use HTTPS in production. When both values are set, Huswell
+is the preferred delivery destination and failed deliveries are retried by the
+existing maintenance job. If neither is set, the existing Google Sheets webhook
+behavior remains unchanged.
+
 To collect qualified leads, run `supabase/24-confirmed-lead-capture.sql` in the
 Supabase SQL Editor. Open the connected Page's Settings and enable Confirmed Lead
 Capture. Add fields (for example, `Full Name|name`, `Phone|phone`, and

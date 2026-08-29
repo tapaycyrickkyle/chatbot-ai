@@ -36,6 +36,7 @@ import {
   parseLeadFields,
 } from "@/lib/lead-capture";
 import { detectCustomerLanguageStyle } from "@/lib/language-style";
+import { createConfirmedLeadPayload, resolveConfirmedLeadDestination } from "@/lib/confirmed-lead-delivery";
 
 type ConnectedPageClient = NonNullable<Awaited<ReturnType<typeof getClientByPageId>>>;
 
@@ -555,15 +556,27 @@ async function deliverConfirmedLead(input: {
   recipientId: string;
   fields: Record<string, string>;
   fieldConfig: Array<{ label: string; type: string; required: boolean }>;
-  webhookUrl: string;
+  fallbackWebhookUrl: string;
   sheetTab: string;
   attempts: number;
 }) {
   const nextAttempts = input.attempts + 1;
-  if (!input.webhookUrl) {
+  let destination;
+  try {
+    destination = resolveConfirmedLeadDestination(input.fallbackWebhookUrl);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Lead delivery is not configured";
     await updateLeadRecord(input.leadId, {
       status: "delivery_failed", delivery_attempts: nextAttempts,
-      last_delivery_error: "Google Apps Script webhook URL is not configured",
+      last_delivery_error: message,
+    });
+    return false;
+  }
+
+  if (!destination) {
+    await updateLeadRecord(input.leadId, {
+      status: "delivery_failed", delivery_attempts: nextAttempts,
+      last_delivery_error: "No lead delivery destination is configured",
     });
     return false;
   }
@@ -571,19 +584,17 @@ async function deliverConfirmedLead(input: {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(input.webhookUrl, {
+    const response = await fetch(destination.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(destination.authorization ? { Authorization: destination.authorization } : {}),
+      },
       signal: controller.signal,
-      body: JSON.stringify({
-        leadId: input.leadId, pageId: input.pageId, recipientId: input.recipientId,
-        capturedAt: new Date().toISOString(), sheetTab: input.sheetTab,
-        fields: Object.fromEntries(input.fieldConfig.map((field) => [field.label, input.fields[field.label] ?? ""])),
-        fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, field.type])),
-      }),
+      body: JSON.stringify(createConfirmedLeadPayload({ ...input, capturedAt: new Date().toISOString() })),
     });
     const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-    if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Google Sheets returned ${response.status}`);
+    if (!response.ok || !payload?.ok) throw new Error(payload?.error || `${destination.name} returned ${response.status}`);
     await updateLeadRecord(input.leadId, {
       status: "delivered", delivery_attempts: nextAttempts, delivered_at: new Date().toISOString(),
       last_delivery_error: "",
@@ -592,9 +603,9 @@ async function deliverConfirmedLead(input: {
   } catch (error) {
     await updateLeadRecord(input.leadId, {
       status: "delivery_failed", delivery_attempts: nextAttempts,
-      last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Google Sheets delivery failed",
+      last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery failed",
     });
-    console.warn("Confirmed lead could not be delivered to Google Sheets", error);
+    console.warn(`Confirmed lead could not be delivered to ${destination.name}`, error);
     return false;
   } finally {
     clearTimeout(timeoutId);
@@ -661,7 +672,7 @@ async function handleLeadCapture(input: {
     const delivered = await deliverConfirmedLead({
       leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
       fieldConfig: lead.field_config,
-      webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
+      fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
       attempts: lead.delivery_attempts,
     });
     return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };
@@ -681,7 +692,7 @@ async function handleLeadCapture(input: {
   const delivered = await deliverConfirmedLead({
     leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
     fieldConfig: lead.field_config,
-    webhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
+    fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
     attempts: lead.delivery_attempts,
   });
   return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };

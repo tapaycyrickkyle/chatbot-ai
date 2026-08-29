@@ -6,6 +6,7 @@ import {
   getLeadRecordsNeedingDelivery,
   updateLeadRecord,
 } from "@/lib/database";
+import { createConfirmedLeadPayload, resolveConfirmedLeadDestination } from "@/lib/confirmed-lead-delivery";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const RATE_LIMIT_LOG_RETENTION_DAYS = 7;
@@ -96,25 +97,39 @@ async function retryConfirmedLeadDeliveries() {
   const records = await getLeadRecordsNeedingDelivery();
   let delivered = 0;
   for (const record of records) {
-    if (!record.google_sheets_webhook_url) continue;
+    let destination;
+    try {
+      destination = resolveConfirmedLeadDestination(record.google_sheets_webhook_url);
+    } catch (error) {
+      await updateLeadRecord(record.id, {
+        status: "delivery_failed", delivery_attempts: record.delivery_attempts + 1,
+        last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery is not configured",
+      });
+      continue;
+    }
+    if (!destination) continue;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(record.google_sheets_webhook_url, {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({
+      const response = await fetch(destination.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(destination.authorization ? { Authorization: destination.authorization } : {}),
+        },
+        signal: controller.signal,
+        body: JSON.stringify(createConfirmedLeadPayload({
           leadId: record.id, pageId: record.page_id, recipientId: record.recipient_id,
           capturedAt: record.confirmed_at || record.created_at, sheetTab: record.google_sheets_tab_name,
-          fields: Object.fromEntries(record.field_config.map((field) => [field.label, record.fields[field.label] ?? ""])),
-          fieldTypes: Object.fromEntries(record.field_config.map((field) => [field.label, field.type])),
-        }),
+          fields: record.fields, fieldConfig: record.field_config,
+        })),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `Google Sheets returned ${response.status}`);
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `${destination.name} returned ${response.status}`);
       await updateLeadRecord(record.id, { status: "delivered", delivery_attempts: record.delivery_attempts + 1, delivered_at: new Date().toISOString(), last_delivery_error: "" });
       delivered += 1;
     } catch (error) {
-      await updateLeadRecord(record.id, { status: "delivery_failed", delivery_attempts: record.delivery_attempts + 1, last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Google Sheets delivery failed" });
+      await updateLeadRecord(record.id, { status: "delivery_failed", delivery_attempts: record.delivery_attempts + 1, last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery failed" });
     } finally { clearTimeout(timeoutId); }
   }
   return delivered;
