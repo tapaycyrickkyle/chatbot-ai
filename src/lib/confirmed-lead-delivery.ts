@@ -52,13 +52,33 @@ export function resolveConfirmedLeadDestination(fallbackUrl: string): LeadWebhoo
 }
 
 export function createConfirmedLeadPayload(input: ConfirmedLeadPayloadInput) {
+  const fields = Object.fromEntries(input.fieldConfig.map((field) => [field.label, input.fields[field.label] ?? ""]));
+  const contactName = getMappedFieldValue(input, (field) =>
+    field.type === "name" || /(?:^|\s)(?:full\s+|client'?s?\s+|contact\s+)?name(?:\s|$)/i.test(field.label)
+  );
+  const email = getMappedFieldValue(input, (field) => field.type === "email" || /email/i.test(field.label));
+  const phone = getMappedFieldValue(input, (field) =>
+    field.type === "phone" || /(?:phone|mobile|viber|whatsapp|contact number)/i.test(field.label)
+  );
+
   return {
     leadId: input.leadId,
     pageId: input.pageId,
     recipientId: input.recipientId,
     capturedAt: input.capturedAt,
     sheetTab: input.sheetTab,
-    fields: Object.fromEntries(input.fieldConfig.map((field) => [field.label, input.fields[field.label] ?? ""])),
+    // Huswell validates these top-level fields. Keep the original generic
+    // field map too, so Google Sheets and custom destinations remain supported.
+    contactName,
+    name: contactName,
+    email,
+    phone,
+    fields,
     fieldTypes: Object.fromEntries(input.fieldConfig.map((field) => [field.label, field.type])),
   };
+}
+
+function getMappedFieldValue(input: ConfirmedLeadPayloadInput, matches: (field: ConfirmedLeadField) => boolean) {
+  const field = input.fieldConfig.find(matches);
+  return field ? (input.fields[field.label] ?? "").trim() : "";
 }

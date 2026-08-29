@@ -167,3 +167,9 @@ export function getLeadDeliveredReply(languageStyle: string) {
   if (languageStyle === "tagalog" || languageStyle === "taglish") return "Salamat, naipadala na sa team ang details mo.";
   return "Thanks, your details have been sent to the team.";
 }
+
+export function getLeadDeliveryFailedReply(languageStyle: string) {
+  if (languageStyle === "cebuano") return "Salamat, nasave ang imong detalye pero wala pa kini madawat sa team. Sulayan namo ug send balik sa dili madugay.";
+  if (languageStyle === "tagalog" || languageStyle === "taglish") return "Salamat, na-save ang details mo pero hindi pa ito natanggap ng team. Susubukan naming ipadala ulit sa lalong madaling panahon.";
+  return "Thanks, your details are saved, but the team has not received them yet. We’ll retry sending them shortly.";
+}

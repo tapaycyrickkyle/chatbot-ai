@@ -194,7 +194,7 @@ function normalizeClient(row: ClientRow) {
     manual_ai_pause_minutes: row.manual_ai_pause_minutes ?? 5,
     auto_reply_ignore_pattern: row.auto_reply_ignore_pattern ?? "",
     lead_capture_enabled: Boolean(row.lead_capture_enabled),
-    lead_capture_fields: row.lead_capture_fields ?? "Full Name|name\nPhone|phone",
+    lead_capture_fields: row.lead_capture_fields ?? "Full Name|name\nPhone|phone|optional",
     lead_capture_trigger: row.lead_capture_trigger ?? "",
     lead_capture_offer: row.lead_capture_offer ?? "",
     picture_url: buildPagePictureUrl(row.page_id),

@@ -29,6 +29,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   extractLeadValues,
+  getLeadDeliveryFailedReply,
   getLeadDeliveredReply,
   getLeadFormPrompt,
   getLeadPrompt,
@@ -675,7 +676,7 @@ async function handleLeadCapture(input: {
       fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
       attempts: lead.delivery_attempts,
     });
-    return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };
+    return { reply: delivered ? getLeadDeliveredReply(style) : getLeadDeliveryFailedReply(style), hasOpenLead: true, leadCaptured: delivered };
   }
 
   const expectedField = getMissingLeadField(fields, lead.fields);
@@ -695,7 +696,7 @@ async function handleLeadCapture(input: {
     fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
     attempts: lead.delivery_attempts,
   });
-  return { reply: getLeadDeliveredReply(style), hasOpenLead: true, leadCaptured: delivered };
+  return { reply: delivered ? getLeadDeliveredReply(style) : getLeadDeliveryFailedReply(style), hasOpenLead: true, leadCaptured: delivered };
 }
 
 async function startLeadCapture(input: {
