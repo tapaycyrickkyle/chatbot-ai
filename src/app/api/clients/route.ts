@@ -58,7 +58,7 @@ async function configureMessengerProfile(clientName: string, pageAccessToken: st
         greeting: [
           {
             locale: "default",
-            text: `Welcome to ${clientName}. Tap Get Started to open the chat.`,
+            text: `Hi, I'm the AI assistant for ${clientName}. Tap Get Started to open the chat.`,
           },
         ],
       }),

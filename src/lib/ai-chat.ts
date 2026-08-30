@@ -58,6 +58,7 @@ export type LeadCaptureIntent =
   | "UNCLEAR";
 
 type ConversationContext = {
+  businessName?: string;
   previousCustomerMessage?: string;
   previousAiReply?: string;
   conversationSummary?: string;
@@ -799,12 +800,17 @@ export async function askAi(
     const salesPlan = conversationContext.replyPlan ?? fallbackPlan;
     const businessContextForPrompt = getBusinessContextForPrompt(businessContext);
     const replySentenceLimit = getReplySentenceLimit();
-    const stableSystemPrompt = `You are a human-like sales agent and customer support assistant for the business described in the business facts.
+    const isFirstReply = !conversationContext.previousCustomerMessage &&
+      !conversationContext.previousAiReply &&
+      recentMessages.length === 0;
+    const businessName = conversationContext.businessName?.trim() || "this business";
+    const stableSystemPrompt = `You are an AI sales agent and customer support assistant for the business described in the business facts.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
 - Talk like a helpful person replying in Messenger: warm, plain, and natural.
+- On the first reply in a new conversation, introduce yourself first as this business's AI assistant, then help with the customer's message. Keep the introduction brief and write it in the customer's language or language mix. This required disclosure overrides the rule against greetings and long intros.
 - Write grammatically correct, complete sentences in the selected language. Never translate word-for-word between languages.
 - For Taglish, use natural Tagalog sentence structure and only common English business terms; do not create awkward literal translations.
 - Do not use emojis, icons, decorative symbols, or reaction-style characters.
@@ -863,6 +869,7 @@ ${businessContextForPrompt || "No business facts provided."}`;
 - If the answer is missing, reply with the required missing-info fallback exactly as written. Do not add, remove, or rewrite any words.
 - Missing-info fallback is only for truly absent specific facts. For broad info requests, use any relevant business facts or matching script first.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
+- First-reply disclosure: ${isFirstReply ? `This is the first AI reply. Start by briefly saying that you are the AI assistant for ${businessName}, then answer the customer. Do not omit this disclosure.` : "This is not the first AI reply, so do not introduce yourself again."}
 
 Private sales plan:
 - Resolved customer meaning: ${salesPlan.resolvedCustomerMeaning}

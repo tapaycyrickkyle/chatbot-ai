@@ -29,12 +29,14 @@ import {
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   extractLeadValues,
+  LEAD_FIELD_TYPES,
   getLeadDeliveryFailedReply,
   getLeadDeliveredReply,
   getLeadFormPrompt,
   getLeadPrompt,
   getMissingLeadField,
   parseLeadFields,
+  type LeadField,
 } from "@/lib/lead-capture";
 import { detectCustomerLanguageStyle } from "@/lib/language-style";
 import { createConfirmedLeadPayload, resolveConfirmedLeadDestination } from "@/lib/confirmed-lead-delivery";
@@ -621,14 +623,45 @@ type LeadCaptureResult = {
   leadCaptured?: boolean;
 };
 
+const IMAGE_CONTACT_FIELDS: LeadField[] = [
+  { label: "Email address", type: "email", required: true },
+  { label: "Viber/WhatsApp number", type: "phone", required: true },
+];
+
+function getStoredLeadFields(fields: Array<{ label: string; type: string; required: boolean }>) {
+  return fields.flatMap((field) => {
+    const label = field.label.replace(/\s+/g, " ").trim().slice(0, 60);
+    const type = field.type.trim().toLowerCase();
+
+    return label && LEAD_FIELD_TYPES.includes(type as LeadField["type"])
+      ? [{ label, type: type as LeadField["type"], required: field.required !== false }]
+      : [];
+  });
+}
+
+function getImageContactReply(previousCustomerMessage = "") {
+  const languageStyle = detectCustomerLanguageStyle(previousCustomerMessage);
+
+  if (languageStyle === "tagalog" || languageStyle === "taglish") {
+    return "Maraming salamat po sa inyong inquiry. Hindi ko po ma-review ang details ng image dito. Marami pong inquiries na inaasikaso ngayon ang aming team, pero maa-assist pa rin po kayo. Pakisend po ang inyong email address at Viber o WhatsApp number para matawagan kayo ng team namin ngayong araw at ma-discuss ang details.";
+  }
+
+  return "Thank you for your inquiry. I can't review image details here. Our team is currently handling a high volume of inquiries, but you'll still be assisted. Please send your email address and Viber or WhatsApp number so our team can contact you directly today to discuss the details.";
+}
+
 async function handleLeadCapture(input: {
   client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
 }): Promise<LeadCaptureResult> {
-  if (!input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
-  const fields = parseLeadFields(input.client.lead_capture_fields);
-  if (!fields.length) return { reply: null, hasOpenLead: false };
   const style = detectCustomerLanguageStyle(input.message);
   let lead = await getOpenLeadRecord(input.client.id, input.recipientId);
+
+  if (!lead && !input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
+
+  const fields = lead
+    ? getStoredLeadFields(lead.field_config)
+    : parseLeadFields(input.client.lead_capture_fields);
+
+  if (!fields.length) return { reply: null, hasOpenLead: false };
 
   if (!lead) return { reply: null, hasOpenLead: false };
   // A new customer question should be answered by the normal AI first. The open
@@ -1134,7 +1167,18 @@ export default async function handler(
 
           if (!rawText && hasImage) {
             const imageMessage = "Customer sent an image attachment for team review.";
-            const reply = "Salamat po sa pagpapadala ng image. Ipapa-review namin ito sa team para matulungan kayo nang maayos.";
+            const openLead = await getOpenLeadRecord(client.id, userId);
+            if (!openLead) {
+              await createLeadRecord({
+                clientId: client.id,
+                pageId,
+                recipientId: userId,
+                fields: {},
+                fieldConfig: IMAGE_CONTACT_FIELDS,
+                status: "collecting",
+              });
+            }
+            const reply = getImageContactReply(existingConversation?.last_customer_message || "");
             const customerState = inferCustomerState(existingConversation?.customer_state, imageMessage);
             const recentMessages = appendRecentConversationMessages(
               existingConversation?.recent_messages,
@@ -1335,6 +1379,7 @@ export default async function handler(
                   preview: rawText.slice(0, 120),
                 });
                 const aiReply = await askAi(rawText, client.business_info || "", {
+                  businessName: client.client_name,
                   ...aiConversationContext,
                   latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),
