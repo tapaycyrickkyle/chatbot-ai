@@ -117,9 +117,7 @@ function createFallbackSalesPlan(
   languageStyle: CustomerLanguageStyle,
   latestLeadIntent?: LeadCaptureIntent
 ): SalesPlan {
-  const shouldAskFollowUp =
-    latestLeadIntent !== "PROVIDED_LEAD_DETAILS" && latestLeadIntent !== "WANTS_HUMAN_CONTACT";
-
+  const shouldAskFollowUp = latestLeadIntent === "READY_TO_BUY_OR_BOOK";
   return {
     ...parseSalesPlan("", languageStyle),
     leadCaptureIntent: latestLeadIntent ?? "UNCLEAR",
@@ -135,7 +133,7 @@ function createFallbackSalesPlan(
     bestNextStep:
       latestLeadIntent === "READY_TO_BUY_OR_BOOK"
         ? "collect one useful next detail and say the team will confirm"
-        : "ask one relevant qualifying question after the answer",
+        : "answer_only",
     shouldAskFollowUp,
   };
 }
@@ -538,12 +536,9 @@ Rules:
 - If the customer asks a new question, answer the new question directly.
 - If the customer asks a broad info request such as "details", "info", "more info", "tell me more", "explain", "interested", "unsa ni", "ano ito", or any equivalent, plan a short overview from the available business facts instead of treating it as missing information.
 - If the business facts include a script or FAQ matching the customer's intent, use that script's facts naturally without copying labels like "Details:".
-- Identify what the customer is really trying to decide.
-- Choose the answer angle most likely to build trust and move the customer closer to a qualified inquiry, purchase, order, appointment request, quote request, visit, consultation, or human handoff.
-- Choose a simple answer angle that a regular customer can understand quickly. Avoid technical or formal explanations unless the customer clearly asks for them.
-- Identify one relevant benefit from the business facts that matches the customer's likely need, such as savings, convenience, quality, location, flexibility, speed, comfort, safety, trust, suitability, or easier decision-making.
-- Use benefits as proof-based persuasion, not hype. Never claim guarantees, scarcity, urgency, returns, approval, outcomes, or superiority unless explicitly stated in the business facts.
-- Prefer one simple useful qualifying question after the answer when it helps identify fit: product/service/package needed, budget range, preferred date or timing, location, quantity, purpose/use case, payment preference, delivery/pickup need, size/color/model, concern, or main goal.
+- Identify what the customer is really trying to decide, then give the shortest useful answer.
+- Answer before selling. Do not add a benefit, promotion, quote offer, or call to action unless it directly helps answer the latest message.
+- Set bestNextStep to answer_only by default. Ask one simple question only when a necessary detail is missing or the customer clearly wants to proceed.
 - Do not recommend asking for name/phone/contact details unless the customer is ready to proceed, asks for a human/team follow-up, or has already offered contact details.
 - Lead-form trigger: ${input.leadCaptureTrigger?.trim() ? `The page owner chose this rule: "${input.leadCaptureTrigger.trim()}". Set shouldStartLeadCapture to true only when the latest customer message, interpreted in context, clearly confirms that they want to proceed now. Set shouldOfferLeadCapture to true when it is a good time to ask the saved offer question, but the customer has not agreed yet. If the previous assistant message already offered a free consultation, quick audit, demo, quote, booking, or equivalent next step and the customer now says yes/opo/oo/sige or an equivalent confirmation, set shouldStartLeadCapture to true.` : "No custom rule is configured. Set shouldStartLeadCapture and shouldOfferLeadCapture to false."}
 - Saved offer question: ${input.leadCaptureOffer?.trim() || "None"}
@@ -808,9 +803,11 @@ export async function askAi(
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
+- Approved standing offer: qualified orders include a free website. When a customer asks about ordering, offers, packages, or value, mention this naturally when relevant. Do not claim that a specific order qualifies unless the business facts say so; say that the team can confirm eligibility.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
 - Talk like a helpful person replying in Messenger: warm, plain, and natural.
 - On the first reply in a new conversation, introduce yourself first as this business's AI assistant, then help with the customer's message. Keep the introduction brief and write it in the customer's language or language mix. This required disclosure overrides the rule against greetings and long intros.
+- Use the conversation like a person would: interpret short replies, pronouns, corrections, and confirmations from the immediately preceding exchange. The latest customer message controls the topic; do not reopen an earlier topic unless the customer refers to it.
 - Write grammatically correct, complete sentences in the selected language. Never translate word-for-word between languages.
 - For Taglish, use natural Tagalog sentence structure and only common English business terms; do not create awkward literal translations.
 - Do not use emojis, icons, decorative symbols, or reaction-style characters.
@@ -819,10 +816,12 @@ Core rules:
 - Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum. Use a second sentence only when it is essential to give the direct answer or ask one necessary question.
 - Do not pad a short answer. If "Yes, it is available" fully answers the message, stop there.
 - Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop.
-- Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, websites, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel.
+- Do not stack an introduction, product list, promotion, quotation offer, and follow-up question into one reply. On a greeting, give only a short introduction and at most one relevant offer. On a question, answer it before adding anything else.
+- Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel. The approved free-website offer above is an exception.
 - If a detail is not in the business facts, reply with the exact missing-info fallback from the dynamic instructions and nothing else. Do not guess, do not create an alternative process, and do not suggest a different product, service, package, price, computation, schedule, or option.
 - For broad requests like details, info, more info, tell me more, explain, interested, "unsa ni", or "ano ito", do not require one exact field. Give the best short overview from available business facts, then ask one useful qualifying question.
 - If the business facts contain matching scripts, FAQs, named answers, or labeled sections, use those facts naturally. Do not say information is missing when a relevant overview, script, price, location, project, package, or process is present.
+- Treat business scripts as source material, not a message to repeat. Select only the facts needed for the customer's latest message.
 - Act like a helpful sales assistant for this specific business, not a passive FAQ bot. Understand what the customer is trying to decide: price, fit, options, availability, location, delivery/pickup, schedule, requirements, payment, comparison, or next step.
 - Answer the latest customer question directly first. Do not add a follow-up by default.
 - Mention a benefit only when it directly answers what the customer asked. Do not add benefits or persuasion to make a reply longer.
