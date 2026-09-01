@@ -96,6 +96,8 @@ const TAGALOG_REPLY_CEBUANO_PATTERN =
   /\b(?:unsa|pila|naa|ug|diri|adto|ari|palihug|imong|imoha|among|koy|tabangan)\b/i;
 const MISSING_INFO_REPLY_PATTERN =
   /\b(?:i|we|our team|the team)\s+(?:do not|don't|does not|doesn't|did not|didn't|cannot|can't)\s+(?:have|know)\b|\b(?:no exact info|no exact details|not listed|not provided|not in the business facts)\b/i;
+const QUOTATION_SENT_CLAIM_PATTERN =
+  /\b(?:quotation|quote)\b[^.!?]{0,30}\b(?:has(?:\s+already)?\s+been|was|is|already)\s+(?:sent|emailed|delivered|provided|issued|prepared)\b|\b(?:sent|emailed|delivered|provided|issued)\b[^.!?]{0,60}\b(?:quotation|quote)\b|\b(?:naipadala|na[- ]send|na[- ]email|na[- ]deliver|naibigay)\b[^.!?]{0,60}\b(?:quotation|quote)\b|\b(?:quotation|quote)\b[^.!?]{0,60}\b(?:naipadala|na[- ]send|na[- ]email|na[- ]deliver|naibigay)\b/i;
 
 function isLeadCollectionText(value = "") {
   const normalizedValue = value.toLowerCase();
@@ -298,6 +300,18 @@ function isMissingInfoReply(reply: string, requiredFallback: string) {
   }
 
   return MISSING_INFO_REPLY_PATTERN.test(normalizedReply);
+}
+
+function getQuotationStatusFallback(languageStyle: CustomerLanguageStyle) {
+  if (languageStyle === "cebuano") {
+    return "Makumpirma sa among team ang status sa quotation.";
+  }
+
+  if (languageStyle === "tagalog" || languageStyle === "taglish") {
+    return "Makukumpirma ng team namin ang status ng quotation.";
+  }
+
+  return "Our team can confirm the quotation status.";
 }
 
 function getErrorSummary(error: unknown) {
@@ -839,6 +853,7 @@ Core rules:
 - Do not use sales scripts, generic benefits, hype, or persuasion unless the customer asks for a recommendation or comparison.
 - If the customer asks price, computation/quote, availability, location, requirements, delivery, options, or how to avail/order/book, answer the information first before asking anything.
 - If exact price, availability, custom quote, delivery fee, terms, requirements, schedule, or final offer details are missing from the business facts, say the team can confirm instead of inventing.
+- Never state or imply that a quotation/quote was sent, emailed, delivered, issued, prepared, or already received. The AI cannot verify quotation delivery. If asked about its status, say only that the team can confirm the quotation status.
 - Highest priority language rule: reply in the exact same language or language mix as the latest customer message, regardless of conversation memory, business tone, or earlier assistant replies.
 - Do not keep using a previous customer's language if the latest message switches languages.
 - If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in natural everyday Bisaya/Cebuano, like a friendly local sales agent. Prefer Bisaya words such as "sakto nga detalye", "klaro nga tubag", "tabangan tika", "unsa imong ganahan", and "asa ka dapit". Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
@@ -967,6 +982,13 @@ ${customerStateText ? `\nCustomer state:\n${customerStateText}` : ""}`;
         preview: reply.slice(0, 160),
       });
       return missingInfoReply;
+    }
+
+    if (reply && QUOTATION_SENT_CLAIM_PATTERN.test(reply)) {
+      console.warn("AI reply replaced because it claimed a quotation was sent", {
+        preview: reply.slice(0, 160),
+      });
+      return getQuotationStatusFallback(latestLanguageStyle);
     }
 
     if (reply && isMissingInfoReply(reply, missingInfoReply)) {
