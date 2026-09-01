@@ -24,6 +24,7 @@ import {
   appendRecentConversationMessages,
   getDeterministicReply,
   inferCustomerState,
+  isCustomerPastQuotationStage,
   updateConversationSummary,
 } from "@/lib/conversation-memory";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -615,6 +616,40 @@ async function deliverConfirmedLead(input: {
   }
 }
 
+function getRememberedCustomerState(
+  conversation: Awaited<ReturnType<typeof getAiConversation>>
+) {
+  if (!conversation) {
+    return {};
+  }
+
+  // Existing conversations may have useful history from before journey stages
+  // were introduced. Re-read that compact history so the protection applies
+  // immediately instead of waiting for the next explicit production update.
+  const rememberedText = [
+    conversation.conversation_summary,
+    ...conversation.recent_messages.map((message) => message.content),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return rememberedText
+    ? inferCustomerState(conversation.customer_state, rememberedText)
+    : conversation.customer_state;
+}
+
+async function safelyRecordManualPageReply(input: {
+  clientId: string;
+  pageId: string;
+  recipientId: string;
+  reply: string;
+  conversationSummary: string;
+  customerState: Record<string, unknown>;
+  recentMessages: Array<{ role: string; content: string }>;
+}) {
+  await safelyRecordAiReply(input);
+}
+
 type LeadCaptureResult = {
   reply: string | null;
   formReply?: string;
@@ -1055,6 +1090,35 @@ export default async function handler(
               continue;
             }
 
+            // A Page owner's reply is valuable context too. In particular, it often
+            // contains the handoff/production update that explains why a later
+            // customer question must not be treated like a new sales inquiry.
+            const customerState = inferCustomerState(
+              getRememberedCustomerState(existingPageConversation),
+              echoText,
+              false,
+              "page"
+            );
+            const recentMessages = appendRecentConversationMessages(
+              existingPageConversation?.recent_messages,
+              "",
+              echoText
+            );
+            const conversationSummary = updateConversationSummary(
+              existingPageConversation?.conversation_summary || "",
+              "Page reply",
+              echoText
+            );
+            await safelyRecordManualPageReply({
+              clientId: client.id,
+              pageId,
+              recipientId: userId,
+              reply: echoText,
+              conversationSummary,
+              customerState,
+              recentMessages,
+            });
+
             await safelyPauseAiForManualPageReply({
               clientId: client.id,
               pageId,
@@ -1227,9 +1291,16 @@ export default async function handler(
           }
 
           if (rawText) {
-            const activeLead = await handleLeadCapture({
-              client, pageId, recipientId: userId, message: rawText,
-            });
+            const customerStateForMessage = inferCustomerState(
+              getRememberedCustomerState(existingConversation),
+              rawText
+            );
+            const hasMovedPastQuotation = isCustomerPastQuotationStage(customerStateForMessage);
+            const activeLead: LeadCaptureResult = hasMovedPastQuotation
+              ? { reply: null, hasOpenLead: false }
+              : await handleLeadCapture({
+                  client, pageId, recipientId: userId, message: rawText,
+                });
 
             if (activeLead.reply) {
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText, activeLead.leadCaptured);
@@ -1296,7 +1367,7 @@ export default async function handler(
               previousCustomerMessage: existingConversation?.last_customer_message,
               previousAiReply: existingConversation?.last_ai_reply,
               conversationSummary: existingConversation?.conversation_summary,
-              customerState: existingConversation?.customer_state,
+              customerState: customerStateForMessage,
               recentMessages: existingConversation?.recent_messages,
             };
             const fallbackLeadIntent = getFallbackLeadIntent(rawText);
@@ -1322,10 +1393,11 @@ export default async function handler(
               replyPlan?.leadCaptureIntent ?? fallbackLeadIntent
             );
 
-            const shouldStartLeadCapture = leadCaptureTrigger
+            const shouldStartLeadCapture = !hasMovedPastQuotation && (leadCaptureTrigger
               ? replyPlan?.shouldStartLeadCapture === true
-              : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT";
+              : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT");
             const shouldOfferLeadCapture = Boolean(
+              !hasMovedPastQuotation &&
               leadCaptureTrigger &&
               client.lead_capture_offer.trim() &&
               replyPlan?.shouldOfferLeadCapture === true
@@ -1386,10 +1458,7 @@ export default async function handler(
                 });
                 const replyParts = [aiReply, leadConfirmationPrompt].filter(Boolean) as string[];
                 const reply = replyParts.join("\n\n");
-                const customerState = inferCustomerState(
-                  existingConversation?.customer_state,
-                  rawText
-                );
+                const customerState = customerStateForMessage;
                 const recentMessages = appendRecentConversationMessages(
                   existingConversation?.recent_messages,
                   rawText,

@@ -4,6 +4,13 @@ import { detectCustomerLanguageStyle } from "@/lib/language-style";
 
 export type ConversationMemoryState = Record<string, unknown>;
 
+export type CustomerJourneyStage =
+  | "new"
+  | "quotation"
+  | "production"
+  | "fulfillment"
+  | "completed";
+
 export type RecentConversationMessage = {
   role: "user" | "assistant";
   content: string;
@@ -12,6 +19,14 @@ export type RecentConversationMessage = {
 const MAX_SUMMARY_CHARS = 900;
 const MAX_MESSAGE_CHARS = 320;
 const MAX_RECENT_MESSAGES = 6;
+
+const CUSTOMER_JOURNEY_STAGE_RANK: Record<CustomerJourneyStage, number> = {
+  new: 0,
+  quotation: 1,
+  production: 2,
+  fulfillment: 3,
+  completed: 4,
+};
 
 function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -69,15 +84,90 @@ function extractInterestedProduct(message: string) {
   );
 }
 
+function getStageFromValue(value: unknown): CustomerJourneyStage {
+  return value === "quotation" ||
+    value === "production" ||
+    value === "fulfillment" ||
+    value === "completed"
+    ? value
+    : "new";
+}
+
+function detectCustomerJourneyStage(message: string): CustomerJourneyStage | null {
+  const normalizedMessage = cleanText(message).toLowerCase();
+
+  if (
+    /\b(?:delivered|received|completed|finished|fulfilled)\b/.test(normalizedMessage) ||
+    /\b(?:na[- ]deliver|natanggap|tapos na|nahuman na)\b/.test(normalizedMessage)
+  ) {
+    return "completed";
+  }
+
+  if (
+    /\b(?:shipped|out for delivery|ready for pickup|ready to pick up|for delivery)\b/.test(normalizedMessage) ||
+    /\b(?:na[- ]ship|ipapadala na|for delivery na|ready na for pickup|andam na para pickup)\b/.test(normalizedMessage)
+  ) {
+    return "fulfillment";
+  }
+
+  if (
+    /\b(?:already|now|currently|is|has|have|being|started|starting|start|ongoing)\s+(?:in\s+)?production\b/.test(normalizedMessage) ||
+    /\b(?:production\s+(?:has\s+)?(?:started|starting|start|is ongoing|ongoing|na))\b/.test(normalizedMessage) ||
+    /\b(?:being produced|under production|order\s+(?:is\s+)?(?:being\s+)?processed)\b/.test(normalizedMessage) ||
+    /\b(?:nasa|na sa|ongoing ang|sinimulan na ang|nagsimula na ang|naa na sa|sugod na ang|gisugdan na ang|ongoing na ang)\s+(?:production|produksyon)\b/.test(normalizedMessage) ||
+    /\b(?:ginaproseso na|ginaprocess na|nagsimula na ang paggawa)\b/.test(normalizedMessage)
+  ) {
+    return "production";
+  }
+
+  if (
+    /\b(?:quotation|quote)\s+(?:has been |was |is |already )?(?:sent|received|approved|accepted|prepared)\b/.test(normalizedMessage) ||
+    /\b(?:sent|received|approved|accepted)\s+(?:the\s+)?(?:quotation|quote)\b/.test(normalizedMessage) ||
+    /\b(?:naipadala|natanggap|naaprubahan|na[- ]approve)\s+(?:na\s+)?(?:ang\s+)?(?:quotation|quote)\b/.test(normalizedMessage)
+  ) {
+    return "quotation";
+  }
+
+  return null;
+}
+
+export function getCustomerJourneyStage(
+  customerState: ConversationMemoryState = {}
+): CustomerJourneyStage {
+  return getStageFromValue(customerState.customer_journey_stage);
+}
+
+export function isCustomerPastQuotationStage(
+  customerState: ConversationMemoryState = {}
+) {
+  return CUSTOMER_JOURNEY_STAGE_RANK[getCustomerJourneyStage(customerState)] >
+    CUSTOMER_JOURNEY_STAGE_RANK.quotation;
+}
+
 export function inferCustomerState(
   previousState: ConversationMemoryState = {},
   customerMessage: string,
-  leadCaptured = false
+  leadCaptured = false,
+  messageSource: "customer" | "page" = "customer"
 ) {
   const nextState: ConversationMemoryState = { ...previousState };
   const intent = detectIntent(customerMessage);
   const budget = extractBudget(customerMessage);
   const interestedProduct = extractInterestedProduct(customerMessage);
+  const previousJourneyStage = getCustomerJourneyStage(nextState);
+  const detectedJourneyStage = detectCustomerJourneyStage(customerMessage);
+
+  if (
+    detectedJourneyStage &&
+    CUSTOMER_JOURNEY_STAGE_RANK[detectedJourneyStage] >=
+      CUSTOMER_JOURNEY_STAGE_RANK[previousJourneyStage]
+  ) {
+    nextState.customer_journey_stage = detectedJourneyStage;
+  }
+
+  if (messageSource === "page") {
+    nextState.last_page_context = clip(customerMessage, 180);
+  }
 
   if (intent) {
     nextState.intent = intent;
@@ -99,6 +189,10 @@ export function inferCustomerState(
 
   if (intent === "handoff") {
     nextState.handoff_status = "requested";
+  }
+
+  if (isCustomerPastQuotationStage(nextState)) {
+    nextState.quotation_status = "completed";
   }
 
   return nextState;

@@ -495,6 +495,7 @@ async function planRealEstateSalesReply(input: {
   userMessage: string;
   businessContext: string;
   conversationSummary: string;
+  customerStateText: string;
   recentMessages: Array<{ role?: string; content: string }>;
   latestLeadIntent?: LeadCaptureIntent;
   leadCaptureTrigger?: string;
@@ -538,6 +539,7 @@ Rules:
 - If the business facts include a script or FAQ matching the customer's intent, use that script's facts naturally without copying labels like "Details:".
 - Identify what the customer is really trying to decide, then give the shortest useful answer.
 - Answer before selling. Do not add a benefit, promotion, quote offer, or call to action unless it directly helps answer the latest message.
+- Customer journey state is authoritative when present. If the customer is in production, fulfillment, or completed, they are an existing customer who has already moved past quotation. Support their current question; set shouldStartLeadCapture and shouldOfferLeadCapture to false, and never suggest a quotation or lead form unless they explicitly ask for a new or revised quotation.
 - Set bestNextStep to answer_only by default. Ask one simple question only when a necessary detail is missing or the customer clearly wants to proceed.
 - Do not recommend asking for name/phone/contact details unless the customer is ready to proceed, asks for a human/team follow-up, or has already offered contact details.
 - Lead-form trigger: ${input.leadCaptureTrigger?.trim() ? `The page owner chose this rule: "${input.leadCaptureTrigger.trim()}". Set shouldStartLeadCapture to true only when the latest customer message, interpreted in context, clearly confirms that they want to proceed now. Set shouldOfferLeadCapture to true when it is a good time to ask the saved offer question, but the customer has not agreed yet. If the previous assistant message already offered a free consultation, quick audit, demo, quote, booking, or equivalent next step and the customer now says yes/opo/oo/sige or an equivalent confirmation, set shouldStartLeadCapture to true.` : "No custom rule is configured. Set shouldStartLeadCapture and shouldOfferLeadCapture to false."}
@@ -575,6 +577,9 @@ Return only JSON:
 
 Previous lead intent:
 ${input.latestLeadIntent || "UNCLEAR"}
+
+Customer journey state:
+${input.customerStateText || "new or unknown"}
 
 Recent conversation:
 ${recentMessages || input.conversationSummary || "None"}
@@ -642,6 +647,9 @@ export async function planAiReply(
       userMessage,
       businessContext,
       conversationSummary: getMemorySummaryForPrompt(conversationContext),
+      customerStateText: Object.keys(conversationContext.customerState ?? {}).length > 0
+        ? JSON.stringify(conversationContext.customerState).slice(0, MAX_MEMORY_CHARS)
+        : "",
       recentMessages: getRecentMessagesForPrompt(conversationContext),
       latestLeadIntent: conversationContext.latestLeadIntent,
       leadCaptureTrigger,
@@ -836,6 +844,7 @@ Core rules:
 - If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in natural everyday Bisaya/Cebuano, like a friendly local sales agent. Prefer Bisaya words such as "sakto nga detalye", "klaro nga tubag", "tabangan tika", "unsa imong ganahan", and "asa ka dapit". Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
+- Customer journey state is authoritative when present. If it says customer_journey_stage is production, fulfillment, or completed, this is an existing customer who has already moved past quotation. Answer their current support or production question directly. Do not offer, ask for, or append a quotation, consultation, lead form, or new contact details unless the latest message explicitly asks for a new or revised quotation.
 - Keep replies brief. Never use more than ${replySentenceLimit} sentence${replySentenceLimit === 1 ? "" : "s"}, except for a requested list or detail that cannot fit in one sentence.
 - Ask at most one question, only when it is necessary. A complete answer with no question is preferred.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
@@ -868,6 +877,7 @@ ${businessContextForPrompt || "No business facts provided."}`;
 - If the answer is missing, reply with the required missing-info fallback exactly as written. Do not add, remove, or rewrite any words.
 - Missing-info fallback is only for truly absent specific facts. For broad info requests, use any relevant business facts or matching script first.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
+- If customer state says customer_journey_stage is production, fulfillment, or completed, never reopen quotation or lead capture. Treat this as an ongoing customer-support conversation unless the latest customer message explicitly requests a new or revised quotation.
 - First-reply disclosure: ${isFirstReply ? `This is the first AI reply. Start by briefly saying that you are the AI assistant for ${businessName}, then answer the customer. Do not omit this disclosure.` : "This is not the first AI reply, so do not introduce yourself again."}
 
 Private sales plan:
