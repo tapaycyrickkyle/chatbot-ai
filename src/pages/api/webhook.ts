@@ -1296,6 +1296,13 @@ export default async function handler(
               rawText
             );
             const hasMovedPastQuotation = isCustomerPastQuotationStage(customerStateForMessage);
+            const isReturningCustomer = Boolean(
+              existingConversation?.last_customer_message ||
+              existingConversation?.last_ai_reply ||
+              existingConversation?.conversation_summary ||
+              existingConversation?.recent_messages.length ||
+              Object.keys(existingConversation?.customer_state ?? {}).length
+            );
             const activeLead: LeadCaptureResult = hasMovedPastQuotation
               ? { reply: null, hasOpenLead: false }
               : await handleLeadCapture({
@@ -1398,6 +1405,7 @@ export default async function handler(
               : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT");
             const shouldOfferLeadCapture = Boolean(
               !hasMovedPastQuotation &&
+              !isReturningCustomer &&
               leadCaptureTrigger &&
               client.lead_capture_offer.trim() &&
               replyPlan?.shouldOfferLeadCapture === true
