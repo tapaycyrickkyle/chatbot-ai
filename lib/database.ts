@@ -12,12 +12,6 @@ type ClientRow = {
   bot_type?: string | null;
   business_info?: string | null;
   ai_enabled?: boolean | null;
-  google_sheets_webhook_url?: string | null;
-  google_sheets_tab_name?: string | null;
-  lead_capture_enabled?: boolean | null;
-  lead_capture_fields?: string | null;
-  lead_capture_trigger?: string | null;
-  lead_capture_offer?: string | null;
   welcome_sequence_enabled?: boolean | null;
   welcome_message?: string | null;
   welcome_link_url?: string | null;
@@ -65,17 +59,13 @@ type AiMessageJobRow = {
 };
 
 const CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url, google_sheets_tab_name, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, welcome_sequence_enabled, welcome_message, welcome_link_url, welcome_image_urls";
 const CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE =
   `${CLIENT_COLUMNS}, manual_ai_pause_minutes`;
 const CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE =
-  `${CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE}, auto_reply_ignore_pattern, lead_capture_enabled, lead_capture_fields`;
-const CLIENT_COLUMNS_WITH_LEAD_TRIGGER =
-  `${CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE}, lead_capture_trigger`;
-const CLIENT_COLUMNS_WITH_LEAD_MESSAGES =
-  `${CLIENT_COLUMNS_WITH_LEAD_TRIGGER}, lead_capture_offer`;
+  `${CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE}, auto_reply_ignore_pattern`;
 const LEGACY_CLIENT_COLUMNS =
-  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled, google_sheets_webhook_url";
+  "id, client_name, page_id, page_access_token, created_at, bot_type, business_info, ai_enabled";
 const AI_CONVERSATION_COLUMNS =
   "id, client_id, page_id, recipient_id, last_customer_message, last_ai_reply, conversation_summary, customer_state, recent_messages, welcome_sequence_sent, last_message_at, ai_paused, paused_at, paused_by, ai_pause_expires_at, resumed_at, created_at, updated_at";
 const LEGACY_AI_CONVERSATION_COLUMNS =
@@ -83,13 +73,6 @@ const LEGACY_AI_CONVERSATION_COLUMNS =
 
 function buildPagePictureUrl(pageId: string) {
   return `https://graph.facebook.com/${encodeURIComponent(pageId)}/picture?type=large`;
-}
-
-function isMissingGoogleSheetsTabNameError(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("google_sheets_tab_name") &&
-      error.message.includes("does not exist")
-  );
 }
 
 function isMissingLastAiReplyError(error: { message?: string } | null) {
@@ -140,26 +123,6 @@ function isMissingAiPauseExpiresAtError(error: { message?: string } | null) {
   );
 }
 
-function isMissingLeadCaptureConfigError(error: { message?: string } | null) {
-  return Boolean(
-    (error?.message?.includes("lead_capture_enabled") || error?.message?.includes("lead_capture_fields")) &&
-      error.message.includes("does not exist")
-  );
-}
-
-function isMissingLeadCaptureTriggerError(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("lead_capture_trigger") && error.message.includes("does not exist")
-  );
-}
-
-function isMissingLeadCaptureMessagesError(error: { message?: string } | null) {
-  return Boolean(
-    error?.message?.includes("lead_capture_offer") &&
-      error.message.includes("does not exist")
-  );
-}
-
 function isMissingProcessedMessengerMessagesError(error: { message?: string } | null) {
   return Boolean(
     error?.message?.includes("processed_messenger_messages") &&
@@ -185,18 +148,12 @@ function normalizeClient(row: ClientRow) {
     bot_type: "ai" as const,
     business_info: row.business_info ?? "",
     ai_enabled: row.ai_enabled ?? true,
-    google_sheets_webhook_url: row.google_sheets_webhook_url ?? "",
-    google_sheets_tab_name: row.google_sheets_tab_name ?? "Sheet1",
     welcome_sequence_enabled: row.welcome_sequence_enabled ?? false,
     welcome_message: row.welcome_message ?? "",
     welcome_link_url: row.welcome_link_url ?? "",
     welcome_image_urls: row.welcome_image_urls ?? "",
     manual_ai_pause_minutes: row.manual_ai_pause_minutes ?? 5,
     auto_reply_ignore_pattern: row.auto_reply_ignore_pattern ?? "",
-    lead_capture_enabled: Boolean(row.lead_capture_enabled),
-    lead_capture_fields: row.lead_capture_fields ?? "Full Name|name\nPhone|phone|optional",
-    lead_capture_trigger: row.lead_capture_trigger ?? "",
-    lead_capture_offer: row.lead_capture_offer ?? "",
     picture_url: buildPagePictureUrl(row.page_id),
   };
 }
@@ -266,32 +223,14 @@ export async function getClients() {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
     .order("created_at", { ascending: true });
-  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
     ? await supabase
         .from("clients")
-        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
         .order("created_at", { ascending: true })
     : response;
-  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
-        .order("created_at", { ascending: true })
-    : messageResponse;
-  const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .order("created_at", { ascending: true })
-    : triggerResponse;
-  const currentResponse = isMissingAutoReplyIgnorePatternError(leadConfigResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .order("created_at", { ascending: true })
-    : leadConfigResponse;
   const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
     ? await supabase
         .from("clients")
@@ -299,7 +238,6 @@ export async function getClients() {
         .order("created_at", { ascending: true })
     : currentResponse;
   const { data, error } =
-    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -318,37 +256,16 @@ export async function getClientByPageId(pageId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
     .eq("page_id", pageId)
     .maybeSingle();
-  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
     ? await supabase
         .from("clients")
-        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
         .eq("page_id", pageId)
         .maybeSingle()
     : response;
-  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
-        .eq("page_id", pageId)
-        .maybeSingle()
-    : messageResponse;
-  const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .eq("page_id", pageId)
-        .maybeSingle()
-    : triggerResponse;
-  const currentResponse = isMissingAutoReplyIgnorePatternError(leadConfigResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .eq("page_id", pageId)
-        .maybeSingle()
-    : leadConfigResponse;
   const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
     ? await supabase
         .from("clients")
@@ -357,7 +274,6 @@ export async function getClientByPageId(pageId: string) {
         .maybeSingle()
     : currentResponse;
   const { data, error } =
-    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -636,37 +552,16 @@ export async function getClientById(clientId: string) {
   const supabase = getDb();
   const response = await supabase
     .from("clients")
-    .select(CLIENT_COLUMNS_WITH_LEAD_MESSAGES)
+    .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
     .eq("id", clientId)
     .maybeSingle();
-  const messageResponse = isMissingLeadCaptureMessagesError(response.error)
+  const currentResponse = isMissingAutoReplyIgnorePatternError(response.error)
     ? await supabase
         .from("clients")
-        .select(CLIENT_COLUMNS_WITH_LEAD_TRIGGER)
+        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
         .eq("id", clientId)
         .maybeSingle()
     : response;
-  const triggerResponse = isMissingLeadCaptureTriggerError(messageResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_AUTO_REPLY_IGNORE)
-        .eq("id", clientId)
-        .maybeSingle()
-    : messageResponse;
-  const leadConfigResponse = isMissingLeadCaptureConfigError(triggerResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .eq("id", clientId)
-        .maybeSingle()
-    : triggerResponse;
-  const currentResponse = isMissingAutoReplyIgnorePatternError(leadConfigResponse.error)
-    ? await supabase
-        .from("clients")
-        .select(CLIENT_COLUMNS_WITH_MANUAL_AI_PAUSE)
-        .eq("id", clientId)
-        .maybeSingle()
-    : leadConfigResponse;
   const modernResponse = isMissingManualAiPauseMinutesError(currentResponse.error)
     ? await supabase
         .from("clients")
@@ -675,7 +570,6 @@ export async function getClientById(clientId: string) {
         .maybeSingle()
     : currentResponse;
   const { data, error } =
-    isMissingGoogleSheetsTabNameError(modernResponse.error) ||
     isMissingWelcomeSequenceError(modernResponse.error)
     ? await supabase
         .from("clients")
@@ -701,18 +595,12 @@ export async function updateClientSettings(
     bot_type: "ai";
     business_info: string;
     ai_enabled: boolean;
-    google_sheets_webhook_url: string;
-    google_sheets_tab_name: string;
     welcome_sequence_enabled: boolean;
     welcome_message: string;
     welcome_link_url: string;
     welcome_image_urls: string;
     manual_ai_pause_minutes: number;
     auto_reply_ignore_pattern: string;
-    lead_capture_enabled: boolean;
-    lead_capture_fields: string;
-    lead_capture_trigger: string;
-    lead_capture_offer: string;
   }>
 ) {
   const supabase = getDb();
@@ -800,120 +688,6 @@ export async function recordCustomerConversationMessage(input: {
   if (error) {
     throw new Error(error.message || "Failed to record conversation");
   }
-}
-
-export type LeadRecord = {
-  id: string;
-  client_id: string;
-  page_id: string;
-  recipient_id: string;
-  fields: Record<string, string>;
-  field_config: Array<{ label: string; type: string; required: boolean }>;
-  status: "collecting" | "awaiting_confirmation" | "confirmed" | "delivered" | "delivery_failed";
-  delivery_attempts: number;
-  last_delivery_error: string;
-  confirmed_at: string;
-  delivered_at: string;
-  created_at: string;
-  updated_at: string;
-};
-
-function normalizeLeadRecord(row: Record<string, unknown>): LeadRecord {
-  const fields = row.fields && typeof row.fields === "object" && !Array.isArray(row.fields)
-    ? Object.fromEntries(Object.entries(row.fields as Record<string, unknown>).flatMap(([key, value]) =>
-        typeof value === "string" ? [[key, value]] : []
-      ))
-    : {};
-  const fieldConfig = Array.isArray(row.field_config)
-    ? row.field_config.flatMap((field) => {
-        if (!field || typeof field !== "object") return [];
-        const value = field as Record<string, unknown>;
-        return typeof value.label === "string" && typeof value.type === "string"
-          ? [{ label: value.label, type: value.type, required: value.required !== false }]
-          : [];
-      })
-    : [];
-  return {
-    id: String(row.id), client_id: String(row.client_id), page_id: String(row.page_id),
-    recipient_id: String(row.recipient_id), fields, field_config: fieldConfig,
-    status: (typeof row.status === "string" ? row.status : "collecting") as LeadRecord["status"],
-    delivery_attempts: Number(row.delivery_attempts) || 0,
-    last_delivery_error: typeof row.last_delivery_error === "string" ? row.last_delivery_error : "",
-    confirmed_at: typeof row.confirmed_at === "string" ? row.confirmed_at : "",
-    delivered_at: typeof row.delivered_at === "string" ? row.delivered_at : "",
-    created_at: String(row.created_at), updated_at: String(row.updated_at),
-  };
-}
-
-export async function getOpenLeadRecord(clientId: string, recipientId: string) {
-  const { data, error } = await getDb().from("lead_records")
-    .select("*").eq("client_id", clientId).eq("recipient_id", recipientId)
-    .in("status", ["collecting", "awaiting_confirmation"])
-    .order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (error) throw new Error(error.message || "Failed to load lead record");
-  return data ? normalizeLeadRecord(data as Record<string, unknown>) : null;
-}
-
-export async function createLeadRecord(input: {
-  clientId: string; pageId: string; recipientId: string;
-  fields: Record<string, string>; fieldConfig: Array<{ label: string; type: string; required: boolean }>;
-  status?: LeadRecord["status"];
-}) {
-  const { data, error } = await getDb().from("lead_records").insert({
-    client_id: input.clientId, page_id: input.pageId, recipient_id: input.recipientId,
-    fields: input.fields, field_config: input.fieldConfig, status: input.status ?? "collecting",
-  }).select("*").single();
-  if (error) throw new Error(error.message || "Failed to create lead record");
-  return normalizeLeadRecord(data as Record<string, unknown>);
-}
-
-export async function updateLeadRecord(id: string, updates: {
-  fields?: Record<string, string>; status?: LeadRecord["status"]; confirmed_at?: string | null;
-  delivered_at?: string | null; delivery_attempts?: number; last_delivery_error?: string;
-}) {
-  const { data, error } = await getDb().from("lead_records")
-    .update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
-  if (error) throw new Error(error.message || "Failed to update lead record");
-  return normalizeLeadRecord(data as Record<string, unknown>);
-}
-
-export async function getLeadDeliverySummary(clientId: string) {
-  const { data, error } = await getDb().from("lead_records")
-    .select("status").eq("client_id", clientId).gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString());
-  if (error) {
-    if (error.message.includes("lead_records") && error.message.includes("does not exist")) {
-      return { delivered: 0, failed: 0, pending: 0 };
-    }
-    throw new Error(error.message || "Failed to load lead delivery status");
-  }
-  return (data ?? []).reduce((summary, row) => {
-    const status = typeof row.status === "string" ? row.status : "";
-    if (status === "delivered") summary.delivered += 1;
-    else if (status === "delivery_failed") summary.failed += 1;
-    else if (status === "confirmed") summary.pending += 1;
-    return summary;
-  }, { delivered: 0, failed: 0, pending: 0 });
-}
-
-export async function getLeadRecordsNeedingDelivery(limit = 25) {
-  const { data, error } = await getDb().from("lead_records")
-    .select("*, clients!inner(google_sheets_webhook_url, google_sheets_tab_name)")
-    .in("status", ["confirmed", "delivery_failed"])
-    .order("updated_at", { ascending: true }).limit(limit);
-  if (error) {
-    if (error.message.includes("lead_records") && error.message.includes("does not exist")) return [];
-    throw new Error(error.message || "Failed to load pending lead deliveries");
-  }
-  return (data ?? []).map((row) => {
-    const record = normalizeLeadRecord(row as Record<string, unknown>);
-    const client = (row as { clients?: unknown }).clients;
-    const settings = client && typeof client === "object" ? client as Record<string, unknown> : {};
-    return {
-      ...record,
-      google_sheets_webhook_url: typeof settings.google_sheets_webhook_url === "string" ? settings.google_sheets_webhook_url : "",
-      google_sheets_tab_name: typeof settings.google_sheets_tab_name === "string" ? settings.google_sheets_tab_name : "Sheet1",
-    };
-  });
 }
 
 export async function recordWelcomeSequenceCandidate(input: {

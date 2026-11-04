@@ -137,17 +137,9 @@ export function getCustomerJourneyStage(
   return getStageFromValue(customerState.customer_journey_stage);
 }
 
-export function isCustomerPastQuotationStage(
-  customerState: ConversationMemoryState = {}
-) {
-  return CUSTOMER_JOURNEY_STAGE_RANK[getCustomerJourneyStage(customerState)] >
-    CUSTOMER_JOURNEY_STAGE_RANK.quotation;
-}
-
 export function inferCustomerState(
   previousState: ConversationMemoryState = {},
   customerMessage: string,
-  leadCaptured = false,
   messageSource: "customer" | "page" = "customer"
 ) {
   const nextState: ConversationMemoryState = { ...previousState };
@@ -181,18 +173,8 @@ export function inferCustomerState(
     nextState.interested_product = clip(interestedProduct, 80);
   }
 
-  if (leadCaptured || nextState.lead_status === "captured") {
-    nextState.lead_status = "captured";
-  } else if (/\b(name|phone|contact|number|email)\b/i.test(customerMessage)) {
-    nextState.lead_status = "partial_or_possible";
-  }
-
   if (intent === "handoff") {
     nextState.handoff_status = "requested";
-  }
-
-  if (isCustomerPastQuotationStage(nextState)) {
-    nextState.quotation_status = "completed";
   }
 
   return nextState;

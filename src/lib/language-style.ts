@@ -95,16 +95,3 @@ export function getMissingInfoReply(customerMessage = "") {
 
   return pickReply(MISSING_INFO_REPLIES[languageStyle]);
 }
-
-export function getLeadCapturedReply(customerMessage = "") {
-  switch (detectCustomerLanguageStyle(customerMessage)) {
-    case "cebuano":
-      return "Salamat, nadawat na nako imong detalye. Mo-follow up ang among team nimo soon.";
-    case "tagalog":
-      return "Salamat, nakuha ko na ang details mo. Magfo-follow up ang team namin sa iyo soon.";
-    case "taglish":
-      return "Thank you po, I got your details. Our team will follow up shortly.";
-    default:
-      return "Thank you, I got your details. Our team will follow up shortly.";
-  }
-}

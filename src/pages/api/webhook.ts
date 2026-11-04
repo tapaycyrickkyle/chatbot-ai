@@ -3,9 +3,6 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { waitUntil } from "@vercel/functions";
 import {
   getAiConversation,
-  createLeadRecord,
-  getOpenLeadRecord,
-  updateLeadRecord,
   hasWelcomeSequenceReceipt,
   cancelPendingAiMessageJobsForConversation,
   enqueueAiMessageJob,
@@ -19,28 +16,14 @@ import {
   tryClaimMessengerMessage,
   resumeAiConversation,
 } from "@/lib/database";
-import { askAi, getLeadFormIntro, getLeadOfferQuestion, planAiReply, type LeadCaptureIntent } from "@/lib/ai-chat";
+import { askAi, planAiReply } from "@/lib/ai-chat";
 import {
   appendRecentConversationMessages,
   getDeterministicReply,
   inferCustomerState,
-  isCustomerPastQuotationStage,
   updateConversationSummary,
 } from "@/lib/conversation-memory";
 import { supabaseAdmin } from "@/lib/supabase";
-import {
-  extractLeadValues,
-  LEAD_FIELD_TYPES,
-  getLeadDeliveryFailedReply,
-  getLeadDeliveredReply,
-  getLeadFormPrompt,
-  getLeadPrompt,
-  getMissingLeadField,
-  parseLeadFields,
-  type LeadField,
-} from "@/lib/lead-capture";
-import { detectCustomerLanguageStyle } from "@/lib/language-style";
-import { createConfirmedLeadPayload, resolveConfirmedLeadDestination } from "@/lib/confirmed-lead-delivery";
 
 type ConnectedPageClient = NonNullable<Awaited<ReturnType<typeof getClientByPageId>>>;
 
@@ -444,177 +427,6 @@ async function safelyRecordWelcomeSequenceSent(input: {
   }
 }
 
-function getFallbackLeadIntent(message: string): LeadCaptureIntent {
-  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
-
-  if (isClearlyInfoOnlyMessage(normalizedMessage)) {
-    return "INFO_ONLY";
-  }
-
-  const providesLeadDetails =
-    /\b(?:name|full name|phone|contact|mobile|number)\s*[:\-]/i.test(normalizedMessage) &&
-    /(?:\+?\d[\d\s().-]{7,}\d)/.test(normalizedMessage);
-
-  if (providesLeadDetails) {
-    return "PROVIDED_LEAD_DETAILS";
-  }
-
-  const wantsHumanContact =
-    /\b(?:call me|contact me|message me|pm me|dm me|talk to|speak to|agent|specialist|human|staff|representative|someone\s+(?:call|contact|assist)|pa\s*(?:call|contact)|tawag(?:an)?|kausap)\b/i.test(
-      normalizedMessage
-    );
-
-  if (wantsHumanContact) {
-    return "WANTS_HUMAN_CONTACT";
-  }
-
-  const readyToBuyOrBook =
-    /\b(?:i want to|i'd like to|ill|i'll|let me|can i|please)\s+(?:order|buy|purchase|reserve|book|schedule|avail|proceed)\b/i.test(
-      normalizedMessage
-    ) ||
-    /\b(?:order now|place order|checkout|buy now|reserve now|book now|schedule viewing|book viewing|set appointment|make appointment|proceed with|go ahead|sign me up)\b/i.test(
-      normalizedMessage
-    ) ||
-    /\b(?:pa\s*reserve|pa\s*book|magpa\s*book|magpa\s*reserve|gusto\s+ko\s+(?:bumili|mag\s*order|magpa\s*reserve|magpa\s*book))\b/i.test(
-      normalizedMessage
-    );
-
-  if (readyToBuyOrBook) {
-    return "READY_TO_BUY_OR_BOOK";
-  }
-
-  return "UNCLEAR";
-}
-
-function isClearlyInfoOnlyMessage(normalizedMessage: string) {
-  const withoutPoliteWords = normalizedMessage
-    .replace(/\b(?:po|please|pls|sir|maam|ma'am|boss|thanks|thank you|salamat)\b/gi, "")
-    .replace(/[^\p{L}\p{N}\s?]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const asksForInfoOnly =
-    /\b(details?|info|information|price|how much|hm|available|availability|requirements?|photos?|pictures?|location|sample computation|computation|monthly|amortization|dp|down payment)\b/i.test(
-      normalizedMessage
-    ) ||
-    /\bhow\s+(?:to|do i|can i)\s+(?:order|buy|book|reserve|schedule|get|avail)/i.test(
-      normalizedMessage
-    );
-
-  return (
-    asksForInfoOnly &&
-    !/\b(?:call me|contact me|message me|pm me|dm me|talk to|speak to|agent|specialist|human|staff|representative|order now|place order|checkout|buy now|reserve now|book now|schedule viewing|book viewing|set appointment|make appointment|proceed with|go ahead|pa\s*reserve|pa\s*book|magpa\s*book|magpa\s*reserve)\b/i.test(
-      normalizedMessage
-    ) &&
-    withoutPoliteWords.split(/\s+/).filter(Boolean).length <= 6
-  );
-}
-
-function getLeadCaptureIntentFromPlan(message: string, planIntent: LeadCaptureIntent) {
-  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
-
-  if (isClearlyInfoOnlyMessage(normalizedMessage)) {
-    return "INFO_ONLY";
-  }
-
-  if (planIntent !== "UNCLEAR") {
-    return planIntent;
-  }
-
-  return getFallbackLeadIntent(message);
-}
-
-function isLeadCaptureQuestion(message: string) {
-  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
-  if (!normalizedMessage) return false;
-  if (normalizedMessage.includes("?") || isClearlyInfoOnlyMessage(normalizedMessage)) return true;
-
-  return /^(?:what|why|how|where|when|who|which|can|could|do|does|did|is|are|may|will|would|ano|anong|bakit|paano|saan|kailan|magkano|ilan|para\s+saan|may|meron|pwede|maaari|unsa|ngano|nganong|asa|kanus-a|pila|naa|pwede\s+ba|makaya\s+ba)\b/i.test(
-    normalizedMessage
-  );
-}
-
-function isLeadProceedingMessage(message: string) {
-  const normalizedMessage = message.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-  const confirmationWord = "(?:yes|yeah|yep|sure|okay|ok|oo|opo|sige|sge|pwede)";
-  const confirmationFiller = "(?:po|please|na|ako|kami|ko|lang|nga|bitaw)";
-  const shortConfirmation = new RegExp(
-    `^${confirmationWord}(?:\\s+(?:${confirmationWord}|${confirmationFiller}))*$`,
-    "i"
-  );
-
-  return shortConfirmation.test(normalizedMessage) || /^(?:go ahead|proceed|lets proceed|let us proceed|gusto ko(?:\s+(?:na|po|sana|mag proceed))?|mag proceed|magproceed|book|reserve)$/i.test(
-    normalizedMessage
-  );
-}
-
-function getLeadProceedConfirmationPrompt(languageStyle: string, customOffer = "") {
-  if (customOffer.trim()) return customOffer.trim();
-  if (languageStyle === "cebuano") return "Gusto nimo mopadayon? Kung oo, kuhaon nako imong detalye para sa sunod nga step.";
-  if (languageStyle === "tagalog" || languageStyle === "taglish") return "Gusto mo bang mag-proceed? Kung oo, kukunin ko ang details mo para sa next step.";
-  return "Would you like to proceed? If yes, I’ll collect your details for the next step.";
-}
-
-async function deliverConfirmedLead(input: {
-  leadId: string;
-  pageId: string;
-  recipientId: string;
-  fields: Record<string, string>;
-  fieldConfig: Array<{ label: string; type: string; required: boolean }>;
-  fallbackWebhookUrl: string;
-  sheetTab: string;
-  attempts: number;
-}) {
-  const nextAttempts = input.attempts + 1;
-  let destination;
-  try {
-    destination = resolveConfirmedLeadDestination(input.fallbackWebhookUrl);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Lead delivery is not configured";
-    await updateLeadRecord(input.leadId, {
-      status: "delivery_failed", delivery_attempts: nextAttempts,
-      last_delivery_error: message,
-    });
-    return false;
-  }
-
-  if (!destination) {
-    await updateLeadRecord(input.leadId, {
-      status: "delivery_failed", delivery_attempts: nextAttempts,
-      last_delivery_error: "No lead delivery destination is configured",
-    });
-    return false;
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(destination.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(destination.authorization ? { Authorization: destination.authorization } : {}),
-      },
-      signal: controller.signal,
-      body: JSON.stringify(createConfirmedLeadPayload({ ...input, capturedAt: new Date().toISOString() })),
-    });
-    const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-    if (!response.ok || !payload?.ok) throw new Error(payload?.error || `${destination.name} returned ${response.status}`);
-    await updateLeadRecord(input.leadId, {
-      status: "delivered", delivery_attempts: nextAttempts, delivered_at: new Date().toISOString(),
-      last_delivery_error: "",
-    });
-    return true;
-  } catch (error) {
-    await updateLeadRecord(input.leadId, {
-      status: "delivery_failed", delivery_attempts: nextAttempts,
-      last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery failed",
-    });
-    console.warn(`Confirmed lead could not be delivered to ${destination.name}`, error);
-    return false;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 
 function getRememberedCustomerState(
   conversation: Awaited<ReturnType<typeof getAiConversation>>
@@ -623,9 +435,6 @@ function getRememberedCustomerState(
     return {};
   }
 
-  // Existing conversations may have useful history from before journey stages
-  // were introduced. Re-read that compact history so the protection applies
-  // immediately instead of waiting for the next explicit production update.
   const rememberedText = [
     conversation.conversation_summary,
     ...conversation.recent_messages.map((message) => message.content),
@@ -650,166 +459,10 @@ async function safelyRecordManualPageReply(input: {
   await safelyRecordAiReply(input);
 }
 
-type LeadCaptureResult = {
-  reply: string | null;
-  formReply?: string;
-  confirmationPrompt?: string;
-  hasOpenLead: boolean;
-  leadCaptured?: boolean;
-};
-
-const IMAGE_CONTACT_FIELDS: LeadField[] = [
-  { label: "Email address", type: "email", required: true },
-  { label: "Viber/WhatsApp number", type: "phone", required: true },
-];
-
-function getStoredLeadFields(fields: Array<{ label: string; type: string; required: boolean }>) {
-  return fields.flatMap((field) => {
-    const label = field.label.replace(/\s+/g, " ").trim().slice(0, 60);
-    const type = field.type.trim().toLowerCase();
-
-    return label && LEAD_FIELD_TYPES.includes(type as LeadField["type"])
-      ? [{ label, type: type as LeadField["type"], required: field.required !== false }]
-      : [];
-  });
-}
-
-function getImageContactReply(previousCustomerMessage = "") {
-  const languageStyle = detectCustomerLanguageStyle(previousCustomerMessage);
-
-  if (languageStyle === "tagalog" || languageStyle === "taglish") {
-    return "Maraming salamat po sa inyong inquiry. Hindi ko po ma-review ang details ng image dito. Marami pong inquiries na inaasikaso ngayon ang aming team, pero maa-assist pa rin po kayo. Pakisend po ang inyong email address at Viber o WhatsApp number para matawagan kayo ng team namin ngayong araw at ma-discuss ang details.";
-  }
-
-  return "Thank you for your inquiry. I can't review image details here. Our team is currently handling a high volume of inquiries, but you'll still be assisted. Please send your email address and Viber or WhatsApp number so our team can contact you directly today to discuss the details.";
-}
-
-async function handleLeadCapture(input: {
-  client: ConnectedPageClient; pageId: string; recipientId: string; message: string;
-}): Promise<LeadCaptureResult> {
-  const style = detectCustomerLanguageStyle(input.message);
-  let lead = await getOpenLeadRecord(input.client.id, input.recipientId);
-
-  if (!lead && !input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
-
-  const fields = lead
-    ? getStoredLeadFields(lead.field_config)
-    : parseLeadFields(input.client.lead_capture_fields);
-
-  if (!fields.length) return { reply: null, hasOpenLead: false };
-
-  if (!lead) return { reply: null, hasOpenLead: false };
-  // A new customer question should be answered by the normal AI first. The open
-  // lead is paused until the customer explicitly chooses to proceed again.
-  if (isLeadCaptureQuestion(input.message)) {
-    if (lead.status !== "awaiting_confirmation") {
-      lead = await updateLeadRecord(lead.id, { status: "awaiting_confirmation" });
-    }
-    return {
-      reply: null,
-      confirmationPrompt: await getLeadOfferQuestion({
-        customerMessage: input.message,
-        businessContext: input.client.business_info,
-        offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
-      }),
-      hasOpenLead: true,
-    };
-  }
-
-  if (lead.status === "awaiting_confirmation") {
-    if (!isLeadProceedingMessage(input.message)) {
-      return { reply: null, hasOpenLead: true };
-    }
-
-    const missingField = getMissingLeadField(fields, lead.fields);
-    if (missingField) {
-      await updateLeadRecord(lead.id, { status: "collecting" });
-      return {
-        reply: await getLeadFormIntro({
-          customerMessage: input.message,
-          businessContext: input.client.business_info,
-          leadOffer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
-        }),
-        formReply: getLeadFormPrompt(fields, style),
-        hasOpenLead: true,
-      };
-    }
-
-    lead = await updateLeadRecord(lead.id, {
-      status: "confirmed", confirmed_at: new Date().toISOString(),
-    });
-    const delivered = await deliverConfirmedLead({
-      leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
-      fieldConfig: lead.field_config,
-      fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
-      attempts: lead.delivery_attempts,
-    });
-    return { reply: delivered ? getLeadDeliveredReply(style) : getLeadDeliveryFailedReply(style), hasOpenLead: true, leadCaptured: delivered };
-  }
-
-  const expectedField = getMissingLeadField(fields, lead.fields);
-  const values = extractLeadValues(input.message, fields, lead.fields, expectedField);
-  const missingField = getMissingLeadField(fields, values);
-  if (missingField) {
-    await updateLeadRecord(lead.id, { fields: values, status: "collecting" });
-    return { reply: getLeadPrompt(missingField, style), hasOpenLead: true };
-  }
-
-  lead = await updateLeadRecord(lead.id, {
-    fields: values, status: "confirmed", confirmed_at: new Date().toISOString(),
-  });
-  const delivered = await deliverConfirmedLead({
-    leadId: lead.id, pageId: input.pageId, recipientId: input.recipientId, fields: lead.fields,
-    fieldConfig: lead.field_config,
-    fallbackWebhookUrl: input.client.google_sheets_webhook_url, sheetTab: input.client.google_sheets_tab_name,
-    attempts: lead.delivery_attempts,
-  });
-  return { reply: delivered ? getLeadDeliveredReply(style) : getLeadDeliveryFailedReply(style), hasOpenLead: true, leadCaptured: delivered };
-}
-
-async function startLeadCapture(input: {
-  client: ConnectedPageClient; pageId: string; recipientId: string; message: string; confirmed?: boolean;
-}): Promise<LeadCaptureResult> {
-  if (!input.client.lead_capture_enabled) return { reply: null, hasOpenLead: false };
-  const fields = parseLeadFields(input.client.lead_capture_fields);
-  if (!fields.length) return { reply: null, hasOpenLead: false };
-  const values = extractLeadValues(input.message, fields);
-  await createLeadRecord({
-    clientId: input.client.id, pageId: input.pageId, recipientId: input.recipientId,
-    fields: values, fieldConfig: fields, status: input.confirmed ? "collecting" : "awaiting_confirmation",
-  });
-  const style = detectCustomerLanguageStyle(input.message);
-  if (!input.confirmed) {
-    return {
-      reply: await getLeadOfferQuestion({
-        customerMessage: input.message,
-        businessContext: input.client.business_info,
-        offer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
-      }),
-      hasOpenLead: true,
-    };
-  }
-
-  return {
-    reply: await getLeadFormIntro({
-      customerMessage: input.message,
-      businessContext: input.client.business_info,
-      leadOffer: input.client.lead_capture_offer || getLeadProceedConfirmationPrompt(style),
-    }),
-    formReply: getLeadFormPrompt(fields, style),
-    hasOpenLead: true,
-  };
-}
-
 function shouldUseAiReplyPlanner(
   message: string,
-  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>,
-  fallbackIntent: LeadCaptureIntent
+  conversation: Awaited<ReturnType<typeof safelyGetAiConversation>>
 ) {
-  if (fallbackIntent !== "UNCLEAR") {
-    return false;
-  }
-
   const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ").trim();
   const words = normalizedMessage.split(/\s+/).filter(Boolean);
   const hasConversationContext = Boolean(
@@ -1096,7 +749,6 @@ export default async function handler(
             const customerState = inferCustomerState(
               getRememberedCustomerState(existingPageConversation),
               echoText,
-              false,
               "page"
             );
             const recentMessages = appendRecentConversationMessages(
@@ -1230,19 +882,8 @@ export default async function handler(
           }
 
           if (!rawText && hasImage) {
-            const imageMessage = "Customer sent an image attachment for team review.";
-            const openLead = await getOpenLeadRecord(client.id, userId);
-            if (!openLead) {
-              await createLeadRecord({
-                clientId: client.id,
-                pageId,
-                recipientId: userId,
-                fields: {},
-                fieldConfig: IMAGE_CONTACT_FIELDS,
-                status: "collecting",
-              });
-            }
-            const reply = getImageContactReply(existingConversation?.last_customer_message || "");
+            const imageMessage = "Customer sent an image attachment.";
+            const reply = "Thanks for sending the image. I can answer questions about the business, but I can’t review image details here.";
             const customerState = inferCustomerState(existingConversation?.customer_state, imageMessage);
             const recentMessages = appendRecentConversationMessages(
               existingConversation?.recent_messages,
@@ -1295,43 +936,12 @@ export default async function handler(
               getRememberedCustomerState(existingConversation),
               rawText
             );
-            const hasMovedPastQuotation = isCustomerPastQuotationStage(customerStateForMessage);
-            const isReturningCustomer = Boolean(
-              existingConversation?.last_customer_message ||
-              existingConversation?.last_ai_reply ||
-              existingConversation?.conversation_summary ||
-              existingConversation?.recent_messages.length ||
-              Object.keys(existingConversation?.customer_state ?? {}).length
-            );
-            const activeLead: LeadCaptureResult = hasMovedPastQuotation
-              ? { reply: null, hasOpenLead: false }
-              : await handleLeadCapture({
-                  client, pageId, recipientId: userId, message: rawText,
-                });
-
-            if (activeLead.reply) {
-              const customerState = inferCustomerState(existingConversation?.customer_state, rawText, activeLead.leadCaptured);
-              const recordedReply = [activeLead.reply, activeLead.formReply].filter(Boolean).join("\n\n");
-              const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
-              const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, recordedReply);
-              await safelyHandleFlowSend(
-                async () => {
-                  await safeSendHumanTextReply(userId, activeLead.reply!, pageAccessToken, pageId, client.id);
-                  if (activeLead.formReply) {
-                    await safeSendHumanTextReply(userId, activeLead.formReply, pageAccessToken, pageId, client.id);
-                  }
-                },
-                { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
-              );
-              await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: recordedReply, conversationSummary, customerState, recentMessages });
-              continue;
-            }
 
             const deterministicReply = getDeterministicReply(rawText);
 
             if (deterministicReply) {
-              const replyParts = [deterministicReply, activeLead.confirmationPrompt].filter(Boolean) as string[];
-              const reply = replyParts.join("\n\n");
+              const replyParts = [deterministicReply];
+              const reply = deterministicReply;
               const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
               const recentMessages = appendRecentConversationMessages(
                 existingConversation?.recent_messages,
@@ -1377,76 +987,20 @@ export default async function handler(
               customerState: customerStateForMessage,
               recentMessages: existingConversation?.recent_messages,
             };
-            const fallbackLeadIntent = getFallbackLeadIntent(rawText);
-            const leadCaptureTrigger = client.lead_capture_enabled
-              ? client.lead_capture_trigger.trim()
-              : "";
-            const shouldPlanReply = Boolean(leadCaptureTrigger) || shouldUseAiReplyPlanner(
-              rawText,
-              existingConversation,
-              fallbackLeadIntent
-            );
+            const shouldPlanReply = shouldUseAiReplyPlanner(rawText, existingConversation);
             const replyPlan = shouldPlanReply
               ? await planAiReply(
                   rawText,
                   client.business_info || "",
-                  aiConversationContext,
-                  leadCaptureTrigger,
-                  client.lead_capture_offer
+                  aiConversationContext
                 )
               : undefined;
-            const leadIntent = getLeadCaptureIntentFromPlan(
-              rawText,
-              replyPlan?.leadCaptureIntent ?? fallbackLeadIntent
-            );
-
-            const shouldStartLeadCapture = !hasMovedPastQuotation && (leadCaptureTrigger
-              ? replyPlan?.shouldStartLeadCapture === true
-              : leadIntent === "READY_TO_BUY_OR_BOOK" || leadIntent === "WANTS_HUMAN_CONTACT");
-            const shouldOfferLeadCapture = Boolean(
-              !hasMovedPastQuotation &&
-              !isReturningCustomer &&
-              leadCaptureTrigger &&
-              client.lead_capture_offer.trim() &&
-              replyPlan?.shouldOfferLeadCapture === true
-            );
-            let leadConfirmationPrompt = activeLead.confirmationPrompt;
-
-            if (!activeLead.hasOpenLead && (shouldStartLeadCapture || shouldOfferLeadCapture)) {
-              const startedLead = await startLeadCapture({
-                client, pageId, recipientId: userId, message: rawText,
-                confirmed: shouldStartLeadCapture,
-              });
-              if (startedLead.reply && shouldStartLeadCapture) {
-                const customerState = inferCustomerState(existingConversation?.customer_state, rawText);
-                const recordedReply = [startedLead.reply, startedLead.formReply].filter(Boolean).join("\n\n");
-                const recentMessages = appendRecentConversationMessages(existingConversation?.recent_messages, rawText, recordedReply);
-                const conversationSummary = updateConversationSummary(existingConversation?.conversation_summary || "", rawText, recordedReply);
-                await safelyHandleFlowSend(
-                  async () => {
-                    await safeSendHumanTextReply(userId, startedLead.reply!, pageAccessToken, pageId, client.id);
-                    if (startedLead.formReply) {
-                      await safeSendHumanTextReply(userId, startedLead.formReply, pageAccessToken, pageId, client.id);
-                    }
-                  },
-                  { clientId: client.id, pageId, recipientId: userId, messengerMessageId: messageId, messageType: "text" }
-                );
-                await safelyRecordAiReply({ clientId: client.id, pageId, recipientId: userId, reply: recordedReply, conversationSummary, customerState, recentMessages });
-                continue;
-              }
-              // For a soft offer, keep the normal answer and append the saved
-              // offer question instead of replacing the answer with it.
-              if (startedLead.reply && shouldOfferLeadCapture) {
-                leadConfirmationPrompt = startedLead.reply;
-              }
-            }
 
             if (!shouldPlanReply) {
               console.info("AI reply planner skipped for token control", {
                 clientId: client.id,
                 pageId,
                 userId,
-                fallbackLeadIntent,
               });
             }
 
@@ -1461,11 +1015,10 @@ export default async function handler(
                 const aiReply = await askAi(rawText, client.business_info || "", {
                   businessName: client.client_name,
                   ...aiConversationContext,
-                  latestLeadIntent: leadIntent,
                   ...(replyPlan ? { replyPlan } : {}),
                 });
-                const replyParts = [aiReply, leadConfirmationPrompt].filter(Boolean) as string[];
-                const reply = replyParts.join("\n\n");
+                const replyParts = [aiReply];
+                const reply = aiReply;
                 const customerState = customerStateForMessage;
                 const recentMessages = appendRecentConversationMessages(
                   existingConversation?.recent_messages,

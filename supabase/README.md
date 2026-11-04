@@ -56,27 +56,9 @@ The app uses Next.js API routes plus `SUPABASE_SERVICE_ROLE_KEY` for server-side
 
 Admin users are controlled only by `SUPABASE_ADMIN_EMAILS`.
 
-## Confirmed Google Sheets Leads
+## FAQ-only chatbot
 
-Run `24-confirmed-lead-capture.sql` for an existing database (or run the updated
-`00-run-all.sql` for a fresh setup). In Page Settings, enable Confirmed Lead
-Capture, add each `label|type` field, and mark an optional one as
-`label|type|optional`, then enter the Google Apps Script
-Web App `/exec` URL plus sheet tab name. Copy the script in
-`google-apps-script-lead-webhook.js` to Apps Script, deploy it as a Web App with
-access set to anyone, and paste its deployment URL into Page Settings.
-
-Use **When should the AI ask for lead details?** in the Page's Prompt Builder to
-set the lead trigger for that Page. For example, “when the customer asks for a
-quote, discount, or to place an order.” Leaving it blank keeps the standard
-ready-to-buy, booking, or human-contact trigger.
-
-The app creates a Google Sheet row only after the customer confirms the summary.
-Drafts and delivery attempts are stored for 30 days so a temporary Apps Script
-failure can be retried without asking the customer for their details again.
-The first lead-sheet column is **Date Sent**, automatically formatted like
-`August 14, 2026` when a completed lead is delivered. The remaining columns use
-the configured lead-field headers. The same deployed Apps Script works for later
-field changes: it adds missing header columns and maps each lead value by its
-configured field label.
-Configured phone fields are stored as text, preserving leading zeroes.
+The application no longer reads or writes lead-capture settings, lead records,
+or Google Sheets delivery configuration. The historical lead-capture migration
+files remain only for existing database history and should not be run for this
+FAQ-only workflow.

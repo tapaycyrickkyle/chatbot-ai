@@ -36,9 +36,6 @@ type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 type SalesPlan = {
   languageName: string;
   replyInstruction: string;
-  leadCaptureIntent: LeadCaptureIntent;
-  shouldStartLeadCapture: boolean;
-  shouldOfferLeadCapture: boolean;
   resolvedCustomerMeaning: string;
   conversationAction: string;
   buyerIntent: string;
@@ -48,14 +45,6 @@ type SalesPlan = {
   bestNextStep: string;
   shouldAskFollowUp: boolean;
 };
-
-export type LeadCaptureIntent =
-  | "INFO_ONLY"
-  | "SOFT_INTEREST"
-  | "READY_TO_BUY_OR_BOOK"
-  | "WANTS_HUMAN_CONTACT"
-  | "PROVIDED_LEAD_DETAILS"
-  | "UNCLEAR";
 
 type ConversationContext = {
   businessName?: string;
@@ -67,7 +56,6 @@ type ConversationContext = {
     role?: string;
     content: string;
   }>;
-  latestLeadIntent?: LeadCaptureIntent;
   replyPlan?: SalesPlan;
 };
 
@@ -78,14 +66,6 @@ const MAX_MEMORY_CHARS = 900;
 const DEFAULT_MAX_BUSINESS_CONTEXT_CHARS = MAX_BUSINESS_INFO_LENGTH;
 const DEFAULT_REPLY_SENTENCE_LIMIT = 1;
 const DEFAULT_AI_REQUEST_TIMEOUT_MS = 20000;
-const LEAD_INTENTS = new Set<LeadCaptureIntent>([
-  "INFO_ONLY",
-  "SOFT_INTEREST",
-  "READY_TO_BUY_OR_BOOK",
-  "WANTS_HUMAN_CONTACT",
-  "PROVIDED_LEAD_DETAILS",
-  "UNCLEAR",
-]);
 const ARGUMENTATIVE_TONE_PATTERN =
   /\b(?:talagang gusto mo|obviously|clearly you|you keep asking|paulit-ulit|pinipilit)\b/i;
 const ENGLISH_REPLY_NON_ENGLISH_PATTERN =
@@ -99,32 +79,9 @@ const MISSING_INFO_REPLY_PATTERN =
 const QUOTATION_SENT_CLAIM_PATTERN =
   /\b(?:quotation|quote)\b[^.!?]{0,30}\b(?:has(?:\s+already)?\s+been|was|is|already)\s+(?:sent|emailed|delivered|provided|issued|prepared)\b|\b(?:sent|emailed|delivered|provided|issued)\b[^.!?]{0,60}\b(?:quotation|quote)\b|\b(?:naipadala|na[- ]send|na[- ]email|na[- ]deliver|naibigay)\b[^.!?]{0,60}\b(?:quotation|quote)\b|\b(?:quotation|quote)\b[^.!?]{0,60}\b(?:naipadala|na[- ]send|na[- ]email|na[- ]deliver|naibigay)\b/i;
 
-function isLeadCollectionText(value = "") {
-  const normalizedValue = value.toLowerCase();
-
-  return (
-    (normalizedValue.includes("full name:") &&
-      (normalizedValue.includes("phone:") || normalizedValue.includes("contact number:"))) ||
-    /\b(?:send|provide)\s+(?:your\s+)?details\b/i.test(normalizedValue) ||
-    /\bwould you like to proceed\b/i.test(normalizedValue) ||
-    /\bto proceed\b/i.test(normalizedValue)
-  );
-}
-
-function shouldSuppressLeadContext(intent?: LeadCaptureIntent) {
-  return intent === "INFO_ONLY" || intent === "SOFT_INTEREST" || intent === "UNCLEAR";
-}
-
-function createFallbackSalesPlan(
-  languageStyle: CustomerLanguageStyle,
-  latestLeadIntent?: LeadCaptureIntent
-): SalesPlan {
-  const shouldAskFollowUp = latestLeadIntent === "READY_TO_BUY_OR_BOOK";
+function createFallbackSalesPlan(languageStyle: CustomerLanguageStyle): SalesPlan {
   return {
     ...parseSalesPlan("", languageStyle),
-    leadCaptureIntent: latestLeadIntent ?? "UNCLEAR",
-    shouldStartLeadCapture: false,
-    shouldOfferLeadCapture: false,
     resolvedCustomerMeaning:
       "Answer the latest customer message directly using the business facts and recent conversation only when needed.",
     conversationAction: "answer_latest_message",
@@ -132,36 +89,19 @@ function createFallbackSalesPlan(
     buyerStage: "unknown",
     likelyConcern: "none",
     bestAnswerAngle: "answer_directly_using_business_facts",
-    bestNextStep:
-      latestLeadIntent === "READY_TO_BUY_OR_BOOK"
-        ? "collect one useful next detail and say the team will confirm"
-        : "answer_only",
-    shouldAskFollowUp,
+    bestNextStep: "answer_only",
+    shouldAskFollowUp: false,
   };
 }
 
 function getMemorySummaryForPrompt(context: ConversationContext) {
   const memorySummary = context.conversationSummary?.trim() ?? "";
 
-  if (
-    !memorySummary ||
-    (shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(memorySummary))
-  ) {
-    return "";
-  }
-
-  return memorySummary.slice(0, MAX_MEMORY_CHARS);
+  return memorySummary ? memorySummary.slice(0, MAX_MEMORY_CHARS) : "";
 }
 
 function getPreviousAiReplyForPrompt(context: ConversationContext) {
   const previousAiReply = context.previousAiReply?.trim() ?? "";
-
-  if (
-    !previousAiReply ||
-    (shouldSuppressLeadContext(context.latestLeadIntent) && isLeadCollectionText(previousAiReply))
-  ) {
-    return "";
-  }
 
   return previousAiReply;
 }
@@ -169,11 +109,7 @@ function getPreviousAiReplyForPrompt(context: ConversationContext) {
 function getRecentMessagesForPrompt(context: ConversationContext) {
   const recentMessages = context.recentMessages?.slice(-MAX_RECENT_MESSAGES_FOR_PROMPT) ?? [];
 
-  if (!shouldSuppressLeadContext(context.latestLeadIntent)) {
-    return recentMessages;
-  }
-
-  return recentMessages.filter((message) => !isLeadCollectionText(message.content));
+  return recentMessages;
 }
 
 function getReplyLanguageInstruction(languageStyle: ReturnType<typeof detectCustomerLanguageStyle>) {
@@ -227,12 +163,6 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
         typeof parsed.replyInstruction === "string" && parsed.replyInstruction.trim()
           ? parsed.replyInstruction.trim().slice(0, 220)
           : getReplyLanguageInstruction(fallbackStyle),
-      leadCaptureIntent:
-        typeof parsed.leadCaptureIntent === "string"
-          ? parseLeadIntent(parsed.leadCaptureIntent)
-          : "UNCLEAR",
-      shouldStartLeadCapture: parsed.shouldStartLeadCapture === true,
-      shouldOfferLeadCapture: parsed.shouldOfferLeadCapture === true,
       resolvedCustomerMeaning:
         typeof parsed.resolvedCustomerMeaning === "string"
           ? parsed.resolvedCustomerMeaning.slice(0, 240)
@@ -252,9 +182,6 @@ function parseSalesPlan(value: string, fallbackStyle: CustomerLanguageStyle): Sa
     return {
       languageName: fallbackStyle,
       replyInstruction: getReplyLanguageInstruction(fallbackStyle),
-      leadCaptureIntent: "UNCLEAR",
-      shouldStartLeadCapture: false,
-      shouldOfferLeadCapture: false,
       resolvedCustomerMeaning: "Interpret the latest message using the recent conversation.",
       conversationAction: "answer_latest_message",
       buyerIntent: "understand_latest_message",
@@ -438,7 +365,7 @@ async function requestChatCompletion(input: {
   messages: ChatMessage[];
   temperature: number;
   maxTokens: number;
-  purpose: "planner" | "reply" | "lead_form_intro" | "lead_offer";
+  purpose: "planner" | "reply";
 }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), getAiRequestTimeoutMs());
@@ -511,9 +438,6 @@ async function planRealEstateSalesReply(input: {
   conversationSummary: string;
   customerStateText: string;
   recentMessages: Array<{ role?: string; content: string }>;
-  latestLeadIntent?: LeadCaptureIntent;
-  leadCaptureTrigger?: string;
-  leadCaptureOffer?: string;
   fallbackStyle: CustomerLanguageStyle;
 }) {
   const recentMessages = input.recentMessages
@@ -553,19 +477,16 @@ Rules:
 - If the business facts include a script or FAQ matching the customer's intent, use that script's facts naturally without copying labels like "Details:".
 - Identify what the customer is really trying to decide, then give the shortest useful answer.
 - Answer before selling. Do not add a benefit, promotion, quote offer, or call to action unless it directly helps answer the latest message.
-- Customer journey state is authoritative when present. If the customer is in production, fulfillment, or completed, they are an existing customer who has already moved past quotation. Support their current question; set shouldStartLeadCapture and shouldOfferLeadCapture to false, and never suggest a quotation or lead form unless they explicitly ask for a new or revised quotation.
+- Customer journey state is context only. Answer the customer's current question directly and do not reopen old sales or contact-collection flows.
 - Set bestNextStep to answer_only by default. Ask one simple question only when a necessary detail is missing or the customer clearly wants to proceed.
-- Do not recommend asking for name/phone/contact details unless the customer is ready to proceed, asks for a human/team follow-up, or has already offered contact details.
-- Lead-form trigger: ${input.leadCaptureTrigger?.trim() ? `The page owner chose this rule: "${input.leadCaptureTrigger.trim()}". Set shouldStartLeadCapture to true only when the latest customer message, interpreted in context, clearly confirms that they want to proceed now. Set shouldOfferLeadCapture to true when it is a good time to ask the saved offer question, but the customer has not agreed yet. If the previous assistant message already offered a free consultation, quick audit, demo, quote, booking, or equivalent next step and the customer now says yes/opo/oo/sige or an equivalent confirmation, set shouldStartLeadCapture to true.` : "No custom rule is configured. Set shouldStartLeadCapture and shouldOfferLeadCapture to false."}
-- Saved offer question: ${input.leadCaptureOffer?.trim() || "None"}
+- Never recommend asking for name, phone, contact details, or other personal information.
 - Booking, reservation, appointment, order confirmation, availability confirmation, final pricing, custom quotes, approvals, and discounts still require the team/human to confirm unless the business facts explicitly say the AI can confirm them.
-- Classify the latest customer message for intent only. This classification helps choose the answer style and must not trigger a lead form.
+- Classify the latest customer message for intent only. This classification helps choose the answer style and must not trigger contact collection.
 - Intent labels:
   INFO_ONLY = asks for info, details, price, availability, requirements, photos, location, computation/quote, options, services, products, delivery, or how the process/order works.
   SOFT_INTEREST = interested but not asking to be contacted, scheduled, reserved, quoted, or processed yet.
   READY_TO_BUY_OR_BOOK = clearly wants to buy, reserve, book, schedule, visit, set an appointment, or proceed now.
   WANTS_HUMAN_CONTACT = asks for a person/team/agent/specialist to call, contact, message, or assist them directly.
-  PROVIDED_LEAD_DETAILS = provides name and phone/contact details.
   UNCLEAR = not enough context.
 - "how to order" is INFO_ONLY unless they also say they want to order now.
 - Detect the customer's latest language or language mix from the latest customer message only. If it contains clear Bisaya/Cebuano words or sentence patterns, classify it as Bisaya/Cebuano even if it also has English words or polite words like "po". If short English like "yes", "ok", "now i understand", "got it", or "sure", classify as English.
@@ -576,9 +497,6 @@ Return only JSON:
 {
   "languageName":"English/Tagalog/Taglish/Cebuano-English/etc",
   "replyInstruction":"Reply in English only.",
-  "leadCaptureIntent":"INFO_ONLY/SOFT_INTEREST/READY_TO_BUY_OR_BOOK/WANTS_HUMAN_CONTACT/PROVIDED_LEAD_DETAILS/UNCLEAR",
-  "shouldStartLeadCapture":false,
-  "shouldOfferLeadCapture":false,
   "resolvedCustomerMeaning":"what the latest customer message means in context",
   "conversationAction":"continue_previous_offer/answer_new_question/answer_choice/clarify/soft_sell/ask_next_step",
   "buyerIntent":"price/location/availability/payment/options/comparison/etc",
@@ -588,9 +506,6 @@ Return only JSON:
   "bestNextStep":"one soft next step or answer_only",
   "shouldAskFollowUp":false
 }
-
-Previous lead intent:
-${input.latestLeadIntent || "UNCLEAR"}
 
 Customer journey state:
 ${input.customerStateText || "new or unknown"}
@@ -614,36 +529,10 @@ ${input.userMessage}`,
   return parseSalesPlan(response, input.fallbackStyle);
 }
 
-function parseLeadIntent(value: string): LeadCaptureIntent {
-  const normalizedValue = value
-    .replace(/```(?:json)?|```/gi, "")
-    .trim()
-    .toUpperCase();
-
-  try {
-    const parsed = JSON.parse(normalizedValue) as { intent?: unknown };
-    const intent = typeof parsed.intent === "string" ? parsed.intent.toUpperCase() : "";
-
-    if (LEAD_INTENTS.has(intent as LeadCaptureIntent)) {
-      return intent as LeadCaptureIntent;
-    }
-  } catch {
-    // Some providers return the label as plain text.
-  }
-
-  const label = normalizedValue.match(
-    /\b(INFO_ONLY|SOFT_INTEREST|READY_TO_BUY_OR_BOOK|WANTS_HUMAN_CONTACT|PROVIDED_LEAD_DETAILS|UNCLEAR)\b/
-  )?.[1];
-
-  return LEAD_INTENTS.has(label as LeadCaptureIntent) ? (label as LeadCaptureIntent) : "UNCLEAR";
-}
-
 export async function planAiReply(
   userMessage: string,
   businessContext: string,
-  conversationContext: ConversationContext = {},
-  leadCaptureTrigger = "",
-  leadCaptureOffer = ""
+  conversationContext: ConversationContext = {}
 ): Promise<SalesPlan> {
   const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const { apiKey, apiUrl, model } = getAiConfig();
@@ -665,126 +554,11 @@ export async function planAiReply(
         ? JSON.stringify(conversationContext.customerState).slice(0, MAX_MEMORY_CHARS)
         : "",
       recentMessages: getRecentMessagesForPrompt(conversationContext),
-      latestLeadIntent: conversationContext.latestLeadIntent,
-      leadCaptureTrigger,
-      leadCaptureOffer,
       fallbackStyle: latestLanguageStyle,
     });
   } catch (error) {
     console.warn("AI planning failed", getErrorSummary(error));
     return parseSalesPlan("", latestLanguageStyle);
-  }
-}
-
-export async function getLeadFormIntro(input: {
-  customerMessage: string;
-  businessContext: string;
-  leadOffer: string;
-}) {
-  const languageStyle = detectCustomerLanguageStyle(input.customerMessage);
-  const { apiKey, apiUrl, model } = getAiConfig();
-  const fallback = languageStyle === "cebuano"
-    ? "Sige, ihatag lang ang mosunod nga detalye aron maka-andam mi para sa sunod nga step."
-    : languageStyle === "tagalog" || languageStyle === "taglish"
-      ? "Sige, pakibigay ang mga sumusunod na detalye para maihanda namin ang next step."
-      : "Great, please share the following details so we can prepare for the next step.";
-
-  if (!apiKey || !apiUrl || !model) return fallback;
-
-  try {
-    const reply = await requestChatCompletion({
-      apiKey,
-      apiUrl,
-      model,
-      temperature: 0.3,
-      maxTokens: 60,
-      purpose: "lead_form_intro",
-      messages: [
-        {
-          role: "system",
-          content: "Write one short customer-facing confirmation sentence that appears immediately before a lead-details form. Do not ask a question. Do not include emojis, icons, field labels, a list, markdown, promises, or facts not provided. Match the customer's language or language mix.",
-        },
-        {
-          role: "user",
-          content: `Customer just agreed: "${input.customerMessage.slice(0, 240)}"\nOffer they agreed to: "${input.leadOffer.slice(0, 600)}"\nBusiness facts: ${getBusinessContextForPrompt(input.businessContext).slice(0, 1400) || "None"}`,
-        },
-      ],
-    });
-    const cleanedReply = reply.replace(/\s+/g, " ").trim();
-    return cleanedReply && cleanedReply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE
-      ? cleanedReply.slice(0, 320)
-      : fallback;
-  } catch (error) {
-    console.warn("Lead form intro generation failed", getErrorSummary(error));
-    return fallback;
-  }
-}
-
-function getLeadOfferFallback(offer: string, languageStyle: CustomerLanguageStyle) {
-  const savedOffer = offer.trim();
-  const isQuotationOffer = /\b(?:quotation|quote)\b/i.test(savedOffer);
-  const isFreeQuotation = /\bfree\b|libreng/i.test(savedOffer);
-
-  if (isQuotationOffer) {
-    const quotationLabel = isFreeQuotation ? "libreng quotation" : "quotation";
-    if (languageStyle === "cebuano") {
-      return `Gusto nimo nga mag-andam mi og ${isFreeQuotation ? "libreng " : ""}quotation para nimo?`;
-    }
-    if (languageStyle === "tagalog" || languageStyle === "taglish") {
-      return `Gusto n'yo po bang maghanda kami ng ${quotationLabel} para sa inyo?`;
-    }
-    return `Would you like us to prepare a${isFreeQuotation ? " free" : ""} quotation for you?`;
-  }
-
-  return savedOffer || (languageStyle === "cebuano"
-    ? "Gusto nimo mopadayon?"
-    : languageStyle === "tagalog" || languageStyle === "taglish"
-      ? "Gusto mo bang mag-proceed?"
-      : "Would you like to proceed?");
-}
-
-export async function getLeadOfferQuestion(input: {
-  customerMessage: string;
-  businessContext: string;
-  offer: string;
-}) {
-  const languageStyle = detectCustomerLanguageStyle(input.customerMessage);
-  const { apiKey, apiUrl, model } = getAiConfig();
-  const fallback = getLeadOfferFallback(input.offer, languageStyle);
-  const isQuotationOffer = /\b(?:quotation|quote)\b/i.test(input.offer);
-
-  // Quotation offers need a fixed, clear question. Rephrasing can accidentally
-  // make it sound like the customer must prepare or send the quotation.
-  if (isQuotationOffer) return fallback;
-
-  if (!apiKey || !apiUrl || !model) return fallback;
-
-  try {
-    const reply = await requestChatCompletion({
-      apiKey,
-      apiUrl,
-      model,
-      temperature: 0.2,
-      maxTokens: 60,
-      purpose: "lead_offer",
-      messages: [
-        {
-          role: "system",
-          content: "Rewrite the saved offer as exactly one short, grammatically correct, customer-facing question in the customer's latest language or language mix. Preserve the offer's meaning and who performs each action. Never use a literal word-for-word translation. For Taglish, use natural Tagalog sentence structure with only common English business terms. Do not add emojis, icons, another offer, promises, field labels, markdown, or any facts not provided.",
-        },
-        {
-          role: "user",
-          content: `Customer's latest message: "${input.customerMessage.slice(0, 240)}"\nSaved offer to express: "${fallback.slice(0, 600)}"\nBusiness facts: ${getBusinessContextForPrompt(input.businessContext).slice(0, 1400) || "None"}`,
-        },
-      ],
-    });
-    const cleanedReply = reply.replace(/\s+/g, " ").trim();
-    return cleanedReply && cleanedReply !== AI_TEMPORARY_UNAVAILABLE_MESSAGE
-      ? cleanedReply.slice(0, 320)
-      : fallback;
-  } catch (error) {
-    console.warn("Lead offer generation failed", getErrorSummary(error));
-    return fallback;
   }
 }
 
@@ -801,10 +575,7 @@ export async function askAi(
       : "";
   const latestLanguageStyle = detectCustomerLanguageStyle(userMessage);
   const missingInfoReply = getMissingInfoReply(userMessage);
-  const fallbackPlan = createFallbackSalesPlan(
-    latestLanguageStyle,
-    conversationContext.latestLeadIntent
-  );
+  const fallbackPlan = createFallbackSalesPlan(latestLanguageStyle);
   const { apiKey, apiUrl, model } = getAiConfig();
 
   try {
@@ -821,14 +592,13 @@ export async function askAi(
       !conversationContext.previousAiReply &&
       recentMessages.length === 0;
     const businessName = conversationContext.businessName?.trim() || "this business";
-    const stableSystemPrompt = `You are an AI sales agent and customer support assistant for the business described in the business facts.
+const stableSystemPrompt = `You are an FAQ and customer support assistant for the business described in the business facts.
 
 Core rules:
 - Use only the business facts below. Never invent prices, products, availability, promos, policies, requirements, contact channels, payment methods, links, phone numbers, schedules, or processes.
-- Approved standing offer: qualified orders include a free website. When a customer asks about ordering, offers, packages, or value, mention this naturally when relevant. Do not claim that a specific order qualifies unless the business facts say so; say that the team can confirm eligibility.
 - Infer the business type from the business facts and adapt naturally. The business may be real estate, food, retail, salon/spa, clinic, car rental, event service, professional service, local service, ecommerce, or something else.
 - Talk like a helpful person replying in Messenger: warm, plain, and natural.
-- On the first reply in a new conversation, introduce yourself first as this business's AI assistant, then help with the customer's message. Briefly mention the free quotation and that qualified orders include a free website. Keep this in the customer's language or language mix. This required disclosure and first-time benefits override the rule against greetings, long intros, and the normal sentence limit; use no more than two short sentences.
+- On the first reply in a new conversation, briefly introduce yourself as this business's AI assistant and answer the customer's question. Do not add an offer or request for personal information.
 - Use the conversation like a person would: interpret short replies, pronouns, corrections, and confirmations from the immediately preceding exchange. The latest customer message controls the topic; do not reopen an earlier topic unless the customer refers to it.
 - Write grammatically correct, complete sentences in the selected language. Never translate word-for-word between languages.
 - For Taglish, use natural Tagalog sentence structure and only common English business terms; do not create awkward literal translations.
@@ -838,13 +608,13 @@ Core rules:
 - Keep the reply to ${replySentenceLimit} short sentence${replySentenceLimit === 1 ? "" : "s"} maximum. Use a second sentence only when it is essential to give the direct answer or ask one necessary question.
 - Do not pad a short answer. If "Yes, it is available" fully answers the message, stop there.
 - Do not repeat the same idea in different words. If the exact answer is missing, say that once and stop.
-- Do not stack an introduction, product list, promotion, quotation offer, and follow-up question into one reply. On a greeting, give only a short introduction and at most one relevant offer. On a question, answer it before adding anything else.
-- Do not mention Viber, WhatsApp, Telegram, email, phone, SMS, calls, links, or other contact channels unless they are explicitly listed in the business facts below or the latest customer message asks about that exact channel. The approved free-website offer above is an exception.
+- Do not stack an introduction, product list, promotion, or follow-up question into one reply. On a question, answer it directly.
+- Do not mention contact channels unless they are explicitly listed in the business facts or the customer asks about that exact channel.
 - If a detail is not in the business facts, reply with the exact missing-info fallback from the dynamic instructions and nothing else. Do not guess, do not create an alternative process, and do not suggest a different product, service, package, price, computation, schedule, or option.
-- For broad requests like details, info, more info, tell me more, explain, interested, "unsa ni", or "ano ito", do not require one exact field. Give the best short overview from available business facts, then ask one useful qualifying question.
+- For broad requests like details, info, more info, tell me more, explain, interested, "unsa ni", or "ano ito", give the best short overview from available business facts without asking for personal information.
 - If the business facts contain matching scripts, FAQs, named answers, or labeled sections, use those facts naturally. Do not say information is missing when a relevant overview, script, price, location, project, package, or process is present.
 - Treat business scripts as source material, not a message to repeat. Select only the facts needed for the customer's latest message.
-- Act like a helpful sales assistant for this specific business, not a passive FAQ bot. Understand what the customer is trying to decide: price, fit, options, availability, location, delivery/pickup, schedule, requirements, payment, comparison, or next step.
+- Act like a helpful FAQ assistant for this specific business. Answer questions about price, fit, options, availability, location, delivery/pickup, schedule, requirements, payment, comparison, or process.
 - Answer the latest customer question directly first. Do not add a follow-up by default.
 - Mention a benefit only when it directly answers what the customer asked. Do not add benefits or persuasion to make a reply longer.
 - Never use fake urgency, guaranteed results, guaranteed approval, guaranteed returns, exaggerated claims, or generic hype. Persuasion must be based only on stated business facts.
@@ -859,7 +629,7 @@ Core rules:
 - If the latest customer uses Bisaya/Cebuano words like "pila", "pilay", "unsa", "unsay", "asa", "naa", "karon", "ani", "diri", "pwede ra", or "palihug", reply in natural everyday Bisaya/Cebuano, like a friendly local sales agent. Prefer Bisaya words such as "sakto nga detalye", "klaro nga tubag", "tabangan tika", "unsa imong ganahan", and "asa ka dapit". Do not reply in Tagalog for a Bisaya/Cebuano message, even if the customer also uses "po" or English words.
 - If the latest customer uses Tagalog, reply in Tagalog. If they use English, reply in English. If they mix languages, mirror that mix.
 - Be helpful first. Do not push the customer to proceed unless the latest message clearly asks to proceed.
-- Customer journey state is authoritative when present. If it says customer_journey_stage is production, fulfillment, or completed, this is an existing customer who has already moved past quotation. Answer their current support or production question directly. Do not offer, ask for, or append a quotation, consultation, lead form, or new contact details unless the latest message explicitly asks for a new or revised quotation.
+- Customer journey state is context only. Answer the customer's latest question directly and do not reopen old sales or contact-collection flows.
 - Keep replies brief. Never use more than ${replySentenceLimit} sentence${replySentenceLimit === 1 ? "" : "s"}, except for a requested list or detail that cannot fit in one sentence.
 - Ask at most one question, only when it is necessary. A complete answer with no question is preferred.
 - Do not use markdown, bullets, numbered lists, long intros, or repeated greetings.
@@ -867,15 +637,8 @@ Core rules:
 - Sound natural and consultative: warm, clear, confident, and lightly persuasive without pressure.
 - Do not over-sell or use generic marketing fluff. Make the customer feel understood, then give the most useful next step.
 - If the customer mixes languages, mirror the same mix. Use polite words like po/opo only when they fit the customer's style.
-- Do not ask for full name, phone number, contact number, email, address, or other personal details during normal information questions or early browsing.
-- You may ask for a contact number or basic contact detail only when the customer clearly wants to proceed, asks to book/reserve/order/schedule, asks for a human/team/agent follow-up, or has already started providing contact details.
-- When asking for contact details, keep it conversational and optional, not a form. Never output fields like "Full Name:" or "Phone:".
-- If the latest customer message is an information question, ignore any earlier lead-form request and answer the latest question directly.
-- Do not say "you had a details request earlier", "would you like to proceed", or similar follow-up unless the latest customer message asks to proceed.
-- If the customer wants to proceed, book, reserve, order, schedule, request a quote, or talk to a human, answer using only the business facts, collect only the most useful next detail if needed, and say the team can assist or confirm next steps.
+- Never ask for or collect a full name, phone number, contact number, email, address, or other personal details. If the customer wants to proceed, book, reserve, order, request a quote, or talk to a human, answer only with relevant FAQ/business facts and explain that this chatbot does not collect requests.
 - Never confirm a booking, reservation, appointment, order, availability, discount, final quote/computation, eligibility, or approval unless the business facts explicitly allow the AI to confirm it. The AI can prepare the details; the team/human confirms.
-- If customer state says lead_prompt_requested is true, or lead_status is requested/captured, continue helping with the latest message instead of asking for any customer information.
-- If complete lead details were already provided earlier, continue helping with the latest customer message instead of repeating the lead confirmation.
 - Treat short replies like "yes", "no", "how much", or "1 BR" as context-dependent answers, not new conversations.
 - Customers never need to use fixed triggers or exact keywords. Understand their intent naturally from any language, slang, short reply, typo, or mixed-language message using the conversation context.
 - For short confirmations, refusals, choices, fragments, or follow-ups in any language, answer what the customer means based on the previous assistant message and recent conversation.
@@ -892,8 +655,7 @@ ${businessContextForPrompt || "No business facts provided."}`;
 - If the answer is missing, reply with the required missing-info fallback exactly as written. Do not add, remove, or rewrite any words.
 - Missing-info fallback is only for truly absent specific facts. For broad info requests, use any relevant business facts or matching script first.
 - If the private plan says the customer is agreeing to a previous offer or answering a previous question, continue that thread immediately. Do not ask the same question again.
-- If customer state says customer_journey_stage is production, fulfillment, or completed, never reopen quotation or lead capture. Treat this as an ongoing customer-support conversation unless the latest customer message explicitly requests a new or revised quotation.
-- First-reply disclosure: ${isFirstReply ? `This is the first AI reply. Start by briefly saying that you are the AI assistant for ${businessName}, answer the customer, and mention the free quotation plus the free website included with qualified orders. Do not omit any of these points. Keep the whole reply to two short sentences maximum.` : "This is an existing customer conversation. Do not introduce yourself again or repeat the free quotation/free-website first-time offer unless the latest message directly asks about it; continue the customer's current topic instead."}
+- First-reply disclosure: ${isFirstReply ? `This is the first AI reply. Briefly introduce yourself as the AI assistant for ${businessName}, then answer the customer directly. Do not mention quotations or ask for personal information.` : "This is an existing customer conversation. Continue the customer's current topic directly."}
 
 Private sales plan:
 - Resolved customer meaning: ${salesPlan.resolvedCustomerMeaning}

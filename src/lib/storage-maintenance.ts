@@ -3,30 +3,23 @@ import "server-only";
 import {
   cleanupAiMessageJobs,
   cleanupProcessedMessengerMessages,
-  getLeadRecordsNeedingDelivery,
-  updateLeadRecord,
 } from "@/lib/database";
-import { createConfirmedLeadPayload, resolveConfirmedLeadDestination } from "@/lib/confirmed-lead-delivery";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const RATE_LIMIT_LOG_RETENTION_DAYS = 7;
 const AI_MESSAGE_JOB_RETENTION_DAYS = 1;
 const AI_CONVERSATION_RETENTION_DAYS = 7;
 const PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS = 7;
-const LEAD_RECORD_RETENTION_DAYS = 30;
 
 type CleanupResult = {
   deletedRateLimitLogs: number;
   deletedAiMessageJobs: number;
   deletedAiConversations: number;
   deletedProcessedMessengerMessages: number;
-  deletedLeadRecords: number;
   logRetentionDays: number;
   aiMessageJobRetentionDays: number;
   aiConversationRetentionDays: number;
   processedMessengerMessageRetentionDays: number;
-  leadRecordRetentionDays: number;
-  retriedLeadDeliveries: number;
   warnings: string[];
 };
 
@@ -93,48 +86,6 @@ async function cleanupRowsOlderThan(
   return { deletedRows: countResult.count };
 }
 
-async function retryConfirmedLeadDeliveries() {
-  const records = await getLeadRecordsNeedingDelivery();
-  let delivered = 0;
-  for (const record of records) {
-    let destination;
-    try {
-      destination = resolveConfirmedLeadDestination(record.google_sheets_webhook_url);
-    } catch (error) {
-      await updateLeadRecord(record.id, {
-        status: "delivery_failed", delivery_attempts: record.delivery_attempts + 1,
-        last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery is not configured",
-      });
-      continue;
-    }
-    if (!destination) continue;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(destination.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(destination.authorization ? { Authorization: destination.authorization } : {}),
-        },
-        signal: controller.signal,
-        body: JSON.stringify(createConfirmedLeadPayload({
-          leadId: record.id, pageId: record.page_id, recipientId: record.recipient_id,
-          capturedAt: record.confirmed_at || record.created_at, sheetTab: record.google_sheets_tab_name,
-          fields: record.fields, fieldConfig: record.field_config,
-        })),
-      });
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!response.ok || !payload?.ok) throw new Error(payload?.error || `${destination.name} returned ${response.status}`);
-      await updateLeadRecord(record.id, { status: "delivered", delivery_attempts: record.delivery_attempts + 1, delivered_at: new Date().toISOString(), last_delivery_error: "" });
-      delivered += 1;
-    } catch (error) {
-      await updateLeadRecord(record.id, { status: "delivery_failed", delivery_attempts: record.delivery_attempts + 1, last_delivery_error: error instanceof Error ? error.message.slice(0, 500) : "Lead delivery failed" });
-    } finally { clearTimeout(timeoutId); }
-  }
-  return delivered;
-}
-
 export async function cleanupOldStorageData(): Promise<CleanupResult> {
   const now = Date.now();
   const rateLimitCutoffIso = new Date(
@@ -146,7 +97,6 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
   const processedMessengerMessageCutoffIso = new Date(
     now - PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
-  const leadRecordCutoffIso = new Date(now - LEAD_RECORD_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const rateLimitLogsResult = await cleanupRowsOlderThan(
     "rate_limit_logs",
     "created_at",
@@ -178,17 +128,11 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
           error instanceof Error ? error.message : String(error)
         ),
       }));
-  const leadRecordsResult = await cleanupRowsOlderThan("lead_records", "created_at", leadRecordCutoffIso);
-  const retriedLeadDeliveries = await retryConfirmedLeadDeliveries().catch((error) => {
-    console.warn("Failed to retry confirmed lead deliveries", error);
-    return 0;
-  });
   const warnings = [
     rateLimitLogsResult.warning,
     aiMessageJobsResult.warning,
     aiConversationsResult.warning,
     processedMessengerMessagesResult.warning,
-    leadRecordsResult.warning,
   ].filter(
     (warning): warning is string => Boolean(warning)
   );
@@ -198,13 +142,10 @@ export async function cleanupOldStorageData(): Promise<CleanupResult> {
     deletedAiMessageJobs: aiMessageJobsResult.deletedRows,
     deletedAiConversations: aiConversationsResult.deletedRows,
     deletedProcessedMessengerMessages: processedMessengerMessagesResult.deletedRows,
-    deletedLeadRecords: leadRecordsResult.deletedRows,
     logRetentionDays: RATE_LIMIT_LOG_RETENTION_DAYS,
     aiMessageJobRetentionDays: AI_MESSAGE_JOB_RETENTION_DAYS,
     aiConversationRetentionDays: AI_CONVERSATION_RETENTION_DAYS,
     processedMessengerMessageRetentionDays: PROCESSED_MESSENGER_MESSAGE_RETENTION_DAYS,
-    leadRecordRetentionDays: LEAD_RECORD_RETENTION_DAYS,
-    retriedLeadDeliveries,
     warnings,
   };
 }

@@ -18,11 +18,6 @@ type ClientSettings = {
   welcome_image_urls: string;
   manual_ai_pause_minutes: number;
   auto_reply_ignore_pattern: string;
-  lead_capture_enabled: boolean;
-  lead_capture_fields: string;
-  google_sheets_webhook_url: string;
-  google_sheets_tab_name: string;
-  lead_delivery?: { delivered: number; failed: number; pending: number };
 };
 
 const DEFAULT_MANUAL_AI_PAUSE_MINUTES = 5;
@@ -30,23 +25,6 @@ const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
 const MAX_AUTO_REPLY_IGNORE_PATTERNS = 10;
 const MAX_AUTO_REPLY_IGNORE_PATTERN_LENGTH = 500;
-const MAX_LEAD_FIELDS = 8;
-const LEAD_FIELD_TYPES = ["name", "phone", "email", "text", "number", "date", "address"] as const;
-type LeadFieldType = (typeof LEAD_FIELD_TYPES)[number];
-type LeadField = { label: string; type: LeadFieldType; required: boolean };
-
-function parseLeadFields(value: string): LeadField[] {
-  return value.split(/\r?\n/).flatMap((line) => {
-    const [label, type, requirement] = line.split("|");
-    return label?.trim() && LEAD_FIELD_TYPES.includes(type?.trim() as LeadFieldType)
-      ? [{ label: label.trim(), type: type.trim() as LeadFieldType, required: requirement?.trim().toLowerCase() !== "optional" }]
-      : [];
-  }).slice(0, MAX_LEAD_FIELDS);
-}
-
-function serializeLeadFields(fields: LeadField[]) {
-  return fields.map((field) => `${field.label.trim()}|${field.type}${field.required ? "" : "|optional"}`).join("\n");
-}
 const MANUAL_AI_PAUSE_OPTIONS = [
   { label: "5 minutes", value: 5 },
   { label: "15 minutes", value: 15 },
@@ -176,14 +154,6 @@ export default function ClientSettingsPage() {
   const [welcomeImageUrls, setWelcomeImageUrls] = useState("");
   const [manualAiPauseMinutes, setManualAiPauseMinutes] = useState(DEFAULT_MANUAL_AI_PAUSE_MINUTES);
   const [autoReplyIgnorePatterns, setAutoReplyIgnorePatterns] = useState<string[]>([""]);
-  const [leadCaptureEnabled, setLeadCaptureEnabled] = useState(false);
-  const [leadFields, setLeadFields] = useState<LeadField[]>([
-    { label: "Full Name", type: "name", required: true }, { label: "Phone", type: "phone", required: false },
-  ]);
-  const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState("");
-  const [googleSheetsTabName, setGoogleSheetsTabName] = useState("Sheet1");
-  const [savingLeadCapture, setSavingLeadCapture] = useState(false);
-  const [leadDelivery, setLeadDelivery] = useState({ delivered: 0, failed: 0, pending: 0 });
   const [loading, setLoading] = useState(true);
   const [cleaningStorage, setCleaningStorage] = useState(false);
   const [repairingMessengerWebhook, setRepairingMessengerWebhook] = useState(false);
@@ -223,12 +193,6 @@ export default function ClientSettingsPage() {
         setWelcomeImageUrls(data.welcome_image_urls || "");
         setManualAiPauseMinutes(normalizeManualAiPauseMinutes(data.manual_ai_pause_minutes));
         setAutoReplyIgnorePatterns(parseAutoReplyIgnorePatterns(data.auto_reply_ignore_pattern || ""));
-        setLeadCaptureEnabled(Boolean(data.lead_capture_enabled));
-        const parsedFields = parseLeadFields(data.lead_capture_fields || "");
-        if (parsedFields.length > 0) setLeadFields(parsedFields);
-        setGoogleSheetsWebhookUrl(data.google_sheets_webhook_url || "");
-        setGoogleSheetsTabName(data.google_sheets_tab_name || "Sheet1");
-        setLeadDelivery(data.lead_delivery || { delivered: 0, failed: 0, pending: 0 });
       } catch (error) {
         console.error(error);
         showToast({
@@ -442,32 +406,6 @@ export default function ClientSettingsPage() {
     );
   };
 
-  const saveLeadCapture = async () => {
-    if (!clientId) return;
-    setSavingLeadCapture(true);
-    try {
-      const response = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_capture_enabled: leadCaptureEnabled,
-          lead_capture_fields: serializeLeadFields(leadFields),
-          google_sheets_webhook_url: googleSheetsWebhookUrl,
-          google_sheets_tab_name: googleSheetsTabName,
-        }),
-      });
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (!response.ok) throw new Error(data?.error || "Failed to save lead capture");
-      showToast({ tone: "success", message: "Lead capture settings saved." });
-    } catch (error) {
-      console.error(error);
-      showToast({ tone: "error", message: error instanceof Error ? error.message : "Failed to save lead capture." });
-    } finally { setSavingLeadCapture(false); }
-  };
-
-  const updateLeadField = (index: number, key: keyof LeadField, value: string | boolean) => {
-    setLeadFields((current) => current.map((field, fieldIndex) => fieldIndex === index ? { ...field, [key]: value } : field));
-  };
-
   const updateAutoReplyIgnorePattern = (index: number, value: string) => {
     setAutoReplyIgnorePatterns((currentPatterns) =>
       currentPatterns.map((pattern, patternIndex) =>
@@ -668,22 +606,6 @@ export default function ClientSettingsPage() {
               </div>
             </SettingsSection>
 
-            <SettingsSection
-              eyebrow="Qualified leads"
-              title="Confirmed Lead Capture"
-              description="After a customer wants to proceed, the AI collects these details, asks them to confirm, then sends the lead to your tracker."
-              actions={<div className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-background px-3 py-2"><span className="text-[12px] font-semibold text-[var(--text-muted)]">{leadCaptureEnabled ? "Enabled" : "Disabled"}</span><button type="button" role="switch" aria-checked={leadCaptureEnabled} onClick={() => setLeadCaptureEnabled((value) => !value)} className={`relative inline-flex h-6 w-11 rounded-full border ${leadCaptureEnabled ? "border-[var(--accent-bright)] bg-[var(--accent)]" : "border-[var(--border)] bg-[var(--surface-strong)]"}`}><span className={`absolute left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${leadCaptureEnabled ? "translate-x-5" : "translate-x-0"}`} /></button></div>}
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3"><div><p className={labelClass}>Customer details</p><p className="mt-1 text-[12px] text-[var(--text-muted)]">Only the contact name is required so Huswell can accept the lead. All other fields can be optional. Phone and email values are validated.</p></div><button type="button" onClick={() => setLeadFields((current) => current.length >= MAX_LEAD_FIELDS ? current : [...current, { label: "", type: "text", required: false }])} disabled={leadFields.length >= MAX_LEAD_FIELDS} className={secondaryButtonClass}>Add field</button></div>
-                {leadFields.map((field, index) => <div key={`lead-field-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-center"><input value={field.label} onChange={(event) => updateLeadField(index, "label", event.target.value)} maxLength={60} placeholder="Field name, e.g. Full Name" className={inputClass} /><select value={field.type} onChange={(event) => updateLeadField(index, "type", event.target.value)} className={inputClass}>{LEAD_FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select><div className="flex items-center justify-between gap-2"><label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-[12px] font-medium text-[var(--text-muted)]"><input type="checkbox" checked={!field.required} onChange={(event) => updateLeadField(index, "required", !event.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />Optional</label><button type="button" onClick={() => setLeadFields((current) => current.length > 1 ? current.filter((_, fieldIndex) => fieldIndex !== index) : current)} className={secondaryButtonClass}>Remove</button></div></div>)}
-              </div>
-              <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 lg:grid-cols-2"><div><label className={labelClass} htmlFor="google-sheets-webhook-url">Google Apps Script Web App URL</label><input id="google-sheets-webhook-url" type="url" value={googleSheetsWebhookUrl} onChange={(event) => setGoogleSheetsWebhookUrl(event.target.value)} placeholder="https://script.google.com/macros/s/.../exec" className={`${inputClass} mt-2`} /></div><div><label className={labelClass} htmlFor="google-sheets-tab-name">Google Sheet tab name</label><input id="google-sheets-tab-name" value={googleSheetsTabName} onChange={(event) => setGoogleSheetsTabName(event.target.value)} maxLength={100} placeholder="Sheet1" className={`${inputClass} mt-2`} /></div></div>
-              <p className="mt-4 text-[12px] leading-6 text-[var(--text-muted)]">Set the fields here whenever your lead form changes. The one Apps Script template automatically creates new Google Sheet columns and maps values by field name, so you do not need to edit the script after deployment.</p>
-              <p className="mt-2 text-[12px] leading-6 text-[var(--text-muted)]">Last 30 days: {leadDelivery.delivered} delivered, {leadDelivery.pending} waiting to retry, {leadDelivery.failed} failed delivery attempts.</p>
-              <div className="mt-5 flex justify-end border-t border-[var(--border)] pt-5"><button type="button" onClick={() => void saveLeadCapture()} disabled={savingLeadCapture || loading} className={`${primaryButtonClass} w-full sm:w-auto`}>{savingLeadCapture ? "Saving..." : "Save Lead Capture"}</button></div>
-            </SettingsSection>
-
             <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)]">
               <SettingsSection
                 eyebrow="AI handoff"
@@ -833,7 +755,7 @@ export default function ClientSettingsPage() {
         )}
       </div>
       <LoadingModal
-        isOpen={cleaningStorage || repairingMessengerWebhook || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage || savingLeadCapture}
+        isOpen={cleaningStorage || repairingMessengerWebhook || savingWelcomeSequence || savingAutoReplyIgnorePattern || uploadingWelcomeImage}
         message={
           repairingMessengerWebhook
             ? "Repairing Messenger webhook..."
@@ -841,8 +763,6 @@ export default function ClientSettingsPage() {
             ? "Uploading image to Messenger..."
             : savingWelcomeSequence
             ? "Saving first reply sequence..."
-            : savingLeadCapture
-            ? "Saving lead capture..."
             : savingAutoReplyIgnorePattern
             ? "Saving AI conversation controls..."
             : "Cleaning old data..."

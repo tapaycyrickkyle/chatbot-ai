@@ -16,13 +16,8 @@ type ClientSettings = {
   page_id: string;
   bot_type: "ai";
   business_info: string;
-  lead_capture_trigger: string;
-  lead_capture_offer: string;
   ai_enabled: boolean;
 };
-
-const MAX_LEAD_CAPTURE_TRIGGER_LENGTH = 1200;
-const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 600;
 
 export default function PromptBuilderPage() {
   const params = useParams<{ id: string }>();
@@ -30,8 +25,6 @@ export default function PromptBuilderPage() {
   const { showToast } = useToast();
   const [clientName, setClientName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [leadCaptureTrigger, setLeadCaptureTrigger] = useState("");
-  const [leadCaptureOffer, setLeadCaptureOffer] = useState("");
   const [aiEnabled, setAiEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,8 +52,6 @@ export default function PromptBuilderPage() {
 
         setClientName(data.client_name || "");
         setPrompt(data.business_info || "");
-        setLeadCaptureTrigger(data.lead_capture_trigger || "");
-        setLeadCaptureOffer(data.lead_capture_offer || "");
         setAiEnabled(data.ai_enabled ?? true);
       } catch (error) {
         console.error(error);
@@ -89,8 +80,6 @@ export default function PromptBuilderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           business_info: prompt,
-          lead_capture_trigger: leadCaptureTrigger,
-          lead_capture_offer: leadCaptureOffer,
         }),
       });
 
@@ -260,57 +249,6 @@ export default function PromptBuilderPage() {
               </div>
             </div>
 
-            <div className="min-w-0 rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-              <label className="block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="lead-capture-trigger">
-                When should the AI ask for lead details?
-              </label>
-              <p className="mt-1 text-[13px] leading-6 text-[var(--text-muted)]">
-                Add the customer signals that should make the AI offer the next step. The lead form opens only after the customer says yes.
-              </p>
-              <textarea
-                id="lead-capture-trigger"
-                rows={4}
-                value={leadCaptureTrigger}
-                onChange={(event) => setLeadCaptureTrigger(event.target.value)}
-                maxLength={MAX_LEAD_CAPTURE_TRIGGER_LENGTH}
-                placeholder="Example: Ask for lead details when the customer requests a quote, asks about discounts, or says they want to order."
-                className="mt-3 min-h-28 w-full min-w-0 rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
-              />
-              <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                {leadCaptureTrigger.length} / {MAX_LEAD_CAPTURE_TRIGGER_LENGTH} characters used.
-              </p>
-              <label className="mt-5 block text-[13px] font-semibold text-[var(--text-primary)]" htmlFor="lead-capture-offer">
-                Question before the lead form
-              </label>
-              <p className="mt-1 text-[13px] leading-6 text-[var(--text-muted)]">
-                This is sent when the trigger matches. Example: “Would you like a free quick audit of your current page?”
-              </p>
-              <textarea
-                id="lead-capture-offer"
-                rows={3}
-                value={leadCaptureOffer}
-                onChange={(event) => setLeadCaptureOffer(event.target.value)}
-                maxLength={MAX_LEAD_CAPTURE_MESSAGE_LENGTH}
-                placeholder="Would you like a free quick audit of your current page?"
-                className="mt-3 min-h-24 w-full min-w-0 rounded border border-[var(--border-input)] bg-background px-3 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 sm:px-4"
-              />
-              <p className="mt-2 text-[12px] text-[var(--text-muted)]">
-                {leadCaptureOffer.length} / {MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters used. Leave blank for the default question.
-              </p>
-              <p className="mt-5 text-[12px] leading-6 text-[var(--text-muted)]">
-                After the customer says yes, the AI writes one short, contextual confirmation before it sends the lead fields.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => void savePrompt()}
-                  disabled={saving}
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[var(--accent-bright)] bg-[var(--accent)] px-5 py-2.5 text-center text-[14px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
-                >
-                  {saving ? "Saving..." : "Save Lead Trigger"}
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </div>

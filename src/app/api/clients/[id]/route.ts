@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_ACCESS_TOKEN_COOKIE, verifyAdminAccessToken } from "@/lib/admin-auth";
 import { assertSameOrigin, sanitizeIdentifier } from "@/lib/api-security";
 import { MAX_BUSINESS_INFO_LENGTH } from "@/lib/business-info";
-import { getClientById, getLeadDeliverySummary, updateClientSettings } from "@/lib/database";
-import { LEAD_FIELD_TYPES, parseLeadFields, serializeLeadFields } from "@/lib/lead-capture";
+import { getClientById, updateClientSettings } from "@/lib/database";
 
 const MAX_WELCOME_MESSAGES = 5;
 const MAX_WELCOME_MESSAGE_LENGTH = 1200;
@@ -18,9 +17,6 @@ const MAX_AUTO_REPLY_IGNORE_PATTERNS_TOTAL_LENGTH =
   (MAX_AUTO_REPLY_IGNORE_PATTERNS - 1);
 const MANUAL_AI_PAUSE_MINUTE_OPTIONS = [5, 15, 30, 60, 120, 240, 480, 1440];
 const MAX_WELCOME_ATTACHMENTS = 11;
-const MAX_GOOGLE_SHEETS_WEBHOOK_URL_LENGTH = 2000;
-const MAX_LEAD_CAPTURE_TRIGGER_LENGTH = 1200;
-const MAX_LEAD_CAPTURE_MESSAGE_LENGTH = 600;
 const MESSENGER_ATTACHMENT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MESSENGER_WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes"];
 
@@ -67,12 +63,6 @@ function validateClientSettingsPayload(payload: unknown) {
     welcome_image_urls,
     manual_ai_pause_minutes,
     auto_reply_ignore_pattern,
-    lead_capture_enabled,
-    lead_capture_fields,
-    lead_capture_trigger,
-    lead_capture_offer,
-    google_sheets_webhook_url,
-    google_sheets_tab_name,
   } = payload as Record<string, unknown>;
   const updates: Partial<{
     bot_type: "ai";
@@ -84,12 +74,6 @@ function validateClientSettingsPayload(payload: unknown) {
     welcome_image_urls: string;
     manual_ai_pause_minutes: number;
     auto_reply_ignore_pattern: string;
-    lead_capture_enabled: boolean;
-    lead_capture_fields: string;
-    lead_capture_trigger: string;
-    lead_capture_offer: string;
-    google_sheets_webhook_url: string;
-    google_sheets_tab_name: string;
   }> = {};
 
   if (bot_type !== undefined) {
@@ -252,57 +236,6 @@ function validateClientSettingsPayload(payload: unknown) {
     updates.auto_reply_ignore_pattern = autoReplyIgnorePatterns.join("\n");
   }
 
-  if (lead_capture_enabled !== undefined) {
-    if (typeof lead_capture_enabled !== "boolean") throw new Error("Invalid lead capture status");
-    updates.lead_capture_enabled = lead_capture_enabled;
-  }
-
-  if (lead_capture_fields !== undefined) {
-    if (typeof lead_capture_fields !== "string" || lead_capture_fields.length > 800) {
-      throw new Error("Invalid lead fields");
-    }
-    const fields = parseLeadFields(lead_capture_fields);
-    if (fields.length === 0) {
-      throw new Error(`Add at least one valid field using Label|type. Types: ${LEAD_FIELD_TYPES.join(", ")}`);
-    }
-    updates.lead_capture_fields = serializeLeadFields(fields);
-  }
-
-  if (lead_capture_trigger !== undefined) {
-    if (typeof lead_capture_trigger !== "string" || lead_capture_trigger.length > MAX_LEAD_CAPTURE_TRIGGER_LENGTH) {
-      throw new Error(`Lead trigger must be ${MAX_LEAD_CAPTURE_TRIGGER_LENGTH} characters or fewer`);
-    }
-    updates.lead_capture_trigger = lead_capture_trigger.trim();
-  }
-
-  if (lead_capture_offer !== undefined) {
-    if (typeof lead_capture_offer !== "string" || lead_capture_offer.length > MAX_LEAD_CAPTURE_MESSAGE_LENGTH) {
-      throw new Error(`lead_capture_offer must be ${MAX_LEAD_CAPTURE_MESSAGE_LENGTH} characters or fewer`);
-    }
-    updates.lead_capture_offer = lead_capture_offer.trim();
-  }
-
-  if (google_sheets_webhook_url !== undefined) {
-    if (typeof google_sheets_webhook_url !== "string") throw new Error("Invalid Google Sheets webhook URL");
-    const url = google_sheets_webhook_url.trim();
-    if (url.length > MAX_GOOGLE_SHEETS_WEBHOOK_URL_LENGTH) throw new Error("Google Sheets webhook URL is too long");
-    if (url) {
-      let parsed: URL;
-      try { parsed = new URL(url); } catch { throw new Error("Invalid Google Sheets webhook URL"); }
-      if (parsed.protocol !== "https:" || !parsed.hostname.endsWith("google.com")) {
-        throw new Error("Google Apps Script webhook URL must be an HTTPS google.com URL");
-      }
-    }
-    updates.google_sheets_webhook_url = url;
-  }
-
-  if (google_sheets_tab_name !== undefined) {
-    if (typeof google_sheets_tab_name !== "string" || !google_sheets_tab_name.trim() || google_sheets_tab_name.trim().length > 100) {
-      throw new Error("Invalid Google Sheets tab name");
-    }
-    updates.google_sheets_tab_name = google_sheets_tab_name.trim();
-  }
-
   return updates;
 }
 
@@ -327,7 +260,6 @@ export async function GET(
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    const leadDelivery = await getLeadDeliverySummary(clientId).catch(() => ({ delivered: 0, failed: 0, pending: 0 }));
     return NextResponse.json({
       id: client.id,
       client_name: client.client_name,
@@ -341,13 +273,6 @@ export async function GET(
       welcome_image_urls: client.welcome_image_urls,
       manual_ai_pause_minutes: client.manual_ai_pause_minutes,
       auto_reply_ignore_pattern: client.auto_reply_ignore_pattern,
-      lead_capture_enabled: client.lead_capture_enabled,
-      lead_capture_fields: client.lead_capture_fields,
-      lead_capture_trigger: client.lead_capture_trigger,
-      lead_capture_offer: client.lead_capture_offer,
-      google_sheets_webhook_url: client.google_sheets_webhook_url,
-      google_sheets_tab_name: client.google_sheets_tab_name,
-      lead_delivery: leadDelivery,
     });
   } catch (error) {
     console.error(error);

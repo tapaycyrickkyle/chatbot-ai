@@ -88,55 +88,12 @@ GitHub Actions calls `/api/maintenance/storage-cleanup` once daily using `AI_MAI
 
 ## Customer Information
 
-The AI is configured to keep helping with the latest customer message instead of asking for customer information forms. Customer-provided details remain part of the Messenger conversation history used to operate the AI workflow.
-
-## Confirmed Google Sheets Leads
-
-### Send confirmed leads to Huswell Tracker
-
-To send every confirmed lead to Huswell Tracker instead of the Google Sheets
-webhook, configure these server-only environment variables in the chatbot
-deployment:
-
-```env
-HUSWELL_LEAD_WEBHOOK_URL=https://your-huswell-tracker-domain/api/integrations/chatbot/leads
-HUSWELL_LEAD_WEBHOOK_SECRET=the-same-value-as-CHATBOT_LEAD_WEBHOOK_SECRET-in-huswell
-```
-
-The Huswell URL must use HTTPS in production. When both values are set, Huswell
-is the preferred delivery destination and failed deliveries are retried by the
-existing maintenance job. If neither is set, the existing Google Sheets webhook
-behavior remains unchanged.
-
-To collect qualified leads, run `supabase/24-confirmed-lead-capture.sql` in the
-Supabase SQL Editor. Open the connected Page's Settings and enable Confirmed Lead
-Capture. Add fields (for example, `Full Name|name`, `Phone|phone`, and
-`Email|email|optional`), then paste the Google Apps Script Web App `/exec` URL and the
-Google Sheet tab name.
-
-In the connected Page's Prompt Builder, use **When should the AI ask for lead
-details?** to set a page-specific trigger, such as “when the customer requests a
-quote or asks about discounts.” Leave it blank to use the standard trigger: the
-customer is ready to buy/book or asks to speak with the team.
-
-When the trigger matches, the AI first asks whether the customer wants to
-proceed. It only shows the lead form after a clear confirmation. If a customer
-asks a question while a form is open, the AI answers first and then asks whether
-they want to continue.
-
-Copy `supabase/google-apps-script-lead-webhook.js` into a script attached to the
-target Google Sheet, deploy it as a Web App with access set to anyone, and use its
-deployment URL in the dashboard. A row is created as soon as all configured lead
-fields are received. Failed deliveries remain in Supabase and are retried during
-the scheduled maintenance cleanup. Optional fields may be left blank and are
-still included as blank columns in the lead sheet.
-
-The first Google Sheet column is **Date Sent**, automatically formatted like
-`August 14, 2026` when the completed lead is delivered. The remaining columns
-use the lead-field names configured for that Page. It does not add Messenger
-customer IDs or other tracking columns.
-Phone fields are written as text so a number such as `09622441406` keeps its
-leading zero.
+The chatbot is FAQ-only. It answers questions using the configured business
+facts and does not ask for, collect as leads, or deliver customer contact
+details. Normal Messenger conversation history may still contain information
+that a customer voluntarily sends in a message.
+The older lead-capture migrations are retained as database history, but the
+application no longer reads or writes those settings or records.
 
 ## Getting Started
 
